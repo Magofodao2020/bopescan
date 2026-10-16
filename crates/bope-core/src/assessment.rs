@@ -195,11 +195,10 @@ pub const PROXIMITY_SECONDS: i64 = 2 * 60 * 60;
 pub fn default_category(collector: &str) -> &'static str {
     match collector {
         "roblox_trace" => "roblox_tools",
-        "fastflags" => "fastflags",
+        "fastflags" | "roblox_flags" => "fastflags",
         "roblox" | "roblox_process" | "executor_footprint" | "roblox_memory" | "roblox_monitor" => {
             "roblox"
         }
-        "roblox_flags" => "fastflags",
         "process" | "process_modules" => "processes_memory",
         "prefetch" | "bam" | "pca" | "userassist" | "shimcache" | "feature_usage" | "muicache"
         | "shell_mru" | "amcache" | "shortcuts" | "srum" | "shellbags" => "execution",
