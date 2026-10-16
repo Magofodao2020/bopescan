@@ -36,6 +36,7 @@ fn scan_fixture(name: &str) -> (Report, Bundle) {
             self_identity: SelfIdentity::default(),
             tier: ScanTier::Full,
             flag_reference: None,
+            monitor: None,
         },
     );
     (report, bundle)

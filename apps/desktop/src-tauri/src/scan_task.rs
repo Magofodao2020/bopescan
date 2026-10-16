@@ -197,6 +197,7 @@ fn run(slot: &ScanSlot, tier: ScanTier, provenance: Provenance, generated_at: St
         self_identity,
         tier,
         flag_reference: crate::reference::snapshot(),
+        monitor: crate::monitoring::session(),
     };
     let host = crate::live_host();
     let note = |text: &str| {

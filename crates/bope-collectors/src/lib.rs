@@ -30,6 +30,7 @@ pub mod integrity;
 pub mod location;
 pub mod machine_identity;
 pub mod mft;
+pub mod monitor;
 pub mod muicache;
 pub mod net_adapter;
 pub mod net_config;
@@ -347,14 +348,16 @@ pub struct AgePlace {
     pub without: Option<&'static str>,
 }
 
-/// Every collector in this build, with no `FastFlag` reference to compare with.
+/// Every collector in this build, with no `FastFlag` reference and no monitoring session.
 pub fn all() -> Vec<Box<dyn Collector>> {
-    all_with(None)
+    all_with(None, None)
 }
 
-/// Every collector in this build; the ones that read flag values compare them with `reference`.
+/// Every collector in this build; the ones that read flag values compare them with `reference`, and
+/// `roblox_monitor` reports `session` when the person ran one.
 pub fn all_with(
     reference: Option<std::sync::Arc<flag_reference::ReferenceSnapshot>>,
+    session: Option<std::sync::Arc<monitor::Session>>,
 ) -> Vec<Box<dyn Collector>> {
     vec![
         Box::new(amcache::Amcache),
@@ -404,6 +407,7 @@ pub fn all_with(
         Box::new(wmi_subscription::WmiSubscription),
         // The long reads run after the quick ones, so a stopped scan has had them (B.O.P.E, ADR 0133).
         Box::new(roblox_memory::RobloxMemory::new(reference)),
+        Box::new(monitor::RobloxMonitor::new(session)),
         Box::new(file_inventory::FileInventory),
         // Last: it correlates the runs before it (ADR 0123).
         Box::new(roblox_trace::RobloxTrace),

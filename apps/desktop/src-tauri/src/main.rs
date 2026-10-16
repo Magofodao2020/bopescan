@@ -16,6 +16,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod commands;
+mod monitoring;
 mod qr;
 mod reference;
 mod scan_task;
@@ -72,7 +73,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             commands::pick_export_dir,
             commands::export_report,
             reference::fflag_reference_status,
-            reference::fflag_reference_sync
+            reference::fflag_reference_sync,
+            monitoring::monitor_status,
+            monitoring::start_monitor,
+            monitoring::stop_monitor,
+            monitoring::clear_monitor
         ])
         .setup(move |app| {
             webview_hardening::build_main_window(app, &window_dir)?;

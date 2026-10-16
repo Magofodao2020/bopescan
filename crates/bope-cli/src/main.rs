@@ -5,6 +5,7 @@
 //! `bope-scanner-cli`: scan this PC and print evidence. Never prints a verdict.
 
 mod fflags;
+mod monitor;
 mod output;
 mod pt;
 mod trace_ages;
@@ -39,6 +40,21 @@ struct Cli {
 enum Command {
     /// Scan this PC and print the report.
     Scan(ScanArgs),
+    /// Watch the Roblox player at an interval and print what changes (read-only; ADR 0137).
+    Monitor {
+        /// Seconds between samples (at least 5).
+        #[arg(long, default_value_t = 30)]
+        interval: u64,
+        /// How long to watch, in seconds.
+        #[arg(long, default_value_t = 600)]
+        duration: u64,
+        /// The log file to write (must not exist). Default: `Documents\B.O.P.E Scanner\monitor-<time>.jsonl`.
+        #[arg(long, value_name = "FILE")]
+        out: Option<std::path::PathBuf>,
+        /// Language of the messages.
+        #[arg(long, value_enum, default_value_t = Lang::Pt)]
+        lang: Lang,
+    },
     /// The `FastFlag` reference copy the scan compares flag values with (ADR 0136).
     Fflags {
         #[command(subcommand)]
@@ -87,11 +103,36 @@ struct ScanArgs {
     /// Compare with no reference, even if a copy is held.
     #[arg(long)]
     no_fflag_reference: bool,
+    /// A log written by `monitor`, to include that session in the report.
+    #[arg(long, value_name = "FILE")]
+    monitor_log: Option<std::path::PathBuf>,
 }
 
 fn main() -> ExitCode {
     let cli = Cli::parse();
     match cli.command {
+        Command::Monitor {
+            interval,
+            duration,
+            out,
+            lang,
+        } => {
+            let out = out.unwrap_or_else(monitor::default_out);
+            let host = live_host();
+            match monitor::run(
+                host.as_ref(),
+                &out,
+                std::time::Duration::from_secs(interval),
+                std::time::Duration::from_secs(duration),
+                lang,
+            ) {
+                Ok(()) => ExitCode::SUCCESS,
+                Err(error) => {
+                    eprintln!("Error: {error:?}");
+                    ExitCode::FAILURE
+                }
+            }
+        }
         Command::Fflags { action, dir, lang } => match fflags::run(&action, dir.as_deref(), lang) {
             Ok(()) => ExitCode::SUCCESS,
             Err(error) => {
@@ -160,6 +201,10 @@ fn scan(args: &ScanArgs) -> anyhow::Result<()> {
             fflags::store(args.fflag_reference_dir.as_deref())
                 .ok()
                 .and_then(|store| fflags::snapshot(&store))
+        },
+        monitor: match &args.monitor_log {
+            Some(path) => Some(std::sync::Arc::new(monitor::load(path)?)),
+            None => None,
         },
     };
     match &context.flag_reference {

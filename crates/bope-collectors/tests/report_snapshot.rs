@@ -39,6 +39,7 @@ fn report_at(host: &str, self_identity: SelfIdentity, tier: ScanTier) -> bope_co
         self_identity,
         tier,
         flag_reference: None,
+        monitor: None,
     };
     scan::run(&host, &bundle, context)
 }

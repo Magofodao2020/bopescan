@@ -779,6 +779,7 @@ mod tests {
                 self_identity: bope_core::engine::SelfIdentity::default(),
                 tier: bope_core::model::ScanTier::Standard,
                 flag_reference: None,
+                monitor: None,
             },
         );
         crate::output::render(&bope_core::view::for_report(&report), &bundle, lang)
