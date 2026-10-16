@@ -8,17 +8,12 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { defaultExportDir, exportReport, pickExportDir } from "../api";
-import type { Mode, SavedFile, SsOptions } from "../types";
+import type { SavedFile } from "../types";
 import { useTimeSettings } from "../ui/TimeValue";
-
-interface Props {
-  mode: Mode;
-  options?: SsOptions;
-}
 
 const FORMATS = ["html", "json", "txt", "pdf"] as const;
 
-export function ExportPanel({ mode, options }: Props) {
+export function ExportPanel() {
   const { t, i18n } = useTranslation("report");
   const { zone } = useTimeSettings();
   const [dir, setDir] = useState("");
@@ -41,7 +36,7 @@ export function ExportPanel({ mode, options }: Props) {
   return (
     <section className="export panel" aria-labelledby="export-title">
       <h3 id="export-title">{t("export.title")}</h3>
-      <p className="muted">{t(mode === "ss" ? "export.note_ss" : "export.note_self")}</p>
+      <p className="muted">{t("export.note_self")}</p>
       <div className="export-row">
         <label className="export-dir">
           {t("export.folder")}
@@ -78,7 +73,7 @@ export function ExportPanel({ mode, options }: Props) {
         onClick={() => {
           setBusy(true);
           setError(null);
-          void exportReport(mode, options, i18n.language, formats, dir, zone)
+          void exportReport(i18n.language, formats, dir, zone)
             .then(setSaved)
             .catch((reason: unknown) => setError(String(reason)))
             .finally(() => setBusy(false));

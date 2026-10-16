@@ -9,9 +9,8 @@
 //!
 //! **No text reaches this module.** It hands bytes to `bope_parsers::powershell_text::parse_history`
 //! and `bope_parsers::evtx::powershell_text`, which classify inside the parsers crate and return
-//! booleans, counts, times and at most a download host. The host is the one value kept, and it is a
-//! sensitive field (`download_host`, [`SensitiveKind::DownloadHost`]) that SS mode shows only after its
-//! own question; an address is reported by its kind alone.
+//! booleans, counts, times and at most a download host. The host is the one value kept
+//! (`download_host`); an address is reported by its kind alone.
 //!
 //! Three sources, told apart by `source`, the discriminator (ADR 0044):
 //!
@@ -37,7 +36,7 @@ use jiff::Timestamp;
 use serde_json::Value;
 
 use crate::failure::{read_failure, reason_for};
-use crate::{Collector, Field, ScanTier, SensitiveKind, evtx, fivem_dir, usn};
+use crate::{Collector, Field, ScanTier, evtx, fivem_dir, usn};
 
 const ID: &str = "powershell_text";
 const DISCRIMINATOR: &str = "source";
@@ -67,7 +66,7 @@ const FIELDS: [Field; 26] = [
     Field::boolean("decoded"),
     Field::boolean("defender_tamper"),
     Field::text("download_address_kind"),
-    Field::text("download_host").sensitive(SensitiveKind::DownloadHost),
+    Field::text("download_host"),
     Field::boolean("download_then_execute"),
     Field::boolean("encoded_command"),
     Field::number("examined"),
@@ -470,11 +469,9 @@ mod tests {
     }
 
     #[test]
-    fn it_is_read_only_in_a_full_scan_and_the_host_is_a_download_host() {
+    fn it_is_read_only_in_a_full_scan_and_declares_the_download_host() {
         assert_eq!(PowershellText.tier(), ScanTier::Full);
-        let host = FIELDS.iter().find(|f| f.name == "download_host").unwrap();
-        assert_eq!(host.sensitive, Some(SensitiveKind::DownloadHost));
-        assert_eq!(FIELDS.iter().filter(|f| f.sensitive.is_some()).count(), 1);
+        assert!(FIELDS.iter().any(|f| f.name == "download_host"));
     }
 
     #[test]

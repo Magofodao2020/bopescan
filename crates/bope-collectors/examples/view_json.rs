@@ -14,7 +14,7 @@ use std::path::PathBuf;
 use bope_collectors::scan::{self, ScanContext};
 use bope_core::bundle::Bundle;
 use bope_core::engine::SelfIdentity;
-use bope_core::model::{Mode, ScanTier};
+use bope_core::model::ScanTier;
 use bope_core::provenance::Provenance;
 use bope_core::view;
 use bope_host::FixtureHost;
@@ -38,15 +38,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         tier: ScanTier::Full,
     };
     let report = scan::run(&host, &bundle, context);
-    let views: BTreeMap<&str, view::ReportView> = [("self", Mode::SelfCheck), ("ss", Mode::Ss)]
-        .into_iter()
-        .map(|(name, mode)| {
-            (
-                name,
-                view::for_mode(&report, mode).with_assessment(&report, &bundle),
-            )
-        })
-        .collect();
+    let views: BTreeMap<&str, view::ReportView> = BTreeMap::from([(
+        "self",
+        view::for_report(&report).with_assessment(&report, &bundle),
+    )]);
     let texts: BTreeMap<String, _> = bundle
         .rules()
         .iter()

@@ -16,7 +16,7 @@ use bope_core::assessment::{Conclusion, ModuleState};
 use bope_core::bundle::Bundle;
 use bope_core::engine::SelfIdentity;
 use bope_core::export::{self, Format};
-use bope_core::model::{Mode, Report, ScanTier};
+use bope_core::model::{Report, ScanTier};
 use bope_core::provenance::Provenance;
 use bope_core::view;
 use bope_host::FixtureHost;
@@ -43,7 +43,7 @@ fn scan_fixture(name: &str) -> (Report, Bundle) {
 #[test]
 fn an_ordinary_roblox_pc_has_no_supporting_evidence_and_is_never_called_clean() {
     let (report, bundle) = scan_fixture("baseline-roblox-win11");
-    let view = view::for_mode(&report, Mode::SelfCheck).with_assessment(&report, &bundle);
+    let view = view::for_report(&report).with_assessment(&report, &bundle);
     let assessment = view.assessment.as_ref().unwrap();
     assert!(
         assessment.supporting.is_empty(),
@@ -70,7 +70,7 @@ fn an_ordinary_roblox_pc_has_no_supporting_evidence_and_is_never_called_clean() 
 #[test]
 fn executor_traces_from_independent_sources_are_high_confidence() {
     let (report, bundle) = scan_fixture("roblox-executor-traces");
-    let view = view::for_mode(&report, Mode::Ss).with_assessment(&report, &bundle);
+    let view = view::for_report(&report).with_assessment(&report, &bundle);
     let assessment = view.assessment.as_ref().unwrap();
     assert_eq!(
         assessment.conclusion,
@@ -176,7 +176,7 @@ fn a_removed_executor_is_corroborated_from_history_without_its_files() {
             .any(|o| o.fields["source"] == "amcache" && o.fields["state"] == "measured")
     );
 
-    let view = view::for_mode(&report, Mode::Ss).with_assessment(&report, &bundle);
+    let view = view::for_report(&report).with_assessment(&report, &bundle);
     let assessment = view.assessment.as_ref().unwrap();
     assert_eq!(
         assessment.conclusion,
@@ -200,7 +200,7 @@ fn a_removed_executor_is_corroborated_from_history_without_its_files() {
 #[test]
 fn every_export_is_the_bytes_its_hash_names_and_html_is_escaped() {
     let (report, bundle) = scan_fixture("roblox-executor-traces");
-    let view = view::for_mode(&report, Mode::Ss).with_assessment(&report, &bundle);
+    let view = view::for_report(&report).with_assessment(&report, &bundle);
     for format in [Format::Json, Format::Html, Format::Text, Format::Pdf] {
         let exported = export::export(&view, &bundle, "pt-BR", format);
         assert_eq!(exported.sha256, export::sha256_hex(&exported.bytes));
@@ -215,13 +215,8 @@ fn every_export_is_the_bytes_its_hash_names_and_html_is_escaped() {
         String::from_utf8(export::export(&view, &bundle, "pt-BR", Format::Html).bytes).unwrap();
     assert!(html.starts_with("<!doctype html>"));
     assert!(!html.contains("<script"), "an exported page runs nothing");
-    // SS mode hides the user name in paths, and the export is built from the SS view.
-    assert!(
-        !html.contains("fixtureuser"),
-        "the user name leaked into an SS export"
-    );
     // The PDF carries the version, the time in UTC, the tools section, the sources and the hash of
-    // the JSON export of the same view, and is redacted like the view it was built from (ADR 0129).
+    // the JSON export of the same view (ADR 0129).
     let pdf = export::export(&view, &bundle, "pt-BR", Format::Pdf).bytes;
     let pdf_text = String::from_utf8_lossy(&pdf);
     assert!(pdf.starts_with(b"%PDF-1.4"));
@@ -229,7 +224,6 @@ fn every_export_is_the_bytes_its_hash_names_and_html_is_escaped() {
     assert!(pdf_text.contains("FERRAMENTAS ROBLOX"));
     let json_sha = export::export(&view, &bundle, "pt-BR", Format::Json).sha256;
     assert!(pdf_text.contains(&json_sha));
-    assert!(!pdf_text.contains("fixtureuser"));
 }
 
 /// B.O.P.E, ADR 0132: the exported files write each time in UTC and in the zone the window showed,
@@ -238,7 +232,7 @@ fn every_export_is_the_bytes_its_hash_names_and_html_is_escaped() {
 #[test]
 fn exports_write_times_like_the_window_and_keep_services_and_recycle_bin_apart() {
     let (report, bundle) = scan_fixture("roblox-tool-history");
-    let mut view = view::for_mode(&report, Mode::SelfCheck).with_assessment(&report, &bundle);
+    let mut view = view::for_report(&report).with_assessment(&report, &bundle);
     let observe = |fields: serde_json::Value| bope_core::model::Observation {
         collector: "windows_service".to_owned(),
         fields: serde_json::from_value(fields).unwrap(),

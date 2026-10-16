@@ -7,11 +7,11 @@
 
 import { useEffect, useState } from "react";
 import { ageTexts, codeLinks, reportView, ruleMeta, ruleTexts, timeFields } from "./api";
-import type { AgeText, CodeLinks, Mode, ReportView, RuleMeta, RuleText, SsOptions } from "./types";
+import type { AgeText, CodeLinks, ReportView, RuleMeta, RuleText } from "./types";
 
+/** One finished scan; a new object for each, so the pages read its report afresh. */
 export interface ScanResult {
-  mode: Mode;
-  options?: SsOptions;
+  startedAt: string | null;
 }
 
 export interface ReportData {
@@ -23,8 +23,6 @@ export interface ReportData {
   meta: Record<string, RuleMeta>;
   /** `null` while unknown — in flight or failed — never a guess about the build (carried fix b). */
   links: CodeLinks | null;
-  /** What the player agreed SS mode may show beyond its default (ADR 0052). */
-  options?: SsOptions;
   /** The fields each collector declares as times; empty until known. */
   timeFields: Record<string, string[]>;
 }
@@ -45,7 +43,7 @@ export function useReportData(result: ScanResult | null, lang: string): ReportDa
       return;
     }
     let alive = true;
-    void reportView(result.mode, result.options)
+    void reportView()
       .then((next) => alive && setView(next))
       .catch((reason: unknown) => alive && setFailed(String(reason)));
     return () => {
@@ -76,7 +74,7 @@ export function useReportData(result: ScanResult | null, lang: string): ReportDa
       .catch(() => {});
   }, [lang]);
 
-  return { view, failed, texts, ages, meta, links, options: result?.options, timeFields: times };
+  return { view, failed, texts, ages, meta, links, timeFields: times };
 }
 
 /** A field of an observation as text; `""` when it is absent. */

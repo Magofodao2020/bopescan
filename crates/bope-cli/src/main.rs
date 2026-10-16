@@ -15,11 +15,11 @@ use anyhow::Context;
 use bope_collectors::scan::{self, ScanContext};
 use bope_core::bundle::Bundle;
 use bope_core::engine::SelfIdentity;
-use bope_core::model::{Mode, ScanTier, SensitiveKind};
+use bope_core::model::ScanTier;
 use bope_core::provenance::Provenance;
-use bope_core::view::{self, SsOptions};
+use bope_core::view;
 use bope_host::Host;
-use clap::{Args, Parser, Subcommand, ValueEnum};
+use clap::{Args, Parser, Subcommand};
 
 use crate::output::Lang;
 
@@ -45,9 +45,6 @@ enum Command {
 #[allow(clippy::struct_excessive_bools)]
 #[derive(Args)]
 struct ScanArgs {
-    /// `self`: see everything. `ss`: screenshare view — asks for consent, shows only matches.
-    #[arg(long, value_enum, default_value_t = ModeArg::SelfCheck)]
-    mode: ModeArg,
     /// Print the report as JSON instead of text.
     #[arg(long)]
     json: bool,
@@ -60,9 +57,6 @@ struct ScanArgs {
     /// Which formats `--export-dir` writes, comma-separated: json, html, txt, pdf.
     #[arg(long, value_delimiter = ',', default_value = "json,html,txt,pdf")]
     export_format: Vec<String>,
-    /// Skip the SS-mode consent question (the player has already agreed).
-    #[arg(long)]
-    yes: bool,
     /// Ask for a full scan, which reads more than the standard one (ADR 0052). The question is asked
     /// every time, before anything is read; only `yes` starts it, and no flag answers it.
     #[arg(long)]
@@ -74,22 +68,6 @@ struct ScanArgs {
     /// Windows closes as soon as that copy exits (ADR 0012, amended); not meant to be typed.
     #[arg(long, hide = true)]
     pause_at_exit: bool,
-}
-
-#[derive(Clone, Copy, ValueEnum)]
-enum ModeArg {
-    #[value(name = "self")]
-    SelfCheck,
-    Ss,
-}
-
-impl From<ModeArg> for Mode {
-    fn from(mode: ModeArg) -> Self {
-        match mode {
-            ModeArg::SelfCheck => Self::SelfCheck,
-            ModeArg::Ss => Self::Ss,
-        }
-    }
 }
 
 fn main() -> ExitCode {
@@ -116,17 +94,16 @@ fn main() -> ExitCode {
 
 fn scan(args: &ScanArgs) -> anyhow::Result<()> {
     let bundle = Bundle::embedded().context("the embedded rules bundle is invalid")?;
-    let mode = Mode::from(args.mode);
     let host = live_host();
 
     // Elevation is a property of a process token, so it takes a new process (ADR 0012). Asked before the
-    // consent question, so nobody answers that question for a scan that will not happen here.
+    // full-scan question, so nobody answers that question for a scan that will not happen here.
     if args.elevate && host.is_elevated() != Some(true) {
         return relaunch_elevated(args.lang);
     }
 
     // Asked by the process that reads, before any collector runs, every time: a flag in a shortcut
-    // is not a player agreeing (ADR 0052). `--yes` does not answer it.
+    // is not a player agreeing (ADR 0052).
     let tier = if args.full && ask_full(args.lang)? {
         ScanTier::Full
     } else {
@@ -135,25 +112,6 @@ fn scan(args: &ScanArgs) -> anyhow::Result<()> {
         }
         ScanTier::Standard
     };
-
-    if mode == Mode::Ss && !args.yes && !ask_consent(args.lang, tier)? {
-        eprintln!("{}", output::declined(args.lang));
-        return Ok(());
-    }
-    // Each kind of sensitive value the scan could read is its own question, default no. `--yes`
-    // answers the consent question only, so a scripted SS scan shows none of them (ADR 0052).
-    let mut options = SsOptions::default();
-    if mode == Mode::Ss && !args.yes {
-        for kind in bope_collectors::sensitive_kinds(tier) {
-            if ask_yes(output::sensitive_question(args.lang, kind))? {
-                match kind {
-                    SensitiveKind::ServerIdentity => options.server_identity = true,
-                    SensitiveKind::AccountIdentifier => options.account_identifier = true,
-                    SensitiveKind::DownloadHost => options.download_host = true,
-                }
-            }
-        }
-    }
 
     let provenance = Provenance::current();
     // This program is in its own process list while it scans. The engine needs to know what "this
@@ -172,7 +130,7 @@ fn scan(args: &ScanArgs) -> anyhow::Result<()> {
         tier,
     };
     let report = scan::run(host.as_ref(), &bundle, context);
-    let view = view::for_mode_with(&report, mode, options).with_assessment(&report, &bundle);
+    let view = view::for_report(&report).with_assessment(&report, &bundle);
 
     if let Some(dir) = &args.export_dir {
         export_reports(&view, &bundle, args, dir)?;
@@ -186,24 +144,6 @@ fn scan(args: &ScanArgs) -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Asks the player on standard error, not standard output.
-///
-/// Standard output is the report, and with `--json` it is the file someone redirected it into.
-/// Written there, the question went into that file instead of in front of the player, and the
-/// program sat waiting for an answer to a question nobody could see.
-fn ask_consent(lang: Lang, tier: ScanTier) -> anyhow::Result<bool> {
-    ask_yes(&output::consent_for(lang, tier))
-}
-
-/// Asks `question` on standard error; `y`, `yes`, `s` or `sim` is yes, anything else — end of input
-/// too — is no.
-fn ask_yes(question: &str) -> anyhow::Result<bool> {
-    Ok(matches!(
-        read_answer(question)?.as_str(),
-        "y" | "yes" | "s" | "sim"
-    ))
-}
-
 /// Writes each chosen format into `dir`, with a `.sha256` file beside each, and prints where
 /// (B.O.P.E, ADR 0116). The report goes only where the person pointed; nothing is sent anywhere.
 fn export_reports(
@@ -214,7 +154,7 @@ fn export_reports(
 ) -> anyhow::Result<()> {
     use bope_core::export::{self, Format};
     std::fs::create_dir_all(dir).with_context(|| format!("could not create {}", dir.display()))?;
-    let stem = export::file_stem(&view.header.generated_at, view.mode);
+    let stem = export::file_stem(&view.header.generated_at);
     for name in &args.export_format {
         let format = Format::parse(name)
             .with_context(|| format!("unknown export format `{name}` (json, html, txt, pdf)"))?;
@@ -247,6 +187,9 @@ fn is_full_answer(answer: &str) -> bool {
 }
 
 /// Prints `question` on standard error and reads one line, trimmed and lower-cased.
+///
+/// Standard error, not standard output: standard output is the report, and with `--json` it is the
+/// file someone redirected it into.
 fn read_answer(question: &str) -> anyhow::Result<String> {
     eprint!("{question}");
     std::io::stderr().flush()?;
@@ -289,7 +232,7 @@ fn relaunch_elevated(lang: Lang) -> anyhow::Result<()> {
 
     let forwarded = elevated_args(std::env::args().skip(1));
 
-    // Both lines go to standard error for the reason `ask_consent` does: standard output is the
+    // Both lines go to standard error for the reason `read_answer` does: standard output is the
     // report, and this process produces none.
     match elevate::relaunch_elevated(&forwarded) {
         Ok(()) => {
@@ -352,8 +295,8 @@ mod tests {
     #[test]
     fn the_elevated_copy_does_not_elevate_again_and_waits_before_closing() {
         assert_eq!(
-            elevated_args(args(&["scan", "--mode", "ss", "--elevate", "--lang", "th"])),
-            args(&["scan", "--mode", "ss", "--lang", "th", "--pause-at-exit"]),
+            elevated_args(args(&["scan", "--json", "--elevate", "--lang", "th"])),
+            args(&["scan", "--json", "--lang", "th", "--pause-at-exit"]),
         );
     }
 

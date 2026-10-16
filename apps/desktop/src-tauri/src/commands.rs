@@ -3,9 +3,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
 
-//! IPC commands. They start, stop and observe the one scan and read its frozen report; filtering and
-//! redaction happen in `bope_core::view`, the assessment in `bope_core::assessment` and the saved
-//! formats in `bope_core::export`.
+//! IPC commands. They start, stop and observe the one scan and read its frozen report; the view is
+//! built in `bope_core::view`, the assessment in `bope_core::assessment` and the saved formats in
+//! `bope_core::export`.
 
 // Tauri injects `State` by value; commands cannot take it by reference.
 #![allow(clippy::needless_pass_by_value)]
@@ -14,10 +14,10 @@ use std::collections::BTreeMap;
 
 use bope_core::bundle::BundleInfo;
 use bope_core::export::{self, Format};
-use bope_core::model::{Mode, ReportHeader, ScanTier};
+use bope_core::model::{ReportHeader, ScanTier};
 use bope_core::provenance::REPOSITORY_URL;
 use bope_core::rules::RuleText;
-use bope_core::view::{self, ReportView, SsOptions};
+use bope_core::view::{self, ReportView};
 use tauri::State;
 
 use crate::AppState;
@@ -97,31 +97,24 @@ pub fn scan_status(state: State<'_, AppState>) -> Status {
     state.scan.status()
 }
 
-/// Facts about the finished scan without evidence (ADR 0049).
+/// Facts about the finished scan without evidence.
 #[tauri::command]
 pub fn report_header(state: State<'_, AppState>) -> Result<ReportHeader, String> {
     state
         .scan
         .report()
-        .map(|report| view::shown_header(&report))
+        .map(|report| report.header)
         .ok_or_else(|| "no finished scan".to_owned())
 }
 
-/// The finished report as `mode` may see it, with the assessment (ADR 0052, B.O.P.E ADR 0100).
+/// The finished report's view, with the assessment (B.O.P.E ADR 0100).
 #[tauri::command]
-pub fn report_view(
-    state: State<'_, AppState>,
-    mode: Mode,
-    options: Option<SsOptions>,
-) -> Result<ReportView, String> {
+pub fn report_view(state: State<'_, AppState>) -> Result<ReportView, String> {
     let report = state
         .scan
         .report()
         .ok_or_else(|| "no finished scan".to_owned())?;
-    Ok(
-        view::for_mode_with(&report, mode, options.unwrap_or_default())
-            .with_assessment(&report, &state.bundle),
-    )
+    Ok(view::for_report(&report).with_assessment(&report, &state.bundle))
 }
 
 /// Rule text in `lang`, keyed by rule id.
@@ -323,13 +316,11 @@ pub struct SavedFile {
     pub sha256: String,
 }
 
-/// Saves the finished report as the view `mode` shows it, in each of `formats` (`json`, `html`,
-/// `txt`), in `dir` — which the person chose — with a `.sha256` file beside each (B.O.P.E, ADR 0116).
+/// Saves the finished report's view in each of `formats` (`json`, `html`, `txt`, `pdf`), in `dir` —
+/// which the person chose — with a `.sha256` file beside each (B.O.P.E, ADR 0116).
 #[tauri::command]
 pub fn export_report(
     state: State<'_, AppState>,
-    mode: Mode,
-    options: Option<SsOptions>,
     lang: String,
     formats: Vec<String>,
     dir: String,
@@ -339,14 +330,13 @@ pub fn export_report(
         .scan
         .report()
         .ok_or_else(|| "no finished scan".to_owned())?;
-    let view = view::for_mode_with(&report, mode, options.unwrap_or_default())
-        .with_assessment(&report, &state.bundle);
+    let view = view::for_report(&report).with_assessment(&report, &state.bundle);
     let dir = std::path::PathBuf::from(dir.trim());
     if !dir.is_absolute() {
         return Err("choose an absolute folder".to_owned());
     }
     std::fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
-    let stem = export::file_stem(&view.header.generated_at, view.mode);
+    let stem = export::file_stem(&view.header.generated_at);
     let mut saved = Vec::new();
     for name in formats {
         let format = Format::parse(&name).ok_or_else(|| format!("unknown format {name}"))?;

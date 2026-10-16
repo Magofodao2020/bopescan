@@ -1,7 +1,5 @@
 {
   "header": {
-    "mode_self": "Self check",
-    "mode_ss": "SS mode",
     "version": "Version",
     "platform": "Platform",
     "rights": "Rights",
@@ -17,9 +15,7 @@
     "rules": "Rules",
     "scan_tier": "Scan",
     "tier_standard": "standard",
-    "tier_full": "full",
-    "server_identity_hidden": "Server names are shown as %SERVER_IDENTITY%: the player did not agree to show them.",
-    "download_host_hidden": "Website names are shown as %DOWNLOAD_HOST%: the player did not agree to show them."
+    "tier_full": "full"
   },
   "state": {
     "found": "Found",
@@ -72,7 +68,6 @@
     "title": "Unmatched observations",
     "note": "What the collectors saw that no rule matched. These are things that were seen, not findings."
   },
-  "hidden": "Hidden in SS mode: {{notFound}} not found · {{unmeasuredExpected}} not measured (expected) · {{unmeasuredUnexpected}} not measured (not expected) · {{unmatched}} unmatched observations",
   "empty": "No evidence to show.",
   "summary": {
     "title": "What this scan lists",
@@ -473,7 +468,6 @@
     "save": "Save report",
     "saved": "Saved, each with a .sha256 file beside it:",
     "failed": "Not saved: {{error}}",
-    "note_ss": "The saved report is the SS view you see: filtered, with user names hidden in paths.",
     "note_self": "The saved report is the full view, including paths with your user name.",
     "hash_note": "The SHA-256 shows whether the file changed after it was saved. It does not prove the scan was honest or who made the report."
   },

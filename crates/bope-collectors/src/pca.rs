@@ -10,18 +10,16 @@
 //! `bope_parsers::pca` deliberately does not name. The collector reads the bytes through the
 //! `Host` and hands them to that parser; it decodes nothing itself (ADR 0013).
 //!
-//! No rule reads this collector yet (ADR 0020), so what it sees is listed in Self mode as unmatched
-//! observations and counted, never listed, in SS mode (ADR 0014).
+//! No rule reads this collector yet (ADR 0020), so what it sees is listed as unmatched observations
+//! (ADR 0014).
 //!
 //! # This is a list of what a person has on their computer
 //!
 //! Every launch record names a program the owner of the machine ran, so the fields are chosen to be
 //! matchable by a rule and as little else as possible:
 //!
-//! - a full path is emitted **only when it begins with a drive letter**, which is the one shape
-//!   `bope_core::view::redact_profile_paths` can reach. Any other shape — a UNC share, a device
-//!   path — is withheld, because a path carrying `\Users\<name>\` with no drive letter in front of
-//!   it would reach an SS viewer unredacted while the code around it says paths are redacted;
+//! - the full path is emitted as PCA wrote it, with `path_form` (`drive`, `device`, `other`) saying
+//!   which shape it is in;
 //! - the general databases contribute **no record content at all**, only how many records they held
 //!   and whether every line parsed. A field there has no established meaning, and field 1 of the
 //!   lines this repository has is a user path;
@@ -36,7 +34,7 @@ use bope_parsers::error::ParseError;
 use bope_parsers::pca::{self, PcaLaunchEntry};
 
 use crate::failure::{read_failure, reason_for};
-use crate::paths::{UNREDACTABLE_FORM, file_name, is_drive_rooted};
+use crate::paths::{file_name, path_form};
 use crate::{Age, AgeCount, AgeRows, Collector, Field};
 
 /// Environment variable holding the Windows directory.
@@ -98,7 +96,7 @@ const FIELDS: [Field; 9] = [
     Field::timestamp("last_run"),
     Field::text("name"),
     Field::text("path"),
-    Field::text("path_withheld"),
+    Field::text("path_form"),
     Field::text("read"),
     Field::number("rejected"),
     Field::text("source"),
@@ -109,7 +107,7 @@ const FIELDS: [Field; 9] = [
 /// The subset a content-level reason gaps: `source_empty` and `partial` both describe files this
 /// collector **did** reach, so gapping `entries`, `rejected`, `intact` or `source` — which were
 /// measured — would claim it had not (ADR 0030).
-const RECORD_FIELDS: [&str; 4] = ["last_run", "name", "path", "path_withheld"];
+const RECORD_FIELDS: [&str; 4] = ["last_run", "name", "path", "path_form"];
 
 /// The `pca` collector.
 #[derive(Debug, Default, Clone, Copy)]
@@ -310,19 +308,14 @@ fn launch(source: &str, entry: &PcaLaunchEntry) -> Observation {
     if let Some(name) = file_name(&entry.path) {
         fields.insert("name".to_owned(), serde_json::Value::from(name));
     }
-    if is_drive_rooted(&entry.path) {
-        fields.insert(
-            "path".to_owned(),
-            serde_json::Value::from(entry.path.clone()),
-        );
-    } else {
-        // Said out loud rather than left out: an absent `path` would read as "PCA recorded no path",
-        // which is not what happened.
-        fields.insert(
-            "path_withheld".to_owned(),
-            serde_json::Value::from(UNREDACTABLE_FORM),
-        );
-    }
+    fields.insert(
+        "path".to_owned(),
+        serde_json::Value::from(entry.path.clone()),
+    );
+    fields.insert(
+        "path_form".to_owned(),
+        serde_json::Value::from(path_form(&entry.path)),
+    );
     fields.insert(
         "last_run".to_owned(),
         serde_json::Value::from(entry.last_run.to_string()),
@@ -440,7 +433,7 @@ mod tests {
         );
         assert_eq!(text(entries[0], "name"), Some("game.exe"));
         assert_eq!(text(entries[0], "last_run"), Some("2026-09-12T10:23:46Z"));
-        assert_eq!(entries[0].fields.get("path_withheld"), None);
+        assert_eq!(text(entries[0], "path_form"), Some("drive"));
     }
 
     /// A file that parsed says so, with what it held.
@@ -619,32 +612,25 @@ mod tests {
         assert!(!json.contains("second.exe"), "{json}");
     }
 
-    /// A path that SS-mode redaction cannot reach is withheld, and the observation says it was.
+    /// Every path is kept as PCA wrote it, with the form it is written in.
     #[test]
-    fn a_path_redaction_cannot_reach_is_withheld() {
+    fn every_path_is_kept_with_its_form() {
         let run = Pca.collect(&fixture("pca-unredactable-path"));
         let (observations, _) = measured(&run);
         let entries = launches(observations, APP_LAUNCH_DIC);
         assert_eq!(entries.len(), 3, "{entries:?}");
-
-        // A drive-rooted path is the shape `redact_profile_paths` was written for, so it is emitted.
         assert_eq!(
             text(entries[0], "path"),
             Some(r"C:\Users\fixtureuser\Downloads\drive-rooted.exe")
         );
-
-        // A UNC path carries an account name that redaction would walk straight past.
-        assert_eq!(entries[1].fields.get("path"), None);
-        assert_eq!(text(entries[1], "path_withheld"), Some(UNREDACTABLE_FORM));
+        assert_eq!(text(entries[0], "path_form"), Some("drive"));
+        assert_eq!(
+            text(entries[1], "path"),
+            Some(r"\\nas\home\shareduser\unc.exe")
+        );
+        assert_eq!(text(entries[1], "path_form"), Some("other"));
         assert_eq!(text(entries[1], "name"), Some("unc.exe"));
-
-        // A device path has no drive letter either.
-        assert_eq!(entries[2].fields.get("path"), None);
-        assert_eq!(text(entries[2], "path_withheld"), Some(UNREDACTABLE_FORM));
-
-        let json = serde_json::to_string(&observations).unwrap();
-        assert!(!json.contains("shareduser"), "{json}");
-        assert!(!json.contains("deviceuser"), "{json}");
+        assert_eq!(text(entries[2], "path_form"), Some("device"));
     }
 
     #[test]

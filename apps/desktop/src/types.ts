@@ -5,8 +5,6 @@
 // Mirrors crates/bope-core/src/model.rs and view.rs. The UI tests feed these types with the Rust
 // report snapshots, so a drift between the two fails `pnpm test`. (Generating them with ts-rs is planned.)
 
-export type Mode = "self" | "ss";
-
 export type UnmeasuredReason =
   | "not_windows"
   | "not_on_this_os"
@@ -66,8 +64,6 @@ export interface ReportHeader {
   elevated: boolean | null;
   generated_at: string;
   boot_time: BootTime;
-  /** The machine's profile root, for SS-mode redaction only; absent from an SS view (ADR 0049). */
-  profiles_directory?: string;
   /** Which scan the player chose before it started; absent from an older report, which was standard (ADR 0052). */
   scan_tier?: ScanTier;
   /** Dated facts about when parts of this PC were set up, UTC dates only (ADR 0061). */
@@ -125,7 +121,7 @@ export interface FoldedLogs {
   not_read: number;
 }
 
-/** The trace-ages section, built in Rust for each mode (ADR 0061). Nothing in it is compared. */
+/** The trace-ages section, built in Rust (ADR 0061). Nothing in it is compared. */
 export interface TraceAges {
   anchors: AnchorAge[];
   rows: TraceAge[];
@@ -232,14 +228,6 @@ export interface AgeText {
 /** How much a scan reads, chosen before it starts (ADR 0052). */
 export type ScanTier = "standard" | "full";
 
-/** What the player agreed SS mode may show beyond its default, each default no (ADR 0052). */
-export interface SsOptions {
-  server_identity: boolean;
-  account_identifier: boolean;
-  /** The name of a website a PowerShell command downloaded from (ADR 0064). */
-  download_host: boolean;
-}
-
 /**
  * One observation that describes aeterna-rongroi itself rather than the machine. The tool is running
  * while it scans, so a collector that enumerates the machine sees it (ADR 0010).
@@ -301,7 +289,7 @@ export interface UnmeasuredSource {
 
 /**
  * The times a view may show, oldest first, with the spans that bound them (ADR 0051). Nothing is
- * computed from the entries: no gap, no count, no summary. Built in Rust for each mode.
+ * computed from the entries: no gap, no count, no summary. Built in Rust.
  */
 export interface Timeline {
   entries: TimelineEntry[];
@@ -328,21 +316,20 @@ export interface ReportView {
   roblox_tools?: RobloxTools;
   /** `windows_service` observations, current state first (B.O.P.E, ADR 0130); absent when none. */
   services?: Observation[];
-  /** `recycle_bin` observations (B.O.P.E, ADR 0131); SS mode keeps only the summary and catalog matches. */
+  /** `recycle_bin` observations (B.O.P.E, ADR 0131). */
   recycle_bin?: Observation[];
   /** The B.O.P.E assessment of the report this view came from (ADR 0100); absent from upstream snapshots. */
   assessment?: Assessment;
-  mode: Mode;
   header: ReportHeader;
   evidence: Evidence[];
-  /** Shown in both modes: hiding "this was us" from an SS viewer would tell them less, not more. */
+  /** What this program itself left in what the collectors saw, kept apart from the evidence (ADR 0010). */
   own_traces: OwnTraceEntry[];
-  /** Self mode lists these; SS mode leaves the list empty and counts them in `hidden.unmatched`. */
+  /** What the collectors saw that no rule matched (ADR 0014). */
   unmatched: UnmatchedGroup[];
   /**
-   * Facts about the scan, above the evidence in both modes. `not_admin` is how many checks missing
-   * administrator rights left unanswered — one fact about the scan rather than one per rule, and the
-   * one with a remedy. It is not a fourth hidden count; the same checks are in `hidden` (ADR 0027).
+   * Facts about the scan, above the evidence. `not_admin` is how many checks missing administrator
+   * rights left unanswered — one fact about the scan rather than one per rule, and the one with a
+   * remedy (ADR 0027).
    */
   scope: { not_admin: number; not_attempted: number; not_consented?: number };
   listed: ListedCounts;
@@ -351,16 +338,10 @@ export interface ReportView {
   collector_order: string[];
   /** By rule id, for a `found` or `not_found` row whose count is for a span; absent when none is. */
   row_bands?: Record<string, RowBand>;
-  /** How far back each source reaches, beside the anchors; the same in both modes (ADR 0061). */
+  /** How far back each source reaches, beside the anchors (ADR 0061). */
   trace_ages?: TraceAges;
   /** At most one cross-source statement; absent when its conditions do not hold (ADR 0061). */
   cross_source?: CrossSourceStatement[];
-  hidden: {
-    not_found: number;
-    unmeasured_expected: number;
-    unmeasured_unexpected: number;
-    unmatched: number;
-  };
 }
 
 /** Where a rule, its fixtures and its collector are in the repository, from its root (ADR 0045). */

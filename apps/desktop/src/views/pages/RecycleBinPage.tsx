@@ -40,7 +40,7 @@ export function RecycleBinPage({ view }: { view: ReportView }) {
     <div className="page-stack">
       <p className="note">{t("ui.recycle.intro")}</p>
       <Summary bin={bin} />
-      <Items items={items} ss={view.mode === "ss"} />
+      <Items items={items} />
     </div>
   );
 }
@@ -131,7 +131,7 @@ function Summary({ bin }: { bin: Observation }) {
   );
 }
 
-function Items({ items, ss }: { items: Observation[]; ss: boolean }) {
+function Items({ items }: { items: Observation[] }) {
   const { t } = useTranslation();
   const [filter, setFilter] = useState<ItemFilter>("all");
   const [search, setSearch] = useState("");
@@ -156,7 +156,6 @@ function Items({ items, ss }: { items: Observation[]; ss: boolean }) {
           {t("ui.evidence.shown", { shown: shown.length, total: items.length })}
         </span>
       </div>
-      {ss && <p className="small muted">{t("ui.recycle.ss_note")}</p>}
       {items.length === 0 ? (
         <Empty title={t("ui.recycle.no_items")} />
       ) : (

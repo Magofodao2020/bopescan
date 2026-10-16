@@ -106,8 +106,6 @@ export function OverviewPage({ data, go }: Props) {
       <section className="panel" aria-labelledby="facts-title">
         <h3 id="facts-title">{t("common:ui.overview.facts")}</h3>
         <dl className="facts context">
-          <dt>{t("common:ui.overview.mode")}</dt>
-          <dd>{view.mode === "ss" ? t("header.mode_ss") : t("header.mode_self")}</dd>
           <dt>{t("header.scan_tier")}</dt>
           <dd>{header.scan_tier === "full" ? t("header.tier_full") : t("header.tier_standard")}</dd>
           <dt>{t("common:ui.overview.scanned_at")}</dt>
@@ -157,7 +155,6 @@ export function ScopeNotes({ data }: { data: ReportData }) {
   if (!view) {
     return null;
   }
-  const { header } = view;
   return (
     <>
       {view.scope.not_admin > 0 && (
@@ -170,12 +167,6 @@ export function ScopeNotes({ data }: { data: ReportData }) {
         <p className="scope">
           {t("scope.not_consented", { checks: view.scope.not_consented ?? 0 })}
         </p>
-      )}
-      {view.mode === "ss" && header.scan_tier === "full" && !data.options?.server_identity && (
-        <p className="muted">{t("header.server_identity_hidden")}</p>
-      )}
-      {view.mode === "ss" && header.scan_tier === "full" && !data.options?.download_host && (
-        <p className="muted">{t("header.download_host_hidden")}</p>
       )}
     </>
   );

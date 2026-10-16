@@ -2,18 +2,16 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
 
-// The start screen: what will be examined, who will see it, how deep, and consent — all before anything
-// is read (B.O.P.E, ADR 0115).
+// The start screen: what will be examined, how deep, and consent — all before anything is read
+// (B.O.P.E, ADR 0115).
 
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { type ElevateOutcome, relaunchElevated } from "../api";
-import type { AppInfo, Mode, ScanTier, SsOptions } from "../types";
+import type { AppInfo, ScanTier } from "../types";
 
 export interface ScanChoice {
-  mode: Mode;
   tier: ScanTier;
-  options: SsOptions;
 }
 
 interface Props {
@@ -43,10 +41,8 @@ export const CATEGORY_ORDER = [
 
 export function Home({ info, infoFailed, onStart }: Props) {
   const { t } = useTranslation();
-  const [mode, setMode] = useState<Mode>("ss");
   const [tier, setTier] = useState<ScanTier>("standard");
   const [agreed, setAgreed] = useState(false);
-  const [downloadHost, setDownloadHost] = useState(false);
   const [elevation, setElevation] = useState<ElevateOutcome | null>(null);
 
   const fullOnly = (info?.collectors ?? []).filter((c) => c.tier === "full");
@@ -105,25 +101,6 @@ export function Home({ info, infoFailed, onStart }: Props) {
       )}
 
       <fieldset className="option-group">
-        <legend>{t("home.audience")}</legend>
-        <label className={`option ${mode === "ss" ? "selected" : ""}`}>
-          <input type="radio" name="mode" checked={mode === "ss"} onChange={() => setMode("ss")} />
-          <span className="option-title">{t("home.mode_ss")}</span>
-          <span className="muted">{t("home.mode_ss_hint")}</span>
-        </label>
-        <label className={`option ${mode === "self" ? "selected" : ""}`}>
-          <input
-            type="radio"
-            name="mode"
-            checked={mode === "self"}
-            onChange={() => setMode("self")}
-          />
-          <span className="option-title">{t("home.mode_self")}</span>
-          <span className="muted">{t("home.mode_self_hint")}</span>
-        </label>
-      </fieldset>
-
-      <fieldset className="option-group">
         <legend>{t("home.depth")}</legend>
         <label className={`option ${tier === "standard" ? "selected" : ""}`}>
           <input
@@ -170,19 +147,8 @@ export function Home({ info, infoFailed, onStart }: Props) {
           <li>{t("home.promise_readonly")}</li>
           <li>{t("home.promise_private")}</li>
           <li>{t("home.promise_visible")}</li>
-          {mode === "ss" && <li>{t("home.promise_ss")}</li>}
         </ul>
         <p className="muted">{t("home.limits")}</p>
-        {mode === "ss" && tier === "full" && (
-          <label className="switch">
-            <input
-              type="checkbox"
-              checked={downloadHost}
-              onChange={(event) => setDownloadHost(event.target.checked)}
-            />{" "}
-            {t("home.show_download_host")}
-          </label>
-        )}
         <label className="agree">
           <input
             type="checkbox"
@@ -198,17 +164,7 @@ export function Home({ info, infoFailed, onStart }: Props) {
         type="button"
         className="primary start-button"
         disabled={!agreed || info === null}
-        onClick={() =>
-          onStart({
-            mode,
-            tier,
-            options: {
-              server_identity: false,
-              account_identifier: false,
-              download_host: downloadHost,
-            },
-          })
-        }
+        onClick={() => onStart({ tier })}
       >
         {t("home.start")}
       </button>

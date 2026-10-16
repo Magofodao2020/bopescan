@@ -98,7 +98,6 @@ pub fn evaluate(
         discriminators: BTreeMap::new(),
         coverage_fields: BTreeMap::new(),
         unmeasured_sources: Vec::new(),
-        sensitive_fields: std::collections::BTreeMap::new(),
         age_fields: BTreeMap::new(),
         timeline_selectors,
     }
@@ -736,7 +735,6 @@ date: 2026-09-12
             elevated: None,
             generated_at: "2026-01-01T00:00:00Z".to_owned(),
             boot_time: crate::model::BootTime::default(),
-            profiles_directory: None,
             scan_tier: crate::model::ScanTier::Standard,
             anchors: Vec::new(),
         }

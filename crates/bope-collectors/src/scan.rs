@@ -66,7 +66,6 @@ pub struct Cancelled;
 /// Runs every collector against `host` and evaluates `bundle`.
 pub fn run(host: &dyn Host, bundle: &Bundle, context: ScanContext) -> Report {
     let boot_time = boot_time(host, &context.generated_at);
-    let profiles_directory = profiles_directory(host);
     let collectors = crate::all();
     let tier = context.tier;
     let mut runs: Vec<CollectorRun> = Vec::with_capacity(collectors.len());
@@ -78,16 +77,7 @@ pub fn run(host: &dyn Host, bundle: &Bundle, context: ScanContext) -> Report {
         };
         runs.push(run);
     }
-    finish(
-        host,
-        bundle,
-        context,
-        &runs,
-        &collectors,
-        boot_time,
-        profiles_directory,
-        tier,
-    )
+    finish(host, bundle, context, &runs, &collectors, boot_time, tier)
 }
 
 /// One collector's run, or `not_consented` when it is above the scan's tier.
@@ -117,7 +107,6 @@ pub fn run_with_progress(
     // the caller took just before this call: the `evtx` collector alone may run for 30 seconds, and
     // reading the count after it would move the start that much earlier (ADR 0039).
     let boot_time = boot_time(host, &context.generated_at);
-    let profiles_directory = profiles_directory(host);
     let collectors = crate::all();
     let tier = context.tier;
     let total = collectors.len();
@@ -150,7 +139,6 @@ pub fn run_with_progress(
         &runs,
         &collectors,
         boot_time,
-        profiles_directory,
         tier,
     ))
 }
@@ -224,7 +212,6 @@ fn finish(
     runs: &[CollectorRun],
     collectors: &[Box<dyn crate::Collector>],
     boot_time: bope_core::model::BootTime,
-    profiles_directory: Option<String>,
     tier: ScanTier,
 ) -> Report {
     let anchors = anchors(host, runs, &context.generated_at);
@@ -237,13 +224,11 @@ fn finish(
         elevated: host.is_elevated(),
         generated_at: context.generated_at,
         boot_time,
-        profiles_directory,
         scan_tier: tier,
         anchors,
     };
     let mut report = engine::evaluate(bundle, runs, header, &context.self_identity);
     declare_times(&mut report, collectors, runs);
-    declare_sensitive(&mut report, collectors);
     declare_ages(&mut report, collectors, bundle);
     report
 }
@@ -546,23 +531,6 @@ fn folder_created(host: &dyn Host, path: Option<&str>, source: String) -> Anchor
     }
 }
 
-/// Copies into the report which fields each collector declared sensitive, for `view` to hide in SS
-/// mode (ADR 0052), whatever the tier of the scan.
-fn declare_sensitive(report: &mut Report, collectors: &[Box<dyn crate::Collector>]) {
-    for collector in collectors {
-        let fields: BTreeMap<String, bope_core::model::SensitiveKind> = collector
-            .fields()
-            .iter()
-            .filter_map(|field| Some((field.name.to_owned(), field.sensitive?)))
-            .collect();
-        if !fields.is_empty() {
-            report
-                .sensitive_fields
-                .insert(collector.id().to_owned(), fields);
-        }
-    }
-}
-
 /// Copies into the report what the timeline needs to know and the core cannot: which fields are
 /// times, which field names a place, which fields bound a source, and which sources of times could
 /// not be read (ADR 0051).
@@ -831,40 +799,6 @@ mod tests {
             "{:?}",
             full_scan.unmatched
         );
-        // Declared whatever the tier, so a view can hide the field in either report.
-        for report in [&standard, &full_scan] {
-            assert_eq!(
-                report.sensitive_fields["fivem_servers"]["server_folder"],
-                bope_core::model::SensitiveKind::ServerIdentity
-            );
-        }
-    }
-
-    #[test]
-    fn only_a_full_scan_asks_about_sensitive_kinds() {
-        assert!(crate::sensitive_kinds(ScanTier::Standard).is_empty());
-        assert!(
-            crate::sensitive_kinds(ScanTier::Full)
-                .contains(&bope_core::model::SensitiveKind::ServerIdentity)
-        );
-    }
-
-    /// Only a `full` collector may mark a field sensitive: a standard scan's reads are what every
-    /// player agrees to, so nothing it reads is hidden behind a separate answer (ADR 0052).
-    #[test]
-    fn no_standard_collector_declares_a_sensitive_field() {
-        for collector in crate::all() {
-            if collector.tier() == ScanTier::Standard {
-                assert!(
-                    collector
-                        .fields()
-                        .iter()
-                        .all(|field| field.sensitive.is_none()),
-                    "{}",
-                    collector.id()
-                );
-            }
-        }
     }
 
     #[test]

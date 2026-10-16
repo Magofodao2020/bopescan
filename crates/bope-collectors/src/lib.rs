@@ -57,8 +57,8 @@ pub mod windows_service;
 pub mod windows_start;
 pub mod wmi_subscription;
 
+pub use bope_core::model::ScanTier;
 use bope_core::model::{CollectorRun, UnmeasuredReason};
-pub use bope_core::model::{ScanTier, SensitiveKind};
 use bope_host::Host;
 
 /// What kind of value an observation field carries, so that `cargo xtask check-rules` can refuse an
@@ -98,9 +98,6 @@ pub struct Field {
     pub name: &'static str,
     /// What kind of value it carries.
     pub kind: FieldKind,
-    /// The kind of sensitive value it carries, which SS mode hides unless the player agreed to show
-    /// that kind, or `None` (ADR 0052).
-    pub sensitive: Option<SensitiveKind>,
     /// Whether a timestamp field's values are timeline times (ADR 0051). `true` for every timestamp
     /// field unless it was declared [`Self::off_timeline`]; meaningless for the other kinds.
     pub on_timeline: bool,
@@ -112,7 +109,6 @@ impl Field {
         Self {
             name,
             kind: FieldKind::Text,
-            sensitive: None,
             on_timeline: false,
         }
     }
@@ -122,7 +118,6 @@ impl Field {
         Self {
             name,
             kind: FieldKind::Number,
-            sensitive: None,
             on_timeline: false,
         }
     }
@@ -132,18 +127,7 @@ impl Field {
         Self {
             name,
             kind: FieldKind::Bool,
-            sensitive: None,
             on_timeline: false,
-        }
-    }
-
-    /// This field, marked as carrying a sensitive value of `kind` (ADR 0052). Only a collector whose
-    /// tier is `full` may mark one: a standard scan's reads are what every player agrees to.
-    #[must_use]
-    pub const fn sensitive(self, kind: SensitiveKind) -> Self {
-        Self {
-            sensitive: Some(kind),
-            ..self
         }
     }
 
@@ -152,7 +136,6 @@ impl Field {
         Self {
             name,
             kind: FieldKind::Timestamp,
-            sensitive: None,
             on_timeline: true,
         }
     }
@@ -303,21 +286,6 @@ pub struct AgePlace {
     pub count: AgeCount,
     /// Only the place's observations without this field count.
     pub without: Option<&'static str>,
-}
-
-/// Every kind of sensitive value the collectors a scan at `tier` would call declare, so a front end
-/// can ask about each before the scan starts (ADR 0052).
-pub fn sensitive_kinds(tier: ScanTier) -> std::collections::BTreeSet<SensitiveKind> {
-    all()
-        .iter()
-        .filter(|collector| collector.tier() <= tier)
-        .flat_map(|collector| {
-            collector
-                .fields()
-                .iter()
-                .filter_map(|field| field.sensitive)
-        })
-        .collect()
 }
 
 /// Every collector in this build.

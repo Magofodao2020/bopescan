@@ -5,8 +5,8 @@
 //! Saved reports: JSON, HTML, plain text and PDF, each with the SHA-256 of its exact bytes
 //! (B.O.P.E, ADR 0116; PDF: ADR 0129).
 //!
-//! Every format is built from a [`ReportView`] — so an SS-mode export is redacted exactly as the screen
-//! was — and from the bundle's own rule texts. The functions here only build bytes; writing them to a
+//! Every format is built from a [`ReportView`] — so an export says exactly what the screen said — and
+//! from the bundle's own rule texts. The functions here only build bytes; writing them to a
 //! file the person chose is the caller's job, and nothing is ever sent anywhere.
 //!
 //! **What the hash is.** The SHA-256 of a saved report lets anyone tell later whether those bytes were
@@ -20,7 +20,7 @@ use sha2::{Digest, Sha256};
 
 use crate::assessment::{Assessment, Conclusion, Level, ModuleState};
 use crate::bundle::Bundle;
-use crate::model::{EvidenceState, Mode, Observation, UnmeasuredReason};
+use crate::model::{EvidenceState, Observation, UnmeasuredReason};
 use crate::view::ReportView;
 
 /// Name of the format, written into every JSON export.
@@ -91,18 +91,14 @@ pub fn sha256_line(sha256: &str, file_name: &str) -> String {
     format!("{sha256}  {file_name}\n")
 }
 
-/// A file name for a report generated at `generated_at` (RFC 3339) in `mode`.
-pub fn file_stem(generated_at: &str, mode: Mode) -> String {
+/// A file name for a report generated at `generated_at` (RFC 3339).
+pub fn file_stem(generated_at: &str) -> String {
     let stamp: String = generated_at
         .chars()
         .filter(|c| c.is_ascii_digit() || *c == 'T')
         .take(15)
         .collect();
-    let mode = match mode {
-        Mode::SelfCheck => "self",
-        Mode::Ss => "ss",
-    };
-    format!("bope-report-{stamp}-{mode}")
+    format!("bope-report-{stamp}")
 }
 
 /// Builds one export with every time in UTC only.
@@ -532,14 +528,6 @@ fn text(view: &ReportView, bundle: &Bundle, lang: &str, zone: Zone<'_>) -> Strin
             crate::model::ScanTier::Full => "avançada",
         }
     );
-    let _ = writeln!(
-        out,
-        "Modo                 : {}",
-        match view.mode {
-            Mode::SelfCheck => "próprio (tudo visível)",
-            Mode::Ss => "screenshare (filtrado e com caminhos ocultos)",
-        }
-    );
     let _ = writeln!(out);
     if let Some(a) = assessment_of(view) {
         let _ = writeln!(out, "CONCLUSÃO: {}", conclusion_label(a.conclusion));
@@ -793,7 +781,7 @@ fn html(view: &ReportView, bundle: &Bundle, lang: &str, zone: Zone<'_>) -> Strin
     );
     let _ = write!(
         out,
-        "<table class=\"small\" style=\"margin-top:12px\"><tr><th>Versão</th><td>{}</td><th>Gerado em</th><td>{}<br><span class=\"muted small\">{}</span></td></tr><tr><th>Regras</th><td>{} · SHA-256 <code>{}</code></td><th>Windows</th><td>{} {}</td></tr><tr><th>Administrador</th><td>{}</td><th>Verificação</th><td>{} · modo {}</td></tr></table>",
+        "<table class=\"small\" style=\"margin-top:12px\"><tr><th>Versão</th><td>{}</td><th>Gerado em</th><td>{}<br><span class=\"muted small\">{}</span></td></tr><tr><th>Regras</th><td>{} · SHA-256 <code>{}</code></td><th>Windows</th><td>{} {}</td></tr><tr><th>Administrador</th><td>{}</td><th>Verificação</th><td>{}</td></tr></table>",
         escape(&h.provenance.version),
         escape(&at(&h.generated_at)),
         escape(&zone_line(zone)),
@@ -810,10 +798,6 @@ fn html(view: &ReportView, bundle: &Bundle, lang: &str, zone: Zone<'_>) -> Strin
             crate::model::ScanTier::Standard => "padrão",
             crate::model::ScanTier::Full => "avançada",
         },
-        match view.mode {
-            Mode::SelfCheck => "próprio",
-            Mode::Ss => "screenshare",
-        }
     );
     if let Some(a) = assessment_of(view) {
         let top = a
@@ -1208,10 +1192,10 @@ mod tests {
     }
 
     #[test]
-    fn file_names_carry_the_time_and_the_mode() {
+    fn file_names_carry_the_time() {
         assert_eq!(
-            file_stem("2026-10-15T12:34:56Z", Mode::Ss),
-            "bope-report-20261015T123456-ss"
+            file_stem("2026-10-15T12:34:56Z"),
+            "bope-report-20261015T123456"
         );
         assert_eq!(Format::parse("TXT"), Some(Format::Text));
         assert_eq!(Format::parse("pdf"), Some(Format::Pdf));

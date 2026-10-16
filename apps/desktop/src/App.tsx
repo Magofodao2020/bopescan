@@ -113,7 +113,7 @@ export function App() {
     (status: ScanStatus) => {
       setLastStatus(status);
       if (status.state === "done" && choice) {
-        setResult({ mode: choice.mode, options: choice.options });
+        setResult({ startedAt: status.started_at ?? null });
         setFlow({ kind: "done", choice });
         setPage("overview");
       } else if (status.state === "cancelled") {
@@ -232,11 +232,6 @@ export function App() {
                 <Badge
                   tone="neutral"
                   shape="ring"
-                  label={view.mode === "ss" ? t("ui.mode.ss") : t("ui.mode.self")}
-                />
-                <Badge
-                  tone="neutral"
-                  shape="ring"
                   label={
                     view.header.scan_tier === "full"
                       ? t("report:header.tier_full")
@@ -268,7 +263,7 @@ export function App() {
               />
             )}
             {page !== "scanner" && page !== "settings" && hasReport && (
-              <ResultPage page={page} data={data} result={result} focus={focus} go={go} />
+              <ResultPage page={page} data={data} focus={focus} go={go} />
             )}
             {page === "settings" && (
               <SettingsPage
@@ -290,13 +285,11 @@ export function App() {
 function ResultPage({
   page,
   data,
-  result,
   focus,
   go,
 }: {
   page: Page;
   data: ReturnType<typeof useReportData>;
-  result: ScanResult;
   focus: EvidenceFocus | null;
   go: (page: Page, focus?: EvidenceFocus | null) => void;
 }) {
@@ -328,7 +321,7 @@ function ResultPage({
     case "timeline":
       return <TimelinePage view={data.view} texts={data.texts} ages={data.ages} />;
     case "reports":
-      return <ReportsPage mode={result.mode} options={result.options} />;
+      return <ReportsPage />;
     default:
       return null;
   }

@@ -505,13 +505,10 @@ mod tests {
         );
     }
 
-    /// F1: a resolved path under a user profile is redacted the same way any other collector's path
-    /// is. This calls `bope_core::view::redact_profile_paths` directly on the string `resolve`
-    /// produced, rather than building a `Found` row through the rule engine, because no rule reads
-    /// `driver_service` yet in this pull request (ADR 0048) — there is no bundled rule to match it
-    /// and construct a real `Found` evidence item from.
+    /// A driver registered from a user profile resolves to its drive-letter path, whatever case the
+    /// registry spells it in, and that path is recognised as being under a profile.
     #[test]
-    fn a_driver_service_path_under_a_user_profile_is_redacted_by_the_core_view_function() {
+    fn a_driver_service_path_under_a_user_profile_resolves_to_its_drive_path() {
         let host = FixtureHost::from_yaml_str(
             "platform: windows\nenv:\n  SystemRoot: 'C:\\Windows'\nregistry:\n  'HKLM\\SYSTEM\\CurrentControlSet\\Services\\vendor':\n    Type: 1\n    ImagePath: '\\??\\C:\\Users\\bob\\AppData\\vendor.sys'\n",
             "inline",
@@ -522,29 +519,22 @@ mod tests {
         let vendor = service(observations, "vendor");
         let path = text(vendor, "path").unwrap();
         assert_eq!(path, r"C:\Users\bob\AppData\vendor.sys");
+        assert!(crate::paths::is_under_profile_root(path, None));
 
-        let redacted = bope_core::view::redact_profile_paths(path, None);
-        assert_eq!(redacted, r"%USERPROFILE%\AppData\vendor.sys");
-        assert!(!redacted.contains("bob"), "{redacted}");
-
-        // R1: `redact_profile_paths` folds ASCII case, and `resolve` must not have introduced a
-        // separator or segment shape it does not reach — an upper-case `USERS`, and a lower-case
-        // drive letter arriving through `\??\`.
         let root = r"C:\Windows";
-        for (image_path, expected_redacted) in [
+        for (image_path, expected) in [
             (
                 ImagePath::Text(r"C:\USERS\bob\x.sys".to_owned()),
-                r"%USERPROFILE%\x.sys",
+                r"C:\USERS\bob\x.sys",
             ),
             (
                 ImagePath::Text(r"\??\c:\users\bob\x.sys".to_owned()),
-                r"%USERPROFILE%\x.sys",
+                r"c:\users\bob\x.sys",
             ),
         ] {
             let resolved = resolve(&image_path, "svc", root).unwrap();
-            let redacted = bope_core::view::redact_profile_paths(&resolved, None);
-            assert_eq!(redacted, expected_redacted, "{image_path:?}");
-            assert!(!redacted.contains("bob"), "{redacted}");
+            assert_eq!(resolved, expected, "{image_path:?}");
+            assert!(crate::paths::is_under_profile_root(&resolved, None));
         }
     }
 

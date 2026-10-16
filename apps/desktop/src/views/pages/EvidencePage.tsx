@@ -315,7 +315,7 @@ export function EvidencePage({ data, focus }: Props) {
         </section>
       )}
 
-      {/* What the collectors saw that no rule matched. Self mode lists it; SS mode counts it (ADR 0014). */}
+      {/* What the collectors saw that no rule matched (ADR 0014). */}
       {view.unmatched.length > 0 && (
         <section className="panel unmatched" aria-labelledby="unmatched-title">
           <h3 id="unmatched-title">{t("unmatched.title")}</h3>
@@ -327,17 +327,6 @@ export function EvidencePage({ data, focus }: Props) {
             />
           </details>
         </section>
-      )}
-
-      {view.mode === "ss" && (
-        <p className="muted">
-          {t("hidden", {
-            notFound: view.hidden.not_found,
-            unmeasuredExpected: view.hidden.unmeasured_expected,
-            unmeasuredUnexpected: view.hidden.unmeasured_unexpected,
-            unmatched: view.hidden.unmatched,
-          })}
-        </p>
       )}
     </div>
   );

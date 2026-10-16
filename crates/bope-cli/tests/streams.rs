@@ -35,25 +35,26 @@ fn text(bytes: &[u8]) -> String {
 }
 
 #[test]
-fn the_consent_question_goes_to_standard_error_and_the_json_to_standard_output() {
-    let output = run(&["scan", "--lang", "en", "--mode", "ss", "--json"], "y\n");
+fn the_full_scan_question_goes_to_standard_error_and_the_json_to_standard_output() {
+    let output = run(&["scan", "--lang", "en", "--full", "--json"], "no\n");
     assert!(output.status.success(), "{}", text(&output.stderr));
     let stderr = text(&output.stderr);
     assert!(
-        stderr.contains("SS mode") && stderr.contains("[y/N]"),
+        stderr.contains("Full scan") && stderr.contains("Type yes"),
         "{stderr}"
     );
     let report: serde_json::Value =
         serde_json::from_slice(&output.stdout).expect("standard output is only the JSON report");
-    assert_eq!(report["mode"], "ss");
+    assert_eq!(report["header"]["scan_tier"], "standard");
+    assert!(report.get("mode").is_none(), "the view has one audience");
 }
 
+/// The screenshare mode is gone: the option that selected it is refused rather than ignored.
 #[test]
-fn refusing_writes_nothing_to_standard_output() {
-    let output = run(&["scan", "--lang", "en", "--mode", "ss", "--json"], "n\n");
-    assert!(output.status.success());
+fn the_removed_mode_option_is_refused() {
+    let output = run(&["scan", "--lang", "en", "--mode", "ss", "--json"], "");
+    assert!(!output.status.success());
     assert!(output.stdout.is_empty(), "{}", text(&output.stdout));
-    assert!(text(&output.stderr).contains("Scan cancelled. Nothing was read."));
 }
 
 /// The pause the elevated copy is started with asks on standard error and ends at end of input, so a

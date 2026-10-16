@@ -575,7 +575,7 @@ impl<'h> Context<'h> {
         if env_root("ProgramData").is_some_and(|root| is_under(path, &root)) {
             return "program_data";
         }
-        if bope_core::view::redact_profile_paths(path, self.profiles_directory.as_deref()) != path {
+        if paths::is_under_profile_root(path, self.profiles_directory.as_deref()) {
             return "user_profile";
         }
         "other"

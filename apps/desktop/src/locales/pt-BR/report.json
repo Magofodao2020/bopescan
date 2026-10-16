@@ -1,7 +1,5 @@
 {
   "header": {
-    "mode_self": "Verificação própria",
-    "mode_ss": "Modo SS",
     "version": "Versão",
     "platform": "Plataforma",
     "rights": "Direitos",
@@ -17,9 +15,7 @@
     "rules": "Regras",
     "scan_tier": "Verificação",
     "tier_standard": "padrão",
-    "tier_full": "avançada",
-    "server_identity_hidden": "Nomes de servidores aparecem como %SERVER_IDENTITY%: o jogador não concordou em mostrá-los.",
-    "download_host_hidden": "Nomes de sites aparecem como %DOWNLOAD_HOST%: o jogador não concordou em mostrá-los."
+    "tier_full": "avançada"
   },
   "state": {
     "found": "Encontrado",
@@ -72,7 +68,6 @@
     "title": "Observações sem regra",
     "note": "O que os coletores viram e nenhuma regra marcou. São coisas vistas, não achados."
   },
-  "hidden": "Oculto no modo SS: {{notFound}} não encontrado(s) · {{unmeasuredExpected}} não verificado(s) (esperado) · {{unmeasuredUnexpected}} não verificado(s) (não esperado) · {{unmatched}} observações sem regra",
   "empty": "Nenhuma evidência para mostrar.",
   "summary": {
     "title": "O que esta verificação lista",
@@ -473,7 +468,6 @@
     "save": "Salvar relatório",
     "saved": "Salvo, cada um com um arquivo .sha256 ao lado:",
     "failed": "Não foi salvo: {{error}}",
-    "note_ss": "O relatório salvo é a visão SS que você vê: filtrada e com nomes de usuário ocultos nos caminhos.",
     "note_self": "O relatório salvo é a visão completa, incluindo caminhos com seu nome de usuário.",
     "hash_note": "O SHA-256 mostra se o arquivo foi alterado depois de salvo. Ele não prova que a verificação foi honesta nem quem fez o relatório."
   },

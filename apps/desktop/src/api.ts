@@ -9,7 +9,6 @@ import type {
   AgeText,
   AppInfo,
   CodeLinks,
-  Mode,
   ReportHeader,
   ReportView,
   RuleMeta,
@@ -17,7 +16,6 @@ import type {
   SavedFile,
   ScanStatus,
   ScanTier,
-  SsOptions,
 } from "./types";
 
 /** Facts for the start screen, read before any scan: version, rules, rights and the collectors. */
@@ -55,18 +53,14 @@ export function pickExportDir(): Promise<string | null> {
   return invoke<string | null>("pick_export_dir");
 }
 
-/** Saves the report as `mode` shows it, in each format, with a `.sha256` file beside each. */
+/** Saves the report in each format, with a `.sha256` file beside each. */
 export function exportReport(
-  mode: Mode,
-  options: SsOptions | undefined,
   lang: string,
   formats: string[],
   dir: string,
   timeZone: string,
 ): Promise<SavedFile[]> {
   return invoke<SavedFile[]>("export_report", {
-    mode,
-    options: options ?? null,
     lang,
     formats,
     dir,
@@ -79,12 +73,9 @@ export function reportHeader(): Promise<ReportHeader> {
   return invoke<ReportHeader>("report_header");
 }
 
-/**
- * The frozen report as `mode` may see it, with what the player agreed SS mode may show beyond its
- * default. Filtering, redaction and the placeholders happen in Rust (ADR 0052).
- */
-export function reportView(mode: Mode, options?: SsOptions): Promise<ReportView> {
-  return invoke<ReportView>("report_view", { mode, options: options ?? null });
+/** The frozen report's view, built in Rust. */
+export function reportView(): Promise<ReportView> {
+  return invoke<ReportView>("report_view");
 }
 
 /** What came of a request to restart with administrator rights. */

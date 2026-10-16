@@ -12,7 +12,7 @@ use std::path::PathBuf;
 use bope_collectors::scan::{self, ScanContext};
 use bope_core::bundle::Bundle;
 use bope_core::engine::SelfIdentity;
-use bope_core::model::{Mode, ScanTier};
+use bope_core::model::ScanTier;
 use bope_core::provenance::Provenance;
 use bope_core::view;
 use bope_host::FixtureHost;
@@ -44,19 +44,13 @@ fn report_at(host: &str, self_identity: SelfIdentity, tier: ScanTier) -> bope_co
 
 #[test]
 fn secure_boot_off_self_view() {
-    let view = view::for_mode(&report_for("secure-boot-off"), Mode::SelfCheck);
-    insta::assert_json_snapshot!(view, { ".header.rules_bundle.sha256" => "[bundle sha256]" });
-}
-
-#[test]
-fn secure_boot_off_ss_view() {
-    let view = view::for_mode(&report_for("secure-boot-off"), Mode::Ss);
+    let view = view::for_report(&report_for("secure-boot-off"));
     insta::assert_json_snapshot!(view, { ".header.rules_bundle.sha256" => "[bundle sha256]" });
 }
 
 #[test]
 fn unreported_secure_boot_is_unmeasured_not_not_found() {
-    let view = view::for_mode(&report_for("secure-boot-unreported"), Mode::SelfCheck);
+    let view = view::for_report(&report_for("secure-boot-unreported"));
     insta::assert_json_snapshot!(view, { ".header.rules_bundle.sha256" => "[bundle sha256]" });
 }
 
@@ -66,73 +60,16 @@ fn unreported_secure_boot_is_unmeasured_not_not_found() {
 /// and the folder observations, which no rule matches, as unmatched observations (ADR 0014).
 #[test]
 fn fivem_dir_plugin_present_self_view() {
-    let view = view::for_mode(&report_for("fivem-dir-plugin-present"), Mode::SelfCheck);
+    let view = view::for_report(&report_for("fivem-dir-plugin-present"));
     let json = serde_json::to_string(&view).unwrap();
     assert!(json.contains(r"plugins\\example-plugin.dll"), "{json}");
     insta::assert_json_snapshot!(view, { ".header.rules_bundle.sha256" => "[bundle sha256]" });
 }
 
-/// Until ADR 0036 no plugin file reached an SS view, and this test asserted the file name was absent.
-/// Now each file matches a rule and is `found`, so its path **is** shown to the person watching — which
-/// is what the consent question names — and the property that carries the weight is redaction: the
-/// fixture's files live under `C:\Users\fixtureuser\...`, and the user name must not survive while
-/// the rest of the path does.
-#[test]
-fn fivem_dir_plugin_present_ss_view() {
-    let view = view::for_mode(&report_for("fivem-dir-plugin-present"), Mode::Ss);
-    let json = serde_json::to_string(&view).unwrap();
-    assert!(!json.contains("fixtureuser"), "{json}");
-    for redacted in [
-        r"%USERPROFILE%\\AppData\\Local\\FiveM\\FiveM.app\\plugins\\example-plugin.dll",
-        r"%USERPROFILE%\\AppData\\Local\\FiveM\\FiveM.app\\plugins\\unreadable-plugin.dll",
-    ] {
-        assert!(json.contains(redacted), "{redacted} is not in {json}");
-    }
-    insta::assert_json_snapshot!(view, { ".header.rules_bundle.sha256" => "[bundle sha256]" });
-}
-
-/// Both editions' `FiveM.exe` reach an SS view through the client rules, with the user name redacted
-/// out of both paths, the signer's name shown beside a certificate the rule does not know, and nothing
-/// else from either program folder — `modify.exe` and the folder's other entries are listed to find
-/// the executable and are never observations (ADR 0036).
-#[test]
-fn fivem_dir_client_exe_ss_view_redacts_both_programs_and_shows_nothing_else() {
-    const WITHOUT_VERIFIED_SIGNATURE: &str = "148cbcdd-8d18-4af6-a541-71cc7f21b2eb";
-    const ANOTHER_CERTIFICATE: &str = "2dc11b64-72a2-48f5-a273-985e906d5a9e";
-
-    let report = report_for("fivem-dir-client-exe");
-    let everything = serde_json::to_string(&report).unwrap();
-    for never in ["modify.exe", "VisualElementsManifest", "products"] {
-        assert!(!everything.contains(never), "{never} reached the report");
-    }
-
-    let view = view::for_mode(&report, Mode::Ss);
-    let json = serde_json::to_string(&view).unwrap();
-    assert!(!json.contains("fixtureuser"), "{json}");
-    let found = |rule: &str| {
-        view.evidence
-            .iter()
-            .find(|evidence| evidence.rule_id == rule)
-            .map(|evidence| serde_json::to_string(&evidence.state).unwrap())
-            .unwrap_or_default()
-    };
-    let unsigned = found(WITHOUT_VERIFIED_SIGNATURE);
-    assert!(
-        unsigned.contains(r"%USERPROFILE%\\AppData\\Local\\FiveM for GTAV Enhanced\\FiveM.exe"),
-        "{unsigned}"
-    );
-    let other = found(ANOTHER_CERTIFICATE);
-    assert!(
-        other.contains(r"%USERPROFILE%\\AppData\\Local\\FiveM\\fivem.exe"),
-        "{other}"
-    );
-    assert!(other.contains("Example Signer"), "{other}");
-}
-
 /// A folder nobody could list is a gap in every field **for the rules that could match there**
 /// (ADR 0044). Those rules are `unmeasured` — the one asking for an absent `signature` included, whose
 /// `exists: false` would otherwise be satisfied by a folder with nothing read in it — and none of them
-/// declares `access_denied`, so SS mode lists each (ADR 0027, ADR 0029, ADR 0036). A rule whose
+/// declares `access_denied`, so each is an unexpected refusal (ADR 0027, ADR 0029, ADR 0036). A rule whose
 /// `location` rules that folder out keeps the answer the folders that were read give it: until
 /// ADR 0044 an unreadable program folder made the plugin rules `unmeasured` too.
 #[test]
@@ -214,9 +151,9 @@ fn a_fivem_folder_that_could_not_be_listed_leaves_the_rules_that_could_match_the
 /// review of every `access_denied` declaration, no rule names it: on `evtx` and `prefetch` it is a
 /// refusal with administrator rights, and on `posture` a refusal of a key every account may read or a
 /// query that never reports one. On each of these hosts the rules the refusal reaches are
-/// `unmeasured / access_denied` with `expected: false`, and SS mode lists every one of them.
+/// `unmeasured / access_denied` with `expected: false`, and the view lists every one of them.
 #[test]
-fn a_refusal_no_rule_expects_is_listed_in_ss_mode() {
+fn a_refusal_no_rule_expects_is_listed() {
     use bope_core::model::{EvidenceState, UnmeasuredReason};
 
     for (host, rules) in [
@@ -242,7 +179,7 @@ fn a_refusal_no_rule_expects_is_listed_in_ss_mode() {
             })
             .collect();
         assert_eq!(refused.len(), rules, "{host}: {refused:?}");
-        let ss = view::for_mode(&report, Mode::Ss);
+        let view = view::for_report(&report);
         for evidence in refused {
             assert!(
                 matches!(
@@ -256,10 +193,10 @@ fn a_refusal_no_rule_expects_is_listed_in_ss_mode() {
                 evidence.rule_id
             );
             assert!(
-                ss.evidence
+                view.evidence
                     .iter()
                     .any(|row| row.rule_id == evidence.rule_id),
-                "{host}: SS mode does not list {}",
+                "{host}: the view does not list {}",
                 evidence.rule_id
             );
         }
@@ -319,40 +256,25 @@ fn process_own_trace_self_view() {
     );
     let unmatched = serde_json::to_string(&report.unmatched).unwrap();
     assert!(!unmatched.contains("aeterna-rongroi"), "{unmatched}");
-    let view = view::for_mode(&report, Mode::SelfCheck);
+    let view = view::for_report(&report);
     let evidence = serde_json::to_string(&view.evidence).unwrap();
     assert!(!evidence.contains("aeterna-rongroi"), "{evidence}");
     // `started_at` is read for ADR 0062's session statement only (owner decision 8, 2026-10-02):
-    // the processes carry it, and neither mode's timeline holds it.
+    // the processes carry it, and the timeline does not hold it.
     assert!(
         serde_json::to_string(&report.unmatched)
             .unwrap()
             .contains("started_at")
     );
-    for mode in [Mode::SelfCheck, Mode::Ss] {
-        let timeline = view::timeline(&report, mode);
-        assert!(
-            timeline
-                .entries
-                .iter()
-                .all(|entry| entry.collector.as_deref() != Some("process")),
-            "{mode:?}: {:?}",
-            timeline.entries
-        );
-    }
-    insta::assert_json_snapshot!(view, { ".header.rules_bundle.sha256" => "[bundle sha256]" });
-}
-
-/// SS mode shows own traces as well, with the same path redaction as `Found` evidence.
-#[test]
-fn process_own_trace_ss_view() {
-    let view = view::for_mode(
-        &report_for_self("process-own-trace", scanning_ourselves()),
-        Mode::Ss,
+    let timeline = view::timeline(&report);
+    assert!(
+        timeline
+            .entries
+            .iter()
+            .all(|entry| entry.collector.as_deref() != Some("process")),
+        "{:?}",
+        timeline.entries
     );
-    assert_eq!(view.own_traces.len(), 2);
-    let json = serde_json::to_string(&view).unwrap();
-    assert!(!json.contains("fixtureuser"), "{json}");
     insta::assert_json_snapshot!(view, { ".header.rules_bundle.sha256" => "[bundle sha256]" });
 }
 
@@ -367,24 +289,10 @@ fn unofficial_provenance_is_reported() {
 /// needs no change to the CLI or the app: both render the bucket by collector id (ADR 0014).
 #[test]
 fn pca_files_present_self_view() {
-    let view = view::for_mode(&report_for("pca-files-present"), Mode::SelfCheck);
+    let view = view::for_report(&report_for("pca-files-present"));
     let json = serde_json::to_string(&view).unwrap();
     assert!(json.contains("game.exe"), "{json}");
     assert!(json.contains(r"Users\\alex\\Downloads\\game.exe"), "{json}");
-    insta::assert_json_snapshot!(view, { ".header.rules_bundle.sha256" => "[bundle sha256]" });
-}
-
-/// PCA records the paths of programs that ran, which is a list of what a person has on their
-/// computer. SS mode lists no unmatched observation at all, so none of it reaches the person watching
-/// the screenshare — neither the account name in the paths nor the names of the programs.
-#[test]
-fn pca_files_present_ss_view() {
-    let view = view::for_mode(&report_for("pca-files-present"), Mode::Ss);
-    let json = serde_json::to_string(&view).unwrap();
-    assert!(!json.contains("alex"), "{json}");
-    assert!(!json.contains("game.exe"), "{json}");
-    // The viewer is told how many were withheld rather than being told nothing (ADR 0014).
-    assert!(view.hidden.unmatched > 0);
     insta::assert_json_snapshot!(view, { ".header.rules_bundle.sha256" => "[bundle sha256]" });
 }
 
@@ -393,7 +301,7 @@ fn pca_files_present_ss_view() {
 /// through the unmatched bucket with no change to the CLI or the app.
 #[test]
 fn prefetch_files_present_self_view() {
-    let view = view::for_mode(&report_for("prefetch-files-present"), Mode::SelfCheck);
+    let view = view::for_report(&report_for("prefetch-files-present"));
     let json = serde_json::to_string(&view).unwrap();
     assert!(json.contains("cmd.exe"), "{json}");
     insta::assert_json_snapshot!(view, { ".header.rules_bundle.sha256" => "[bundle sha256]" });
@@ -403,50 +311,9 @@ fn prefetch_files_present_self_view() {
 /// reach Self mode through the unmatched bucket with no change to the CLI or the app.
 #[test]
 fn bam_entries_present_self_view() {
-    let view = view::for_mode(&report_for("bam-entries-present"), Mode::SelfCheck);
+    let view = view::for_report(&report_for("bam-entries-present"));
     let json = serde_json::to_string(&view).unwrap();
     assert!(json.contains("example.exe"), "{json}");
-    insta::assert_json_snapshot!(view, { ".header.rules_bundle.sha256" => "[bundle sha256]" });
-}
-
-/// BAM is keyed by a SID, and the fixture writes a whole one out so that this assertion has
-/// something to bite on. A real machine's account name may be a single character — the vendored
-/// Prefetch corpus's is — so the assertion that carries the weight is on the *shapes* an account or
-/// an installation leaves behind, and it is made against the whole report rather than only the view:
-/// neither mode has anything to redact here, because the collector never emits them.
-#[test]
-fn bam_entries_present_ss_view() {
-    let report = report_for("bam-entries-present");
-    let everything = serde_json::to_string(&report).unwrap().to_uppercase();
-    for leaked in ["S-1-5-", "USERSETTINGS", "HARDDISKVOLUME"] {
-        assert!(!everything.contains(leaked), "{leaked} reached the report");
-    }
-
-    let view = view::for_mode(&report, Mode::Ss);
-    let json = serde_json::to_string(&view).unwrap();
-    assert!(!json.contains("example.exe"), "{json}");
-    assert!(!json.contains("fixtureuser"), "{json}");
-    assert!(view.hidden.unmatched > 0);
-    insta::assert_json_snapshot!(view, { ".header.rules_bundle.sha256" => "[bundle sha256]" });
-}
-
-/// A `.pf` file lists every file the program loaded and the volumes it touched. The fixture's own
-/// `.pf` carries the upstream author's profile paths and his machine's volume serial numbers
-/// (`fixtures/prefetch/PROVENANCE.md`), and **neither mode has anything to redact**, because the
-/// collector never emits them. What SS mode adds on top is that it lists no unmatched observation at
-/// all, so not even the program's name reaches the person watching.
-#[test]
-fn prefetch_files_present_ss_view() {
-    let report = report_for("prefetch-files-present");
-    let everything = serde_json::to_string(&report).unwrap().to_uppercase();
-    for leaked in ["VOLUME{", "HARDDISKVOLUME", "\\\\USERS\\\\", ".DLL"] {
-        assert!(!everything.contains(leaked), "{leaked} reached the report");
-    }
-
-    let view = view::for_mode(&report, Mode::Ss);
-    let json = serde_json::to_string(&view).unwrap();
-    assert!(!json.contains("cmd.exe"), "{json}");
-    assert!(view.hidden.unmatched > 0);
     insta::assert_json_snapshot!(view, { ".header.rules_bundle.sha256" => "[bundle sha256]" });
 }
 
@@ -457,43 +324,12 @@ fn prefetch_files_present_ss_view() {
 /// than one observation per record — a real log holds tens of thousands of them.
 #[test]
 fn evtx_logs_present_self_view() {
-    let view = view::for_mode(&report_for("evtx-logs-present"), Mode::SelfCheck);
+    let view = view::for_report(&report_for("evtx-logs-present"));
     let json = serde_json::to_string(&view).unwrap();
     assert!(
         json.contains("Microsoft-Windows-LanguagePackSetup"),
         "{json}"
     );
-    insta::assert_json_snapshot!(view, { ".header.rules_bundle.sha256" => "[bundle sha256]" });
-}
-
-/// One Event Log record can carry a user name, a host name, an address, a SID and a command line.
-/// The parser drops every record's payload and its `Computer` field (ADR 0018), so **neither mode has
-/// anything to redact** — the host name of the machine that wrote the vendored sample reaches no part
-/// of the report. What SS mode adds on top is that it lists no unmatched observation at all, so the
-/// names of the channels on this PC reach the person watching only where a rule matched and the name
-/// is part of the evidence: here both logs hold records of a channel the service writes to another
-/// file, and that file's path — which names the channel — is what the row shows (ADR 0042). The two
-/// log-clearing rules are `tamper`, not `posture`, so their `not_found` is counted here rather than
-/// listed — a rule whose negative result means almost nothing does not get a row in front of a
-/// reviewer (ADR 0031).
-#[test]
-fn evtx_logs_present_ss_view() {
-    let report = report_for("evtx-logs-present");
-    let everything = serde_json::to_string(&report).unwrap();
-    assert!(
-        !everything.contains("DESKTOP-1N4R894"),
-        "the host name reached the report"
-    );
-
-    let view = view::for_mode(&report, Mode::Ss);
-    let outside_the_evidence: Vec<_> = view
-        .evidence
-        .iter()
-        .filter(|row| row.rule_id != "87a53c8f-b0e4-477d-91e7-93b904ba965f")
-        .collect();
-    let json = serde_json::to_string(&outside_the_evidence).unwrap();
-    assert!(!json.contains("LanguagePackSetup"), "{json}");
-    assert!(view.hidden.unmatched > 0);
     insta::assert_json_snapshot!(view, { ".header.rules_bundle.sha256" => "[bundle sha256]" });
 }
 
@@ -541,121 +377,15 @@ fn a_log_that_could_not_be_read_leaves_the_clearing_rules_unmeasured() {
 /// review).
 #[test]
 fn driver_service_refused_self_view() {
-    let view = view::for_mode(&report_for("driver-service-refused"), Mode::SelfCheck);
+    let view = view::for_report(&report_for("driver-service-refused"));
     insta::assert_json_snapshot!(view, { ".header.rules_bundle.sha256" => "[bundle sha256]" });
 }
 
-/// The same refusal in SS mode: `access_denied` is not in this rule's `unmeasured_when`
-/// (`rules/driver_service/vulnerable-driver/loldrivers-listed/rule.yaml`), so it is an unexpected
-/// reason and SS mode lists it rather than only counting it (Minor 6 of the PR 3 review).
-#[test]
-fn driver_service_refused_ss_view() {
-    use bope_core::model::{EvidenceState, UnmeasuredReason};
-
-    const VULNERABLE_DRIVER_LISTED: &str = "98f6e2b8-6d23-4202-bc7f-06587ebdd2f3";
-
-    let report = report_for("driver-service-refused");
-    let evidence = report
-        .evidence
-        .iter()
-        .find(|evidence| evidence.rule_id == VULNERABLE_DRIVER_LISTED)
-        .unwrap_or_else(|| panic!("{VULNERABLE_DRIVER_LISTED} did not reach the report"));
-    assert!(
-        matches!(
-            evidence.state,
-            EvidenceState::Unmeasured {
-                reason: UnmeasuredReason::AccessDenied,
-                expected: false,
-            }
-        ),
-        "{:?}",
-        evidence.state
-    );
-
-    let view = view::for_mode(&report, Mode::Ss);
-    assert!(
-        view.evidence
-            .iter()
-            .any(|row| row.rule_id == VULNERABLE_DRIVER_LISTED),
-        "SS mode does not list {VULNERABLE_DRIVER_LISTED}"
-    );
-    insta::assert_json_snapshot!(view, { ".header.rules_bundle.sha256" => "[bundle sha256]" });
-}
-
-/// A driver service whose file's SHA-256 is the vendored data file's first row is `Found`, with that
-/// hash on the row, and SS mode lists it — `ss_lists` admits every match whatever the rule's
-/// `strength`, and this rule is `posture` (Minor 6 of the PR 3 review).
-#[test]
-fn driver_service_listed_ss_view() {
-    use bope_core::model::EvidenceState;
-
-    const VULNERABLE_DRIVER_LISTED: &str = "98f6e2b8-6d23-4202-bc7f-06587ebdd2f3";
-    const LISTED_SHA256: &str = "000547560fea0dd4b477eb28bf781ea67bf83c748945ce8923f90fdd14eb7a4b";
-
-    let report = report_for("driver-service-listed");
-    let evidence = report
-        .evidence
-        .iter()
-        .find(|evidence| evidence.rule_id == VULNERABLE_DRIVER_LISTED)
-        .unwrap_or_else(|| panic!("{VULNERABLE_DRIVER_LISTED} did not reach the report"));
-    let EvidenceState::Found { observations } = &evidence.state else {
-        panic!("expected Found, got {:?}", evidence.state);
-    };
-    assert!(
-        observations.iter().any(|observation| {
-            observation
-                .fields
-                .get("sha256")
-                .and_then(|value| value.as_str())
-                == Some(LISTED_SHA256)
-        }),
-        "{observations:?}"
-    );
-
-    let view = view::for_mode(&report, Mode::Ss);
-    let json = serde_json::to_string(&view).unwrap();
-    assert!(json.contains(LISTED_SHA256), "{json}");
-    insta::assert_json_snapshot!(view, { ".header.rules_bundle.sha256" => "[bundle sha256]" });
-}
-
-/// A hosts line for a listed name is `Found`. SS mode lists it with the kind of address and without the
-/// address itself, which Self mode shows (ADR 0054, owner decision 2); the proxy's server and the
-/// firewall rules reach neither view as evidence, since no rule reads them.
-#[test]
-fn net_config_listed_name_ss_view() {
-    const HOSTS_RULE: &str = "65ee0ec1-bcda-47a3-a401-98632b42e75f";
-
-    let report = report_for("net-config-listed-name");
-    let evidence = report
-        .evidence
-        .iter()
-        .find(|evidence| evidence.rule_id == HOSTS_RULE)
-        .unwrap_or_else(|| panic!("{HOSTS_RULE} did not reach the report"));
-    assert!(
-        matches!(&evidence.state, bope_core::model::EvidenceState::Found { observations } if observations.len() == 2),
-        "{evidence:?}"
-    );
-
-    let own = serde_json::to_string(&view::for_mode(&report, Mode::SelfCheck)).unwrap();
-    assert!(own.contains("192.0.2.10"), "{own}");
-    let view = view::for_mode(&report, Mode::Ss);
-    let json = serde_json::to_string(&view).unwrap();
-    for withheld in ["192.0.2.10", "proxy.example.test", "Example"] {
-        assert!(
-            !json.contains(withheld),
-            "{withheld} reached the SS view: {json}"
-        );
-    }
-    assert!(json.contains("\"address_kind\":\"public\""), "{json}");
-    insta::assert_json_snapshot!(view, { ".header.rules_bundle.sha256" => "[bundle sha256]" });
-}
-
-/// The boot time is a fact about the scan's context, so both views carry it unchanged: SS mode's
-/// filter is about evidence, and staff read the times on the rows they are shown against it
-/// (ADR 0039). A report written before the field existed reads back as never having tried, not as a
+/// The boot time is a fact about the scan's context, so the view carries it unchanged and the times on
+/// the rows are read against it (ADR 0039). A report written before the field existed reads back as never having tried, not as a
 /// start time nobody measured.
 #[test]
-fn the_boot_time_reaches_both_views_and_an_older_report_reads_back_not_attempted() {
+fn the_boot_time_reaches_the_view_and_an_older_report_reads_back_not_attempted() {
     use bope_core::model::{BootTime, UnmeasuredReason};
 
     let report = report_for("secure-boot-off");
@@ -664,9 +394,7 @@ fn the_boot_time_reaches_both_views_and_an_older_report_reads_back_not_attempted
         seconds_since_boot: 266_584,
     };
     assert_eq!(report.header.boot_time, expected);
-    for mode in [Mode::SelfCheck, Mode::Ss] {
-        assert_eq!(view::for_mode(&report, mode).header.boot_time, expected);
-    }
+    assert_eq!(view::for_report(&report).header.boot_time, expected);
 
     let mut older = serde_json::to_value(&report).unwrap();
     older["header"]
@@ -693,11 +421,11 @@ const USN_ENHANCED_RENAMED: &str = "7996285e-8ccf-4b2d-8fec-339a32b95931";
 const USN_PSREADLINE_DELETED: &str = "926b3863-8f4f-4d18-aab6-26b77934466e";
 const USN_PSREADLINE_RENAMED: &str = "8a39617a-30d6-4fc0-9b20-cb4f899985d5";
 
-/// Every `usn` row that looked carries the journal's span, from the journal's own observation, in both
-/// modes; the Enhanced folder that is not there is an expected `source_absent`, counted in SS mode
-/// (ADR 0047, amendment of 2026-09-30, decisions 3 and 5).
+/// Every `usn` row that looked carries the journal's span, from the journal's own observation; the
+/// Enhanced folder that is not there is an expected `source_absent` (ADR 0047, amendment of
+/// 2026-09-30, decisions 3 and 5).
 #[test]
-fn the_change_journal_rules_carry_the_journals_span_in_both_views() {
+fn the_change_journal_rules_carry_the_journals_span() {
     use bope_core::model::{EvidenceState, UnmeasuredReason};
     use bope_core::view::RowBand;
 
@@ -751,40 +479,15 @@ fn the_change_journal_rules_carry_the_journals_span_in_both_views() {
         to: journal.fields["last_seen"].as_str().unwrap().to_owned(),
     };
 
-    let own = view::for_mode(&report, Mode::SelfCheck);
+    let own = view::for_report(&report);
     assert_eq!(own.row_bands.get(USN_PLUGINS_RENAMED), Some(&span));
     assert_eq!(own.row_bands.get(USN_PLUGINS_DELETED), Some(&span));
     assert_eq!(own.row_bands.get(USN_PSREADLINE_DELETED), Some(&span));
     assert_eq!(own.row_bands.get(USN_ENHANCED_DELETED), None);
-
-    // SS mode lists the match with its span, and counts the `context` not-found and the expected gap.
-    let ss = view::for_mode(&report, Mode::Ss);
-    assert!(
-        ss.evidence
-            .iter()
-            .any(|row| row.rule_id == USN_PLUGINS_RENAMED)
-    );
-    assert!(
-        ss.evidence
-            .iter()
-            .any(|row| row.rule_id == USN_PSREADLINE_DELETED)
-    );
-    assert!(
-        ss.evidence
-            .iter()
-            .all(|row| row.rule_id != USN_PLUGINS_DELETED
-                && row.rule_id != USN_ENHANCED_DELETED
-                && row.rule_id != USN_ENHANCED_RENAMED
-                && row.rule_id != USN_PSREADLINE_RENAMED)
-    );
-    assert_eq!(ss.row_bands.get(USN_PLUGINS_RENAMED), Some(&span));
-    assert_eq!(ss.row_bands.get(USN_PSREADLINE_DELETED), Some(&span));
-    assert_eq!(ss.row_bands.len(), 2, "{:?}", ss.row_bands);
 }
 
-/// A plugin folder on another volume is `other_volume`, which the rules declare, so SS mode counts it
-/// rather than listing "this could not be read" — and the timeline still says, once, where it was
-/// (ADR 0047, amendment of 2026-09-30, decision 1).
+/// A plugin folder on another volume is `other_volume`, which the rules declare, and the timeline says,
+/// once, where it was (ADR 0047, amendment of 2026-09-30, decision 1).
 #[test]
 fn a_plugin_folder_on_another_volume_is_an_expected_reason_not_a_failed_read() {
     use bope_core::model::{EvidenceState, UnmeasuredReason, UnmeasuredSource};
@@ -805,16 +508,8 @@ fn a_plugin_folder_on_another_volume_is_an_expected_reason_not_a_failed_read() {
             "{rule_id}"
         );
     }
-    let ss = view::for_mode(&report, Mode::Ss);
-    assert!(
-        ss.evidence
-            .iter()
-            .all(|row| row.rule_id != USN_PLUGINS_DELETED && row.rule_id != USN_PLUGINS_RENAMED),
-        "{:?}",
-        ss.evidence
-    );
-    assert!(ss.row_bands.is_empty(), "{:?}", ss.row_bands);
-    assert!(ss.timeline.unmeasured.contains(&UnmeasuredSource {
+    let view = view::for_report(&report);
+    assert!(view.timeline.unmeasured.contains(&UnmeasuredSource {
         collector: "usn".to_owned(),
         place: Some("plugins".to_owned()),
         reason: UnmeasuredReason::OtherVolume,
@@ -822,8 +517,8 @@ fn a_plugin_folder_on_another_volume_is_an_expected_reason_not_a_failed_read() {
 }
 
 /// What the trace-ages section and the statement are built from and show, as one document per view.
-fn trace_ages_of(report: &bope_core::model::Report, mode: Mode) -> serde_json::Value {
-    let view = view::for_mode(report, mode);
+fn trace_ages_of(report: &bope_core::model::Report) -> serde_json::Value {
+    let view = view::for_report(report);
     serde_json::json!({
         "anchors": view.header.anchors,
         "trace_ages": view.trace_ages,
@@ -831,93 +526,23 @@ fn trace_ages_of(report: &bope_core::model::Report, mode: Mode) -> serde_json::V
     })
 }
 
-/// A PC read with administrator rights: every anchor dated, each source's oldest time and count, the
-/// logs the bundle reads first and the rest folded, and the cross-source statement — Prefetch reaches
-/// back before `FiveM`'s logs were last written and holds no `FiveM` name, BAM was refused, and PCA holds
-/// one (ADR 0061).
+/// The whole view of the trace-ages host, which the desktop tests render.
 #[test]
-fn trace_ages_elevated_ss_view() {
-    let view = view::for_mode(&report_for("trace-ages-elevated"), Mode::Ss);
+fn trace_ages_elevated_view() {
+    let view = view::for_report(&report_for("trace-ages-elevated"));
     insta::assert_json_snapshot!(view, { ".header.rules_bundle.sha256" => "[bundle sha256]" });
 }
 
 #[test]
-fn trace_ages_elevated_self_and_ss_sections_agree() {
+fn trace_ages_elevated_sections() {
     let report = report_for("trace-ages-elevated");
-    let own = trace_ages_of(&report, Mode::SelfCheck);
-    assert_eq!(own, trace_ages_of(&report, Mode::Ss));
-    insta::assert_json_snapshot!(own);
+    insta::assert_json_snapshot!(trace_ages_of(&report));
 }
 
-/// The same kind of PC without administrator rights: Prefetch, BAM, the Security log and the change
-/// journal are "not read without administrator rights", never empty, and no ADR 0061 statement is made
-/// (ADR 0061, owner decisions 1 and 7); the session statement says when `FiveM` last ran is not known
-/// (ADR 0062).
-#[test]
-fn trace_ages_limited_ss_view() {
-    use bope_core::model::{AnchorKind, AnchorState, UnmeasuredReason};
-    use bope_core::view::TraceAgeState;
-
-    let report = report_for("trace-ages-limited");
-    let view = view::for_mode(&report, Mode::Ss);
-    let not_admin = TraceAgeState::Unmeasured {
-        reason: UnmeasuredReason::NotAdmin,
-    };
-    for (collector, key) in [
-        ("prefetch", None),
-        ("bam", None),
-        ("usn", Some("journal")),
-        ("evtx", Some("Security.evtx")),
-    ] {
-        let row = view
-            .trace_ages
-            .rows
-            .iter()
-            .find(|row| {
-                row.collector == collector
-                    && (key.is_none()
-                        || row.place.as_deref() == key
-                        || row.subject.as_deref() == key)
-            })
-            .unwrap();
-        assert_eq!(row.state, not_admin, "{collector}");
-    }
-    // No ADR 0061 statement; Legacy's FiveM.exe is present, nothing runs and neither Prefetch nor BAM
-    // was read, so its session is "not known" (ADR 0062 section 5) — never compared with the scan.
-    assert_eq!(
-        view.cross_source,
-        vec![view::CrossSourceStatement::Session(
-            view::SessionStatement {
-                edition: "legacy".to_owned(),
-                state: view::SessionState::NotKnown {
-                    prefetch: UnmeasuredReason::NotAdmin,
-                    bam: UnmeasuredReason::NotAdmin,
-                },
-            }
-        )]
-    );
-    let journal = report
-        .header
-        .anchors
-        .iter()
-        .find(|anchor| anchor.anchor == AnchorKind::UsnJournalCreated)
-        .unwrap();
-    assert_eq!(
-        journal.state,
-        AnchorState::Unmeasured {
-            reason: UnmeasuredReason::NotAdmin
-        }
-    );
-    insta::assert_json_snapshot!(trace_ages_of(&report, Mode::Ss));
-}
-
-/// The session statements of one synthetic host, the same in both modes, with no user name in them
-/// (ADR 0062).
+/// The session statements of one synthetic host, with no user name in them (ADR 0062).
 fn sessions_of(host: &str) -> serde_json::Value {
     let report = report_for(host);
-    let own = trace_ages_of(&report, Mode::SelfCheck);
-    assert_eq!(own, trace_ages_of(&report, Mode::Ss), "{host}");
-    let statements = own["cross_source"].clone();
+    let statements = trace_ages_of(&report)["cross_source"].clone();
     assert!(
         !statements.to_string().contains("fixtureuser"),
         "{statements}"
@@ -958,7 +583,7 @@ fn session_prefetch_off_statements() {
 #[test]
 fn the_index_is_shown_beside_its_oldest_cache_file() {
     let report = report_for("session-elevated");
-    let view = view::for_mode(&report, Mode::Ss);
+    let view = view::for_report(&report);
     let row = view
         .trace_ages
         .rows
@@ -1004,30 +629,6 @@ fn powershell_text_present_full_self_view() {
     for typed in ["correct horse", "private-project", "$pw"] {
         assert!(!everything.contains(typed), "{typed} reached the report");
     }
-    let view = view::for_mode(&report, Mode::SelfCheck);
+    let view = view::for_report(&report);
     insta::assert_json_snapshot!(view, { ".header.rules_bundle.sha256" => "[bundle sha256]" });
-}
-
-/// SS mode shows a website's name only when the player agreed to it (ADR 0064): by default it is the
-/// placeholder, and the agreed view shows the name.
-#[test]
-fn powershell_text_present_full_ss_view() {
-    let report = report_at(
-        "powershell-text-present",
-        SelfIdentity::default(),
-        ScanTier::Full,
-    );
-    let hidden = serde_json::to_string(&view::for_mode(&report, Mode::Ss)).unwrap();
-    assert!(hidden.contains(view::DOWNLOAD_HOST_PLACEHOLDER), "{hidden}");
-    assert!(!hidden.contains(".invalid"), "{hidden}");
-    let shown = view::for_mode_with(
-        &report,
-        Mode::Ss,
-        view::SsOptions {
-            download_host: true,
-            ..view::SsOptions::default()
-        },
-    );
-    assert!(serde_json::to_string(&shown).unwrap().contains(".invalid"));
-    insta::assert_json_snapshot!(view::for_mode(&report, Mode::Ss), { ".header.rules_bundle.sha256" => "[bundle sha256]" });
 }

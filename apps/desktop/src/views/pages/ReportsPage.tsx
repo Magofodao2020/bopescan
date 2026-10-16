@@ -6,16 +6,15 @@
 // formats chosen, each with its SHA-256, and how the files write times.
 
 import { useTranslation } from "react-i18next";
-import type { Mode, SsOptions } from "../../types";
 import { useTimeSettings } from "../../ui/TimeValue";
 import { ExportPanel } from "../ExportPanel";
 
-export function ReportsPage({ mode, options }: { mode: Mode; options?: SsOptions }) {
+export function ReportsPage() {
   const { t } = useTranslation();
   const { zone } = useTimeSettings();
   return (
     <div className="page-stack">
-      <ExportPanel mode={mode} options={options} />
+      <ExportPanel />
       <section className="panel" aria-labelledby="formats-title">
         <h3 id="formats-title">{t("ui.reports.formats_title")}</h3>
         <dl className="facts">

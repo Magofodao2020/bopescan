@@ -758,7 +758,7 @@ mod tests {
         assert_eq!(Words::new(Lang::Th).days(48), "48 วัน");
     }
 
-    fn render_fixture(host: &str, mode: bope_core::model::Mode, lang: Lang) -> String {
+    fn render_fixture(host: &str, lang: Lang) -> String {
         use bope_collectors::scan::{self, ScanContext};
         let dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../../fixtures/hosts")
@@ -780,15 +780,14 @@ mod tests {
                 tier: bope_core::model::ScanTier::Standard,
             },
         );
-        crate::output::render(&bope_core::view::for_mode(&report, mode), &bundle, lang)
+        crate::output::render(&bope_core::view::for_report(&report), &bundle, lang)
     }
 
     /// The statement and the section as a screenshare viewer reads them, in both languages: the
     /// statement's line forms and causes, an anchor with its reset, a row with its retention text.
     #[test]
     fn the_section_and_the_statement_read_as_the_adr_writes_them() {
-        use bope_core::model::Mode;
-        let text = render_fixture("trace-ages-elevated", Mode::Ss, Lang::En);
+        let text = render_fixture("trace-ages-elevated", Lang::En);
         for expected in [
             "FiveM on this PC, beside Windows' records of programs that ran",
             "    FiveM: FiveM.exe is present (Legacy). FiveM's own folders were last written 2025-12-30 (1 day before this scan).",
@@ -805,7 +804,7 @@ mod tests {
         ] {
             assert!(text.contains(expected), "missing {expected:?} in\n{text}");
         }
-        let limited = render_fixture("trace-ages-limited", Mode::Ss, Lang::Th);
+        let limited = render_fixture("trace-ages-limited", Lang::Th);
         assert!(
             limited.contains("    - [prefetch] อ่านไม่ได้เพราะไม่มีสิทธิ์ผู้ดูแลระบบ — ไม่รู้"),
             "{limited}"
@@ -819,8 +818,7 @@ mod tests {
     /// index beside its oldest file under the trace ages row. No path, file, user or server name.
     #[test]
     fn the_session_statement_reads_as_the_adr_writes_it() {
-        use bope_core::model::Mode;
-        let elevated = render_fixture("session-elevated", Mode::Ss, Lang::En);
+        let elevated = render_fixture("session-elevated", Lang::En);
         for expected in [
             "FiveM for GTA V Legacy: its last session, beside its own folders",
             "    Session: began 2025-12-31T20:00:00Z (Prefetch, FiveM.exe); ended 2025-12-31T21:30:00Z (BAM); 2 hours before this scan",
@@ -862,17 +860,16 @@ mod tests {
         // BAM's time carries a fraction of a second in the report (the timeline shows it); the
         // statement prints it to the second.
         assert!(!legacy.contains(".2231407"), "{legacy}");
-        for withheld in [
-            "fixtureuser",
-            "CitizenFX_log",
-            "launcher_a",
-            "index_a",
-            r"\Device",
-        ] {
-            assert!(!elevated.contains(withheld), "{withheld}");
+        // The statement itself names no file and no account; the rest of the report may.
+        let statement = &elevated[elevated
+            .find("FiveM for GTA V Legacy: its last session")
+            .unwrap()..];
+        let statement = statement.split("\n\n").next().unwrap_or_default();
+        for withheld in ["fixtureuser", "CitizenFX_log", "launcher_a", "index_a"] {
+            assert!(!statement.contains(withheld), "{withheld}");
         }
 
-        let thai = render_fixture("session-elevated", Mode::Ss, Lang::Th);
+        let thai = render_fixture("session-elevated", Lang::Th);
         for expected in [
             "FiveM for GTA V Legacy: เซสชันล่าสุด เทียบกับโฟลเดอร์ของ FiveM เอง",
             "    เซสชัน: เริ่ม 2025-12-31T20:00:00Z (Prefetch, FiveM.exe); จบ 2025-12-31T21:30:00Z (BAM); 2 ชั่วโมงก่อนสแกน",
@@ -886,7 +883,7 @@ mod tests {
             assert!(thai.contains(expected), "missing {expected:?} in\n{thai}");
         }
 
-        let running = render_fixture("session-limited-running", Mode::Ss, Lang::En);
+        let running = render_fixture("session-limited-running", Lang::En);
         for expected in [
             "    Session: still running since 2025-12-31T23:40:00Z (a running process, FiveM.exe)\n",
             "    Cache: last written 17 minutes after the session began",
@@ -898,14 +895,14 @@ mod tests {
             );
         }
 
-        let not_known = render_fixture("session-not-known", Mode::Ss, Lang::Th);
+        let not_known = render_fixture("session-not-known", Lang::Th);
         assert!(
             not_known.contains("    ไม่รู้ว่า FiveM รันครั้งล่าสุดเมื่อไร เพราะอ่าน Prefetch และ BAM ไม่ได้ ("),
             "{not_known}"
         );
         assert!(!not_known.contains("Enhanced: เซสชันล่าสุด"), "{not_known}");
 
-        let off = render_fixture("session-prefetch-off", Mode::Ss, Lang::En);
+        let off = render_fixture("session-prefetch-off", Lang::En);
         for expected in [
             "    Session: Prefetch is switched off on this PC, so when this run began is not recorded; ended 2025-12-31T22:00:00Z (BAM); 2 hours before this scan",
             "    Logs: the folder's latest log write was 13 hours before the session ended",

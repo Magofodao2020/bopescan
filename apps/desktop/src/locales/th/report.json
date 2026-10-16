@@ -1,7 +1,5 @@
 {
   "header": {
-    "mode_self": "ตรวจเครื่องตัวเอง",
-    "mode_ss": "โหมด SS",
     "version": "เวอร์ชัน",
     "platform": "ระบบ",
     "rights": "สิทธิ์",
@@ -17,9 +15,7 @@
     "rules": "Rule",
     "scan_tier": "การสแกน",
     "tier_standard": "แบบมาตรฐาน",
-    "tier_full": "แบบ Full",
-    "server_identity_hidden": "ชื่อเซิร์ฟเวอร์แสดงเป็น %SERVER_IDENTITY% เพราะผู้เล่นไม่ได้ยินยอมให้แสดง",
-    "download_host_hidden": "ชื่อเว็บไซต์แสดงเป็น %DOWNLOAD_HOST% เพราะผู้เล่นไม่ได้ยินยอมให้แสดง"
+    "tier_full": "แบบ Full"
   },
   "state": {
     "found": "เจอ",
@@ -72,7 +68,6 @@
     "title": "สิ่งที่เห็นแต่ไม่ตรง rule ใดเลย",
     "note": "สิ่งที่ collector เห็นแต่ไม่มี rule ไหนตรงเลย เป็นสิ่งที่เห็น ไม่ใช่สิ่งที่ตรวจเจอ"
   },
-  "hidden": "ซ่อนในโหมด SS: ไม่เจอ {{notFound}} · ยังไม่ได้วัด-ปกติ {{unmeasuredExpected}} · ยังไม่ได้วัด-ไม่ได้คาดไว้ {{unmeasuredUnexpected}} · ไม่ตรง rule ใดเลย {{unmatched}}",
   "empty": "ไม่มีหลักฐานให้แสดง",
   "summary": {
     "title": "สิ่งที่การสแกนนี้แสดง",

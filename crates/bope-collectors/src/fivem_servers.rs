@@ -18,7 +18,7 @@
 
 use std::collections::BTreeMap;
 
-use bope_core::model::{CollectorRun, Observation, ScanTier, SensitiveKind, UnmeasuredReason};
+use bope_core::model::{CollectorRun, Observation, ScanTier, UnmeasuredReason};
 use bope_host::{Host, Platform, SourceError};
 
 use crate::{Collector, Field, fivem_dir};
@@ -32,7 +32,7 @@ static FIELDS: [Field; 5] = [
     Field::timestamp("created_at"),
     Field::text("folder"),
     Field::timestamp("modified_at"),
-    Field::text("server_folder").sensitive(SensitiveKind::ServerIdentity),
+    Field::text("server_folder"),
     Field::number("server_folders"),
 ];
 
@@ -177,19 +177,9 @@ mod tests {
     }
 
     #[test]
-    fn it_is_read_only_in_a_full_scan_and_its_name_is_a_server_identity() {
+    fn it_is_read_only_in_a_full_scan_and_names_the_server_folder() {
         assert_eq!(FivemServers.tier(), ScanTier::Full);
-        let name = FIELDS
-            .iter()
-            .find(|field| field.name == "server_folder")
-            .unwrap();
-        assert_eq!(name.sensitive, Some(SensitiveKind::ServerIdentity));
-        assert!(
-            FIELDS
-                .iter()
-                .filter(|field| field.name != "server_folder")
-                .all(|field| field.sensitive.is_none())
-        );
+        assert!(FIELDS.iter().any(|field| field.name == "server_folder"));
     }
 
     #[test]

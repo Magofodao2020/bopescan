@@ -307,11 +307,6 @@ describe("Recycle Bin page", () => {
     ).toContain("notes.txt");
   });
 
-  it("says SS mode shows only catalog matches", () => {
-    renderWith(<RecycleBinPage view={{ ...view, mode: "ss" }} />);
-    expect(screen.getByText(/SS mode shows only items whose name matches/)).toBeTruthy();
-  });
-
   it("says the bin was not read, with the reason, and invents no time", () => {
     renderWith(
       <RecycleBinPage

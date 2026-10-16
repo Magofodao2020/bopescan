@@ -3,9 +3,8 @@ source: crates/bope-collectors/tests/report_snapshot.rs
 expression: view
 ---
 {
-  "mode": "self",
   "header": {
-    "schema_version": 1,
+    "schema_version": 2,
     "provenance": {
       "official": false,
       "version": "0.0.0-test",
@@ -1124,6 +1123,7 @@ expression: view
             "last_run": "2026-09-12T10:23:46Z",
             "name": "game.exe",
             "path": "C:\\Users\\alex\\Downloads\\game.exe",
+            "path_form": "drive",
             "source": "app_launch_dic"
           }
         },
@@ -1133,6 +1133,7 @@ expression: view
             "last_run": "2026-09-11T22:05:01Z",
             "name": "fivem.exe",
             "path": "C:\\Program Files\\FiveM\\FiveM.exe",
+            "path_form": "drive",
             "source": "app_launch_dic"
           }
         },
@@ -1142,6 +1143,7 @@ expression: view
             "last_run": "2026-01-02T03:04:05Z",
             "name": "notepad.exe",
             "path": "C:\\Windows\\System32\\notepad.exe",
+            "path_form": "drive",
             "source": "app_launch_dic"
           }
         },
@@ -1424,12 +1426,6 @@ expression: view
     "found": 0,
     "not_found": 33,
     "unmeasured": 93
-  },
-  "hidden": {
-    "not_found": 0,
-    "unmeasured_expected": 0,
-    "unmeasured_unexpected": 0,
-    "unmatched": 0
   },
   "timeline": {
     "entries": [

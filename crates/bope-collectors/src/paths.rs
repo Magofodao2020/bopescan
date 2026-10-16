@@ -5,14 +5,63 @@
 //! What a collector may say about a path an artifact spelled.
 //!
 //! Two artifacts record the full path of a program that ran — PCA in a text line, BAM in the name of
-//! a registry value — and both have to answer the same two questions: which single field a rule can
-//! match on, and whether this path is a shape SS-mode redaction can reach. They live here rather than
-//! in one collector because two collectors answering the same question in two wordings is two things
-//! a rule author has to learn. `pca` wrote both first (ADR 0020) and `bam` uses them unchanged
-//! (ADR 0023).
+//! a registry value — and both have to answer the same questions: which single field a rule can match
+//! on, and what form the path is written in. They live here rather than in one collector because two
+//! collectors answering the same question in two wordings is two things a rule author has to learn.
+//! `pca` wrote them first (ADR 0020) and `bam` uses them unchanged (ADR 0023).
 
-/// What a path was replaced with when it is not a shape SS-mode redaction can reach.
-pub const UNREDACTABLE_FORM: &str = "unredactable_form";
+/// The form a recorded path is written in, reported beside it as `path_form` so a reader knows how
+/// to read it: `drive` (`C:\…`), `device` (`\Device\HarddiskVolume3\…`, which names a volume and not
+/// a drive letter) or `other` (a UNC path, an `\??\` path, or anything else).
+pub fn path_form(path: &str) -> &'static str {
+    if is_drive_rooted(path) {
+        "drive"
+    } else if path
+        .get(..8)
+        .is_some_and(|start| start.eq_ignore_ascii_case(r"\Device\"))
+    {
+        "device"
+    } else {
+        "other"
+    }
+}
+
+/// Whether `path` is inside a user profile: below `Users`, `Documents and Settings` or its 8.3 short
+/// name `DOCUME~<n>` on any drive, or below the machine's `ProfilesDirectory`, with at least one
+/// folder (the profile's own) after the root (ADR 0049).
+pub fn is_under_profile_root(path: &str, profiles_directory: Option<&str>) -> bool {
+    if !is_drive_rooted(path) {
+        return false;
+    }
+    let segments: Vec<&str> = path[3..]
+        .split(['\\', '/'])
+        .filter(|segment| !segment.is_empty() && *segment != ".")
+        .collect();
+    let fixed = segments.len() >= 2 && {
+        let root = segments[0]
+            .trim_end_matches(['.', ' '])
+            .to_ascii_lowercase();
+        root == "users"
+            || root == "documents and settings"
+            || root
+                .strip_prefix("docume~")
+                .is_some_and(|d| !d.is_empty() && d.bytes().all(|b| b.is_ascii_digit()))
+    };
+    let machine = profiles_directory
+        .filter(|dir| is_drive_rooted(dir) && !dir.contains('%'))
+        .is_some_and(|dir| {
+            let dir = dir.trim_end_matches(['\\', '/']);
+            path.len() > dir.len() + 1
+                && path.is_char_boundary(dir.len())
+                && path[..dir.len()].eq_ignore_ascii_case(dir)
+                && matches!(path.as_bytes()[dir.len()], b'\\' | b'/')
+                && path
+                    .as_bytes()
+                    .get(dir.len() + 1)
+                    .is_some_and(|b| !matches!(b, b'\\' | b'/'))
+        });
+    fixed || machine
+}
 
 /// The last segment of a Windows path, lower-cased.
 ///
@@ -26,10 +75,6 @@ pub fn file_name(path: &str) -> Option<String> {
 }
 
 /// Whether a path starts `X:\` or `X:/`.
-///
-/// This is the shape `bope_core::view::redact_profile_paths` was first written for, and it is
-/// deliberately narrower than what that function reaches (ADR 0049): a path this refuses is withheld,
-/// and erring toward withholding is the direction that cannot leak a user name.
 pub fn is_drive_rooted(path: &str) -> bool {
     let bytes = path.as_bytes();
     bytes.len() >= 3
@@ -42,9 +87,8 @@ pub fn is_drive_rooted(path: &str) -> bool {
 /// read as the file it appears to name (ADR 0048, R1; shared with `autostart` by ADR 0060): a `.` or
 /// `..` segment, a repeated or trailing separator (an empty segment), a segment ending in `.` or a
 /// space, a `:` past the drive (an alternate data stream), or `Documents and Settings` right after the
-/// drive — a junction to `Users` on current Windows. SS-mode redaction reaches that folder since
-/// ADR 0049; the refusal stays because no such form was measured, and this program does not read the
-/// file a spelling only appears to name.
+/// drive — a junction to `Users` on current Windows. The refusal stays because no such form was
+/// measured, and this program does not read the file a spelling only appears to name.
 pub fn is_refused_form(path: &str) -> bool {
     let mut segments = path.split('\\');
     segments.next(); // the drive segment, e.g. `C:` — not checked here
@@ -89,6 +133,44 @@ mod tests {
         }
         assert!(!is_refused_form(r"C:\Program Files\Vendor\app.exe"));
         assert!(!is_refused_form(r"D:\Games\Documents and Settings\x.exe"));
+    }
+
+    #[test]
+    fn a_path_form_says_how_the_path_is_written() {
+        assert_eq!(path_form(r"C:\Users\a\x.exe"), "drive");
+        assert_eq!(
+            path_form(r"\Device\HarddiskVolume3\Users\a\x.exe"),
+            "device"
+        );
+        assert_eq!(path_form(r"\\nas\share\x.exe"), "other");
+        assert_eq!(path_form(""), "other");
+    }
+
+    #[test]
+    fn a_profile_root_needs_a_profile_folder_after_it() {
+        assert!(is_under_profile_root(r"C:\Users\a\x.exe", None));
+        assert!(is_under_profile_root(r"d:/users/a", None));
+        assert!(is_under_profile_root(r"C:\DOCUME~1\a\x.exe", None));
+        assert!(is_under_profile_root(
+            r"C:\Documents and Settings\a\x",
+            None
+        ));
+        assert!(!is_under_profile_root(r"C:\Users", None));
+        assert!(!is_under_profile_root(r"C:\Users\", None));
+        assert!(!is_under_profile_root(r"C:\Program Files\x.exe", None));
+        assert!(!is_under_profile_root(r"\\nas\Users\a", None));
+        assert!(is_under_profile_root(
+            r"E:\Profiles\a\x.exe",
+            Some(r"E:\Profiles")
+        ));
+        assert!(!is_under_profile_root(
+            r"E:\ProfilesX\a",
+            Some(r"E:\Profiles")
+        ));
+        assert!(!is_under_profile_root(
+            r"E:\Profiles\a",
+            Some(r"%SystemDrive%\Profiles")
+        ));
     }
 
     #[test]

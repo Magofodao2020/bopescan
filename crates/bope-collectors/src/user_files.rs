@@ -10,7 +10,7 @@
 //!
 //! - **`program`** — `.exe`, `.dll`, `.msi`, `.scr`, `.sys`: hash, embedded signature, and the
 //!   **Mark of the Web** Windows attached when it was downloaded (`Zone.Identifier`: the zone, and the
-//!   host it came from as a sensitive value SS mode hides unless the player agrees to show it).
+//!   host it came from).
 //! - **`archive`** — `.zip`, `.rar`, `.7z`: name, times and Mark of the Web.
 //! - **`lua_script`** — `.lua`, `.luau`: which executor-only functions it calls
 //!   (`bope_parsers::lua_markers`), never its text.
@@ -23,7 +23,7 @@
 use std::collections::BTreeMap;
 use std::time::{Duration, Instant};
 
-use bope_core::model::{CollectorRun, Observation, ScanTier, SensitiveKind, UnmeasuredReason};
+use bope_core::model::{CollectorRun, Observation, ScanTier, UnmeasuredReason};
 use bope_host::{DirEntryInfo, Host, Platform};
 use bope_parsers::lua_markers;
 
@@ -47,7 +47,7 @@ const AUTOMATION: [&str; 13] = [
 static FIELDS: [Field; 18] = [
     Field::timestamp("created"),
     Field::number("distinct_markers"),
-    Field::text("download_host").sensitive(SensitiveKind::DownloadHost),
+    Field::text("download_host"),
     Field::text("extension"),
     Field::text("folder"),
     Field::boolean("has_referrer"),

@@ -37,7 +37,6 @@ const THAI_DESCRIPTION = "Windows รายงานว่า UEFI Secure Boot �
 const ENGLISH_FALSEPOSITIVE = "PCs that boot in legacy BIOS or CSM mode";
 const THAI_FALSEPOSITIVE = "เครื่องที่บูตแบบ legacy BIOS หรือ CSM";
 const selfView = snapshot("secure_boot_off_self_view");
-const ssView = snapshot("secure_boot_off_ss_view");
 
 // The evidence entry these tests build their overrides from: the Secure Boot rule, found by id
 // rather than taken as `evidence[0]`. Every assertion below is about that rule's own text, and the
@@ -109,7 +108,7 @@ function mockIPCAnswer(cmd: string, args: unknown): unknown {
         }
         return headerOverride ?? selfView.header;
       case "report_view":
-        return viewOverride ?? (payload.mode === "ss" ? ssView : selfView);
+        return viewOverride ?? selfView;
       case "rule_texts":
         return {
           ...extraTexts,
@@ -232,12 +231,8 @@ afterEach(() => {
 });
 
 /** Goes through the start screen and the scan to the report, as a person does (ADR 0115). */
-async function openReport(mode: "self" | "ss", tier: "standard" | "full" = "standard") {
-  fireEvent.click(
-    await screen.findByLabelText(
-      mode === "ss" ? /Screenshare \(SS mode\)/ : /Only me \(self check\)/,
-    ),
-  );
+async function openReport(tier: "standard" | "full" = "standard") {
+  await screen.findByLabelText("I have read what will be examined and I agree");
   if (tier === "full") {
     fireEvent.click(screen.getByLabelText(/^Advanced/));
   }
@@ -261,8 +256,8 @@ async function goTo(page: string) {
 }
 
 /** Goes through the scan to the report and opens `page` of it. */
-async function openPage(mode: "self" | "ss", page: string, tier: "standard" | "full" = "standard") {
-  await openReport(mode, tier);
+async function openPage(page: string, tier: "standard" | "full" = "standard") {
+  await openReport(tier);
   await screen.findByRole("region", { name: /What this scan lists|สิ่งที่การสแกนนี้แสดง/ });
   await goTo(page);
 }
@@ -296,8 +291,6 @@ const THAI_TITLE = "Secure Boot ถูกปิดอยู่";
 
 describe("App", () => {
   it("snapshots are the Rust pipeline output", () => {
-    expect(selfView.mode).toBe("self");
-    expect(ssView.mode).toBe("ss");
     expect(subject(selfView).rule_id).toBe(RULE_ID);
   });
 
@@ -311,7 +304,7 @@ describe("App", () => {
     fireEvent.click(nav("settings"));
     expect((await screen.findAllByText("UNOFFICIAL BUILD")).length).toBeGreaterThan(0);
     fireEvent.click(nav("scanner"));
-    await openReport("self");
+    await openReport();
     expect(await screen.findByText("UNOFFICIAL BUILD")).toBeTruthy();
   });
 
@@ -323,7 +316,7 @@ describe("App", () => {
     }
     expect(nav("scanner").disabled).toBe(false);
     expect(nav("settings").disabled).toBe(false);
-    await openReport("self");
+    await openReport();
     await waitFor(() => expect(nav("evidence").disabled).toBe(false));
   });
 
@@ -332,7 +325,7 @@ describe("App", () => {
   it("shows the Roblox tools panel with status, sources and traces", async () => {
     const row = (fields: Record<string, unknown>) => ({ collector: "roblox_trace", fields });
     viewOverride = {
-      ...snapshot("trace_ages_elevated_ss_view"),
+      ...snapshot("trace_ages_elevated_view"),
       roblox_tools: {
         tools: [
           row({
@@ -379,7 +372,7 @@ describe("App", () => {
       },
     };
     render(<App />);
-    await openPage("ss", "evidence");
+    await openPage("evidence");
     expect(await screen.findByRole("heading", { name: "Roblox tools" })).toBeTruthy();
     // A status is its word and its shape, never a colour alone.
     const corroborated = screen.getByText("CORROBORATED");
@@ -401,12 +394,12 @@ describe("App", () => {
     expect(screen.getByText("(not_consented)")).toBeTruthy();
   });
 
-  // ADR 0061: the SS view shows how far back each source reaches, beside the anchors; a source not
+  // ADR 0061: the view shows how far back each source reaches, beside the anchors; a source not
   // read without administrator rights is "not known", never "empty".
-  it("shows the trace ages and the cross-source statement in SS mode", async () => {
-    viewOverride = snapshot("trace_ages_elevated_ss_view");
+  it("shows the trace ages and the cross-source statement", async () => {
+    viewOverride = snapshot("trace_ages_elevated_view");
     render(<App />);
-    await openPage("ss", "timeline");
+    await openPage("timeline");
     expect(await screen.findByText("How far back the traces reach")).toBeTruthy();
     expect(screen.getByText(/beside when parts of this PC were set up/)).toBeTruthy();
     expect(
@@ -437,13 +430,13 @@ describe("App", () => {
   });
 
   // ADR 0062: each edition's last session beside its own folders.
-  it("shows each edition's session statement in SS mode", async () => {
+  it("shows each edition's session statement", async () => {
     const statements = snapshot(
       "session_elevated_statements",
     ) as unknown as ReportView["cross_source"];
-    viewOverride = { ...snapshot("trace_ages_elevated_ss_view"), cross_source: statements };
+    viewOverride = { ...snapshot("trace_ages_elevated_view"), cross_source: statements };
     render(<App />);
-    await openPage("ss", "timeline");
+    await openPage("timeline");
     expect(
       await screen.findByText("FiveM for GTA V Legacy: its last session, beside its own folders"),
     ).toBeTruthy();
@@ -467,10 +460,10 @@ describe("App", () => {
     const statements = snapshot(
       "session_limited_running_statements",
     ) as unknown as ReportView["cross_source"];
-    viewOverride = { ...snapshot("trace_ages_elevated_ss_view"), cross_source: statements };
+    viewOverride = { ...snapshot("trace_ages_elevated_view"), cross_source: statements };
     await i18n.changeLanguage("th");
     render(<App />);
-    await openPage("self", "timeline");
+    await openPage("timeline");
     expect(
       await screen.findByText("ยังรันอยู่ตั้งแต่ 2025-12-31T23:40:00Z (process ที่กำลังรัน, FiveM.exe)"),
     ).toBeTruthy();
@@ -480,7 +473,7 @@ describe("App", () => {
   });
 
   it("says a source not read without administrator rights is not known, in Thai too", async () => {
-    const view = snapshot("trace_ages_elevated_ss_view");
+    const view = snapshot("trace_ages_elevated_view");
     const ages = view.trace_ages;
     if (!ages) {
       throw new Error("the snapshot has no trace ages");
@@ -499,19 +492,19 @@ describe("App", () => {
     };
     await i18n.changeLanguage("th");
     render(<App />);
-    await openPage("self", "timeline");
+    await openPage("timeline");
     expect(await screen.findByText("ร่องรอยย้อนกลับไปได้ไกลแค่ไหน")).toBeTruthy();
     expect(screen.getByText("อ่านไม่ได้เพราะไม่มีสิทธิ์ผู้ดูแลระบบ — ไม่รู้")).toBeTruthy();
   });
 
-  it("shows the timeline in SS mode with its note and the scan time, converted once", async () => {
+  it("shows the timeline with its note and the scan time, converted once", async () => {
     render(<App />);
-    await openPage("ss", "timeline");
+    await openPage("timeline");
     expect(
       await screen.findByText(/An order of recorded times is not an order of events/),
     ).toBeTruthy();
     expect(screen.getByText("This scan ran")).toBeTruthy();
-    const at = ssView.header.generated_at;
+    const at = selfView.header.generated_at;
     const element = document.querySelector(`.timeline-list time[datetime="${at}"]`);
     expect(element?.textContent).toBe(shown(at));
     // UTC is the second reading, never a second conversion of the first.
@@ -521,7 +514,7 @@ describe("App", () => {
 
   it("names the selector behind a selected time and its ordinary causes", async () => {
     viewOverride = {
-      ...ssView,
+      ...selfView,
       timeline: {
         entries: [
           {
@@ -548,7 +541,7 @@ describe("App", () => {
       },
     };
     render(<App />);
-    await openPage("ss", "timeline");
+    await openPage("timeline");
     expect(await screen.findByText(/Windows Prefetch · FIVEM\.EXE/)).toBeTruthy();
     expect(
       screen.getAllByText(/When Prefetch recorded a program named like FiveM or GTA V/).length,
@@ -589,7 +582,7 @@ describe("App", () => {
       },
     };
     render(<App />);
-    await openPage("self", "timeline");
+    await openPage("timeline");
     await screen.findByText("Times: 4");
     const subjects = () =>
       Array.from(document.querySelectorAll(".timeline-item")).map((li) => li.textContent ?? "");
@@ -632,7 +625,7 @@ describe("App", () => {
   it("shows the scan's real progress — the module running, counts and time — and lets it be cancelled, with no report", async () => {
     scanState = "running";
     render(<App />);
-    await openReport("ss");
+    await openReport();
     expect(await screen.findByText("1 of 3 modules (33%)", { exact: false })).toBeTruthy();
     expect(screen.getByText("read · 4 observations")).toBeTruthy();
     // The module running is the one Rust names, not one guessed from the order.
@@ -649,48 +642,35 @@ describe("App", () => {
 
   it("starts an advanced scan only when it was chosen", async () => {
     render(<App />);
-    await openPage("ss", "overview", "full");
+    await openPage("overview", "full");
     expect(startedTier).toBe("full");
-  });
-
-  it("shows the SS view with hidden counts after consent", async () => {
-    render(<App />);
-    await openPage("ss", "evidence");
-    expect(await screen.findByText(TITLE)).toBeTruthy();
-    expect(screen.getByText(/^Hidden in SS mode:/).textContent).toBe(
-      `Hidden in SS mode: ${ssView.hidden.not_found} not found · ${ssView.hidden.unmeasured_expected} not measured (expected) · ${ssView.hidden.unmeasured_unexpected} not measured (not expected) · ${ssView.hidden.unmatched} unmatched observations`,
-    );
-    expect(calls).toContain("report_view");
   });
 
   it("shows the program version in the report facts, which the release notes ask people to check", async () => {
     render(<App />);
-    await openReport("self");
+    await openReport();
     expect(await screen.findByText("Version")).toBeTruthy();
     expect(screen.getAllByText(selfView.header.provenance.version).length).toBeGreaterThan(0);
   });
 
-  // One line of context, in both modes, with the caveat that stops a start days before the scan
-  // being read as something the player did (ADR 0039).
-  it.each([["self" as const], ["ss" as const]])(
-    "shows when Windows started, with its caveat, in %s mode",
-    async (mode) => {
-      render(<App />);
-      await openReport(mode);
-      expect(await screen.findByText("Windows start")).toBeTruthy();
-      expect(
-        screen.getByText(`${shown("2025-12-28T21:56:56Z")}, 3d 2h 3m before this scan.`),
-      ).toBeTruthy();
-      expect(screen.getByText(/Not reset by "Shut down" with Fast Startup/)).toBeTruthy();
-    },
-  );
+  // One line of context, with the caveat that stops a start days before the scan being read as
+  // something the player did (ADR 0039).
+  it("shows when Windows started, with its caveat", async () => {
+    render(<App />);
+    await openReport();
+    expect(await screen.findByText("Windows start")).toBeTruthy();
+    expect(
+      screen.getByText(`${shown("2025-12-28T21:56:56Z")}, 3d 2h 3m before this scan.`),
+    ).toBeTruthy();
+    expect(screen.getByText(/Not reset by "Shut down" with Fast Startup/)).toBeTruthy();
+  });
 
   it("shows when Windows started in Thai", async () => {
     render(<App />);
     await act(async () => {
       await i18n.changeLanguage("th");
     });
-    await openReport("self");
+    await openReport();
     expect(await screen.findByText("Windows เริ่มทำงาน")).toBeTruthy();
     expect(
       screen.getByText(`${shown("2025-12-28T21:56:56Z")} (3 วัน 2 ชม. 3 นาที ก่อนการสแกนนี้)`),
@@ -703,7 +683,7 @@ describe("App", () => {
       header: { ...selfView.header, boot_time: { state: "unmeasured", reason: "not_windows" } },
     };
     render(<App />);
-    await openReport("self");
+    await openReport();
     expect(await screen.findByText("not measured — not running on Windows")).toBeTruthy();
     expect(screen.queryByText(/before this scan/)).toBeNull();
   });
@@ -733,7 +713,7 @@ describe("App", () => {
     await act(async () => {
       await i18n.changeLanguage("th");
     });
-    await openPage("self", "evidence");
+    await openPage("evidence");
     expect(await screen.findByText(THAI_TITLE)).toBeTruthy();
     fireEvent.click(nav("settings"));
     expect((await screen.findAllByText("UNOFFICIAL BUILD")).length).toBeGreaterThan(0);
@@ -756,7 +736,7 @@ describe("App", () => {
       ],
     };
     render(<App />);
-    await openPage("self", "evidence");
+    await openPage("evidence");
     const section = await screen.findByRole("region", { name: "Own traces (excluded)" });
     expect(section.textContent).toContain("aeterna-rongroi.exe");
     expect(screen.getByText(TITLE)).toBeTruthy();
@@ -781,7 +761,7 @@ describe("App", () => {
       ],
     };
     render(<App />);
-    await openPage("self", "evidence");
+    await openPage("evidence");
     const section = await screen.findByRole("region", { name: "Unmatched observations" });
     expect(section.textContent).toContain("overlay.dll");
     expect(screen.getByText(TITLE)).toBeTruthy();
@@ -790,7 +770,7 @@ describe("App", () => {
   it("shows no unmatched section when every observation matched a rule", async () => {
     viewOverride = { ...selfView, unmatched: [] };
     render(<App />);
-    await openPage("self", "evidence");
+    await openPage("evidence");
     await screen.findByText(TITLE);
     expect(screen.queryByRole("region", { name: "Unmatched observations" })).toBeNull();
   });
@@ -798,7 +778,7 @@ describe("App", () => {
   // A match shown without what else produces it is a match shown as an accusation (ADR 0027).
   it("shows a found entry's description and its false positives in the side panel", async () => {
     render(<App />);
-    await openPage("self", "evidence");
+    await openPage("evidence");
     fireEvent.click(await screen.findByText(TITLE));
     const panel = await screen.findByRole("complementary", { name: TITLE });
     expect(panel.textContent).toContain(`About this check: ${ENGLISH_DESCRIPTION}`);
@@ -813,7 +793,7 @@ describe("App", () => {
     await act(async () => {
       await i18n.changeLanguage("th");
     });
-    await openPage("self", "evidence");
+    await openPage("evidence");
     fireEvent.click(await screen.findByText(THAI_TITLE));
     expect(await screen.findByText(`เกี่ยวกับการตรวจนี้: ${THAI_DESCRIPTION}`)).toBeTruthy();
     expect(screen.getByText("เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน:")).toBeTruthy();
@@ -835,7 +815,7 @@ describe("App", () => {
       ],
     };
     render(<App />);
-    await openPage("self", "evidence");
+    await openPage("evidence");
     const title = await screen.findByText(TITLE);
     // A row starts closed: nothing about it until it is chosen.
     expect(title.getAttribute("aria-expanded")).toBe("false");
@@ -847,10 +827,10 @@ describe("App", () => {
     expect(screen.getByText(`Look-back: ${ENGLISH_RETENTION}`)).toBeTruthy();
   });
 
-  it("lists the unmeasured result its rule did not expect and counts the one it did", async () => {
+  it("lists the unmeasured result its rule did not expect", async () => {
     const first = subject(selfView);
     viewOverride = {
-      ...ssView,
+      ...selfView,
       evidence: [
         {
           rule_id: first.rule_id,
@@ -861,21 +841,17 @@ describe("App", () => {
           expected: false,
         },
       ],
-      hidden: { ...ssView.hidden, unmeasured_expected: 3 },
     };
     render(<App />);
-    await openPage("ss", "evidence");
+    await openPage("evidence");
     expect(await screen.findByText("Not measured (not expected)")).toBeTruthy();
-    expect(screen.getByText(/^Hidden in SS mode:/).textContent).toContain(
-      "3 not measured (expected)",
-    );
   });
 
   // One fact about the scan that applies to every rule at once, stated once (ADR 0012, ADR 0027).
   it("states missing administrator rights once, on the overview", async () => {
     viewOverride = { ...selfView, scope: { not_admin: 2, not_attempted: 0 } };
     render(<App />);
-    await openReport("self");
+    await openReport();
     const statements = await screen.findAllByText(/could not be answered because this scan/);
     expect(statements).toHaveLength(1);
     expect(statements[0]?.textContent).toContain("2 check(s)");
@@ -884,7 +860,7 @@ describe("App", () => {
   it("states the sources it never reached once, on the overview", async () => {
     viewOverride = { ...selfView, scope: { not_admin: 0, not_attempted: 3 } };
     render(<App />);
-    await openReport("self");
+    await openReport();
     const statements = await screen.findAllByText(/this program stopped reading before/);
     expect(statements).toHaveLength(1);
     expect(statements[0]?.textContent).toContain("3 check(s)");
@@ -920,7 +896,7 @@ describe("App", () => {
       trace_ages: undefined,
     };
     render(<App />);
-    await openPage("self", "evidence");
+    await openPage("evidence");
     fireEvent.click(await screen.findByText(TITLE));
     expect(await screen.findByText(new RegExp(sentence))).toBeTruthy();
   });
@@ -948,7 +924,7 @@ describe("App", () => {
       row_bands: { [first.rule_id]: band },
     };
     render(<App />);
-    await openPage("self", "evidence");
+    await openPage("evidence");
     fireEvent.click(await screen.findByText(TITLE));
     expect(await screen.findByText(sentence)).toBeTruthy();
   });
@@ -956,44 +932,18 @@ describe("App", () => {
   it("states the checks only a full scan answers once, on the overview", async () => {
     viewOverride = { ...selfView, scope: { not_admin: 0, not_attempted: 0, not_consented: 1 } };
     render(<App />);
-    await openReport("self");
+    await openReport();
     const statements = await screen.findAllByText(/read only in a full scan/);
     expect(statements).toHaveLength(1);
     expect(statements[0]?.textContent).toContain("1 check(s)");
   });
 
-  it("offers the website-name choice only for an advanced SS check, and passes the answer to the view", async () => {
-    const seen: unknown[] = [];
-    render(<App />);
-    fireEvent.click(await screen.findByLabelText(/Screenshare \(SS mode\)/));
-    expect(screen.queryByRole("checkbox", { name: /website names/ })).toBeNull();
-    fireEvent.click(screen.getByLabelText(/^Advanced/));
-    const toggle = screen.getByRole("checkbox", { name: /website names/ }) as HTMLInputElement;
-    expect(toggle.checked).toBe(false);
-    fireEvent.click(toggle);
-    fireEvent.click(screen.getByLabelText("I have read what will be examined and I agree"));
-    const answer = mockIPCAnswer;
-    mockIPC((cmd, args) => {
-      if (cmd === "report_view") {
-        seen.push((args as Record<string, unknown>).options);
-      }
-      return answer(cmd, args);
-    });
-    fireEvent.click(screen.getByText("Start the check"));
-    await screen.findByRole("region", { name: "What this scan lists" });
-    expect(seen).toContainEqual({
-      server_identity: false,
-      account_identifier: false,
-      download_host: true,
-    });
-  });
-
   it("saves the report where the person chose, and shows each file's SHA-256", async () => {
     render(<App />);
-    await openPage("ss", "reports");
+    await openPage("reports");
     fireEvent.click(await screen.findByText("Save report"));
     expect(await screen.findByText("ab".repeat(32))).toBeTruthy();
-    expect(exportedWith?.mode).toBe("ss");
+    expect(exportedWith?.mode).toBeUndefined();
     expect(exportedWith?.formats).toEqual(["html", "json", "txt", "pdf"]);
     expect(screen.getByText(/does not prove the scan was honest/)).toBeTruthy();
     expect(screen.getByText(/America\/Sao_Paulo/)).toBeTruthy();
@@ -1003,7 +953,7 @@ describe("App", () => {
   it("states nothing about administrator rights when every check was answerable", async () => {
     viewOverride = { ...selfView, scope: { not_admin: 0, not_attempted: 0 } };
     render(<App />);
-    await openReport("self");
+    await openReport();
     await screen.findByRole("region", { name: "What this scan lists" });
     expect(screen.queryByText(/could not be answered because this scan/)).toBeNull();
   });
@@ -1026,7 +976,7 @@ describe("App", () => {
     await act(async () => {
       await i18n.changeLanguage("th");
     });
-    await openPage("self", "evidence");
+    await openPage("evidence");
     fireEvent.click(await screen.findByText(THAI_TITLE));
     expect(await screen.findByText(`ย้อนดูได้: ${THAI_RETENTION}`)).toBeTruthy();
     // Only the folded raw data carries the English source the evidence keeps.
@@ -1036,7 +986,7 @@ describe("App", () => {
   // Three counts of states and the sentence that no report proves a PC clean; never one number.
   it("lists how many rows are in each state, beside the sentence that it proves nothing clean", async () => {
     render(<App />);
-    await openReport("self");
+    await openReport();
     const summary = await screen.findByRole("region", { name: "What this scan lists" });
     const buttons = Array.from(summary.querySelectorAll("button"));
     expect(buttons.map((b) => b.textContent)).toEqual([
@@ -1054,7 +1004,7 @@ describe("App", () => {
 
   it("opens the evidence filtered to one state from its count, and clears it", async () => {
     render(<App />);
-    await openReport("self");
+    await openReport();
     const summary = await screen.findByRole("region", { name: "What this scan lists" });
     fireEvent.click(summary.querySelector("button") as HTMLElement);
     expect(await screen.findByText(TITLE)).toBeTruthy();
@@ -1078,7 +1028,7 @@ describe("App", () => {
       listed: { ...selfView.listed, unmeasured: 0 },
     };
     render(<App />);
-    await openPage("self", "evidence");
+    await openPage("evidence");
     const summary = await screen.findByRole("region", { name: "What this scan lists" });
     expect(screen.queryByText("No row in this scan is in this state.")).toBeNull();
     fireEvent.click(summary.querySelectorAll("button")[2] as HTMLElement);
@@ -1090,7 +1040,7 @@ describe("App", () => {
 
   it("finds rows by text and says how many it shows", async () => {
     render(<App />);
-    await openPage("self", "evidence");
+    await openPage("evidence");
     await screen.findByText(TITLE);
     fireEvent.change(screen.getByRole("searchbox"), { target: { value: "secure boot" } });
     expect(screen.getByText(TITLE)).toBeTruthy();
@@ -1113,7 +1063,7 @@ describe("App", () => {
     const errors = vi.spyOn(console, "error").mockImplementation(() => {});
     try {
       render(<App />);
-      await openPage("self", "evidence");
+      await openPage("evidence");
       const section = await screen.findByRole("region", { name: "Unmatched observations" });
       expect(section.querySelectorAll(".observations > li").length).toBe(2);
       expect(section.textContent?.split("name=FiveM.exe").length).toBe(3);
@@ -1131,7 +1081,7 @@ describe("App", () => {
     await act(async () => {
       await i18n.changeLanguage("th");
     });
-    await openPage("self", "evidence");
+    await openPage("evidence");
     expect(await screen.findByText(/^การตั้งค่าความปลอดภัยของเครื่อง · \d+$/)).toBeTruthy();
   });
 
@@ -1143,7 +1093,7 @@ describe("App", () => {
     };
     stubClipboard("ok");
     render(<App />);
-    await openPage("self", "evidence");
+    await openPage("evidence");
     fireEvent.click(await screen.findByText(TITLE));
     expect(screen.getAllByText(RULE_ID).length).toBeGreaterThan(0);
     const rulePath = await screen.findByText("rules/posture/boot/secure-boot-disabled/rule.yaml");
@@ -1160,7 +1110,7 @@ describe("App", () => {
 
   it("shows no file links for an unofficial build and says why", async () => {
     render(<App />);
-    await openPage("self", "evidence");
+    await openPage("evidence");
     fireEvent.click(await screen.findByText(TITLE));
     const rulePath = await screen.findByText("rules/posture/boot/secure-boot-disabled/rule.yaml");
     expect(rulePath.parentElement?.querySelector("button")).toBeNull();
@@ -1176,7 +1126,7 @@ describe("App", () => {
     viewOverride = { ...selfView, header: official };
     linksOverride = { repository: REPOSITORY, code: REPOSITORY, commit: null };
     render(<App />);
-    await openPage("self", "evidence");
+    await openPage("evidence");
     fireEvent.click(await screen.findByText(TITLE));
     const rulePath = await screen.findByText("rules/posture/boot/secure-boot-disabled/rule.yaml");
     expect(rulePath.parentElement?.querySelector("button")).toBeNull();
@@ -1191,7 +1141,7 @@ describe("App", () => {
   it("says nothing about the build's commit before the code links resolve", async () => {
     linksNeverResolve = true;
     render(<App />);
-    await openPage("self", "evidence");
+    await openPage("evidence");
     fireEvent.click(await screen.findByText(TITLE));
     const rulePath = await screen.findByText("rules/posture/boot/secure-boot-disabled/rule.yaml");
     expect(rulePath.parentElement?.querySelector("button")).toBeNull();
@@ -1258,15 +1208,14 @@ describe("App", () => {
   });
 
   // Moving between pages never leaves the report or asks for consent again.
-  it("returns from About to the same SS report without asking again", async () => {
+  it("returns from About to the same report without asking again", async () => {
     render(<App />);
-    await openPage("ss", "evidence");
+    await openPage("evidence");
     expect(await screen.findByText(TITLE)).toBeTruthy();
     fireEvent.click(nav("settings"));
     expect(await screen.findByText("About this program and its code")).toBeTruthy();
     fireEvent.click(nav("evidence"));
     expect(await screen.findByText(TITLE)).toBeTruthy();
-    expect(screen.getByText(/^Hidden in SS mode:/)).toBeTruthy();
     expect(screen.queryByText("What will be examined")).toBeNull();
     expect(calls.filter((cmd) => cmd === "start_scan")).toHaveLength(1);
   });
@@ -1339,7 +1288,7 @@ describe("App", () => {
 
   it("switches the first reading of every time to UTC and keeps the choice", async () => {
     render(<App />);
-    await openReport("self");
+    await openReport();
     const at = selfView.header.generated_at;
     await screen.findByRole("region", { name: "What this scan lists" });
     fireEvent.click(nav("settings"));

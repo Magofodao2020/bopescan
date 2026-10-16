@@ -7,9 +7,7 @@
 use std::fmt::Write as _;
 
 use bope_core::bundle::Bundle;
-use bope_core::model::{
-    BootTime, EvidenceState, Mode, Observation, ScanTier, SensitiveKind, UnmeasuredReason,
-};
+use bope_core::model::{BootTime, EvidenceState, Observation, ScanTier, UnmeasuredReason};
 use bope_core::view::{EntrySource, ReportView, RowBand, Timeline};
 use clap::ValueEnum;
 
@@ -52,8 +50,6 @@ fn text(lang: Lang, key: &str) -> &'static str {
         (Lang::Th, "found") => "เจอ",
         (Lang::En, "not_found") => "NOT FOUND",
         (Lang::Th, "not_found") => "ไม่เจอ",
-        (Lang::En, "hidden") => "Hidden in SS mode",
-        (Lang::Th, "hidden") => "ซ่อนในโหมด SS",
         (Lang::En, "unmeasured_expected") => "NOT MEASURED (expected here)",
         (Lang::Th, "unmeasured_expected") => "ยังไม่ได้วัด (เป็นเรื่องปกติของเครื่องนี้)",
         (Lang::En, "unmeasured_unexpected") => "NOT MEASURED (not expected)",
@@ -147,8 +143,6 @@ fn text(lang: Lang, key: &str) -> &'static str {
 /// clippy's line limit.
 fn text_elevate(lang: Lang, key: &str) -> &'static str {
     match (lang, key) {
-        (Lang::En, "declined") => "Scan cancelled. Nothing was read.",
-        (Lang::Th, "declined") => "ยกเลิกการสแกนแล้ว ไม่ได้อ่านอะไรเลย",
         (Lang::En, "elevate_started") => {
             "Starting again with administrator rights. The new window does the scan."
         }
@@ -239,31 +233,6 @@ fn scan_text(lang: Lang, key: &str) -> &'static str {
             "Standard scan: the sources only a full scan reads are not read."
         }
         (Lang::Th, "full_declined") => "สแกนแบบมาตรฐาน: ไม่อ่านแหล่งข้อมูลที่อ่านเฉพาะการสแกนแบบ Full",
-        (Lang::En, "server_identity_question") => {
-            "Show the person watching which servers these are (the names of FiveM's server cache \
-             folders)? If not, each name is shown as %SERVER_IDENTITY%. [y/N] "
-        }
-        (Lang::Th, "server_identity_question") => {
-            "ให้คนที่ดูอยู่เห็นว่าเป็นเซิร์ฟเวอร์ไหน (ชื่อโฟลเดอร์ cache ของเซิร์ฟเวอร์ใน FiveM) หรือไม่ \
-             ถ้าไม่ ชื่อแต่ละชื่อจะแสดงเป็น %SERVER_IDENTITY% [y/N] "
-        }
-        (Lang::En, "account_identifier_question") => {
-            "Show the person watching the account identifiers this scan read? If not, each is shown \
-             as %ACCOUNT_IDENTIFIER%. [y/N] "
-        }
-        (Lang::Th, "account_identifier_question") => {
-            "ให้คนที่ดูอยู่เห็นตัวระบุบัญชีที่การสแกนนี้อ่านมาหรือไม่ ถ้าไม่ แต่ละค่าจะแสดงเป็น \
-             %ACCOUNT_IDENTIFIER% [y/N] "
-        }
-        (Lang::En, "download_host_question") => {
-            "Show the person watching the name of each website a PowerShell command downloaded from? \
-             Only the name is read, never the rest of the address or the command. If not, each name is \
-             shown as %DOWNLOAD_HOST%. [y/N] "
-        }
-        (Lang::Th, "download_host_question") => {
-            "ให้คนที่ดูอยู่เห็นชื่อเว็บไซต์ที่คำสั่ง PowerShell ดาวน์โหลดจากมาหรือไม่ อ่านเฉพาะชื่อ ไม่อ่านส่วนอื่นของที่อยู่หรือตัวคำสั่ง \
-             ถ้าไม่ แต่ละชื่อจะแสดงเป็น %DOWNLOAD_HOST% [y/N] "
-        }
         _ => "",
     }
 }
@@ -331,100 +300,6 @@ pub(crate) fn reason(lang: Lang, reason: UnmeasuredReason) -> &'static str {
     }
 }
 
-/// SS-mode consent question.
-///
-/// It names every kind of thing the scan reads, in the words `PRIVACY.md` uses. Until 0.2.0 the scan
-/// read machine settings and nothing else, and the question said so; the collectors that followed
-/// widened the scan and left the question describing the old one, which is consent to a different
-/// check. `consent_names_every_kind_of_source` keeps the list from going stale quietly again.
-pub fn consent(lang: Lang) -> String {
-    match lang {
-        Lang::Pt => crate::pt::CONSENT.to_owned(),
-        Lang::En => "SS mode — screenshare check\n\
-            This program will read, on this PC:\n\
-            \x20 - security settings such as Secure Boot (as Windows and as the firmware report it), memory integrity, and the PowerShell logging policies of this PC and of the Windows account running the scan, whether the speculative-execution mitigations, SEHOP and the kernel object-namespace protection are switched off, and whether the firmware describes an IOMMU\n\
-            \x20 - the programs running now and when each started, and the files in FiveM's plugin folders for GTA V Legacy and Enhanced and FiveM.exe itself, with their signatures (Authenticode)\n\
-            \x20 - for FiveM's log, crash and cache folders for GTA V Legacy and Enhanced: how many files and subfolders each holds, their total size and the earliest and latest file times, and for each Enhanced server cache folder when it was created and last changed and how many entries it holds, and for Legacy's resource cache, its index folder's own times, how many files it holds and the latest of their times, never a file or folder name; these times can match two reports of this PC\n\
-            \x20 - what Windows recorded about programs that ran (Prefetch, BAM, Program Compatibility Assistant), and whether Prefetch is switched on, and for a running program or one of these records whose file is below FiveM's program folder, which edition's it was (Legacy or Enhanced), never the path\n\
-            \x20 - how many events of each kind the Windows event logs hold, not what the events say, and which file and size Windows sets for each log\n\
-            \x20 - whether a Prefetch or event log file is marked read-only\n\
-            \x20 - how many records the change journal of the Windows drive holds and when the oldest and newest were written, and for the Prefetch, event log and Program Compatibility Assistant folders, FiveM's plugin folders and the folder PowerShell keeps its command history in, how many records name each folder and how many of those created, deleted, renamed or changed a file, never a file name\n\
-            \x20 - the drivers registered with Windows: each driver service's name and start setting, where its file is, and that file's SHA-256\n\
-            \x20 - the PCI devices Windows remembers, present or not: the maker, device and subsystem numbers and the class Windows records, the driver bound to each, its problem code, and when Windows set it up, last saw it at a start of Windows and recorded it removed, never a serial number; these times can match two reports of this PC\n\
-            \x20 - how Windows started each time its System log remembers: one number per start that says whether it followed a full shutdown or a Fast Startup one, and nothing else of that event\n\
-            \x20 - what Windows starts by itself: each program service's name and start setting, each Run and RunOnce value's name, and each scheduled task's name, whether it is on and what starts it, with the file each one starts — where it is and, outside the Windows folder, its SHA-256 and signature (Authenticode); never the arguments a program is given\n\
-            \x20 - Microsoft Defender's exclusions: each folder, program and file type Defender is told not to scan, and how many network addresses it is told to skip, never the addresses\n\
-            \x20 - the settings that decide where network traffic goes, never a record of where it went: the lines of the hosts file that give a name under roblox.com, rbxcdn.com, robloxlabs.com, cfx.re, fivem.net or rockstargames.com an address, with that address (other lines are only counted), whether a proxy is on and whether a proxy server or a setup script is set, never their addresses, and the Windows Firewall rules for programs in FiveM's folders, with how many rules there are\n\
-            \x20 - what Windows says this installation is — the edition, the build, the registered organisation and the manufacturer, model and support link Settings shows, never the registered owner's name — and how each of the services Windows ships with (Defender, Windows Update, Error Reporting, Event Log, SysMain, Diagnostic Policy, Search, telemetry) is set to start, or that its key is not there\n\
-            \x20 - whether six named places are on this PC: five that the Atlas and ReviOS Windows modifications install, and the folder Windows keeps Defender's engine in — whether each is there and nothing about what is inside it\n\
-            \x20 - when parts of this PC were set up, as dates and never times: when this Windows installation was installed or last feature-upgraded, the earliest installation date Windows Setup kept and how many it kept, when the Windows drive's change journal, its root folder and its $Recycle.Bin were created, and when FiveM's program folders were created; these dates can match two reports of this PC\n\
-            \x20 - Roblox's own folders: the player RobloxPlayerBeta.exe and every program or DLL beside it, with their SHA-256 and signatures (Authenticode), how many settings ClientAppSettings.json sets (never the settings), how many Roblox log files there are and their oldest and newest times (no log is opened), and whether Bloxstrap, Fishstrap or Voidstrap is installed\n\
-            \x20 - the running Roblox player from the inside, when Roblox's anti-cheat (Hyperion) allows it: the modules RobloxPlayerBeta.exe has loaded outside the Windows folder, with SHA-256 and signature, and how much executable memory it holds by kind, never what that memory contains; and programs running from Temp, Downloads, Desktop, Documents, AppData or the Recycle Bin, with SHA-256 and signature\n\
-            \x20 - folders laid out like a Roblox script executor (an autoexec and a workspace folder side by side) in Desktop, Downloads, Documents, AppData and Temp, two levels deep: the folder, the programs in it with SHA-256 and signature, and which executor-only functions each autoexec script calls, never the script; and folders named exactly like a publicly known executor\n\
-            \x20 - names that match a catalog of Roblox tools (Bloxstrap, FFlagManager, FPS unlockers, executors, injectors and their spelling variants), and only those names: files and folders in AppData, Temp, ProgramData, Program Files, Downloads, Desktop and Documents, the names inside .zip archives there (nothing is extracted), and items in this account's $Recycle.Bin with where they were and when they were deleted; matching programs get SHA-256 and signature\n\
-            \x20 - shortcuts (.lnk) on the Desktop, in the Start menu, the taskbar and Recent that point at a Roblox tool or at a program in your own folders: the target path, whether it is still there, and the target's times saved in the shortcut, never its arguments\n\
-            \x20 - Amcache.hve, the inventory of programs Windows keeps, read from an existing shadow copy (none is created): entries for Roblox tools and for programs in your own folders\n\
-            \x20 - the SRUM database (SRUDB.dat), read from the same kind of existing shadow copy: for programs named like Roblox tools or in your own folders, how much CPU time and network traffic Windows recorded per hour, never a user name or a network name\n\
-            \x20 - permanent WMI event subscriptions (filters, consumers and bindings): their names and queries, the program a consumer starts and its SHA-256 and signature, never a script's text or a command's arguments\n\
-            \x20 - the state of five Windows services (PcaSvc, DiagTrack, DPS, SysMain, EventLog) as the Service Control Manager reports it now, with query rights only, and their state, start-type and install events (7034, 7036, 7040, 7045) in the System log; no service is started, stopped or changed\n\
-            \x20 - this account's $Recycle.Bin on the system drive: for each item its $I file (where it was, its size, when it was deleted) and the times of its $I and $R entries; the deleted files themselves are never opened, nothing is restored or removed, and SS mode shows only a summary without names and the items matching the Roblox tool catalog\n\
-            \x20 - Roblox FastFlag files (ClientAppSettings.json in the Roblox and bootstrapper folders, and settings files of FastFlag tools): size, times, SHA-256, how many flags of each kind, and the names of network/physics flags, never the values\n\
-            \x20 - in the change journal, the names of files that match the Roblox tool catalog, with how many times they were created, deleted or renamed\n\
-            \x20 - what Explorer records about programs this Windows account started: UserAssist (how many times and when last), MuiCache (the program's own product and company name), FeatureUsage (taskbar counters) and the AppCompatCache, with the path of each program\n\
-            \x20 - registry settings that start or load something inside or instead of another program: Image File Execution Options debuggers, SilentProcessExit monitors, AppInit_DLLs, AppCertDlls and Winlogon's Shell and Userinit — the program each names, never its arguments\n\
-            \x20 - the programs in Windows' list of installed programs (name, publisher, version, install date and folder), grouped as macro tools, Cheat Engine and other memory tools, peripheral suites, cleaners, VPN and virtual machines\n\
-            \x20 - USB and HID devices Windows remembers, present or not: vendor and product numbers (never a serial number), whether the vendor makes Arduino-style boards, and when each was installed, last arrived and was removed; the USB storage models Windows remembers; and the device installs setupapi.dev.log records, with their local times\n\
-            \x20 - the network adapters that have a driver (description, component and provider, and whether it is a software or TAP/tunnel adapter), whether a WinHTTP proxy is set and which proxy environment variables are set, never an address\n\
-            \x20 - what the firmware says this PC is (SMBIOS: manufacturer, model, board, BIOS vendor, version and date), whether Windows started through UEFI, and whether virtual-machine guest drivers are registered\n\
-            \x20 - when Windows last started, which is shown to staff as one time at the top of the report\n\
-            It shows what matches a rule, and a timeline of: the times Windows recorded (Prefetch, BAM, Program Compatibility Assistant) for programs named FiveM.exe, GTA5.exe, GTA5_Enhanced.exe, PlayGTAV.exe or FiveM_b<number>_GTAProcess.exe, a name that does not show which program it was; the times UserAssist, AppCompatCache and FeatureUsage hold for programs whose file name starts with Solara, Xeno, Celery, Fluxus, KRNL, JJSploit, Synapse, Seliware, Nihon or Script-Ware, again a name that does not show which program it was; the times of FiveM's log, crash and cache folders above; the oldest and newest record of each event log; the first and last time the Code Integrity log recorded Windows refusing to load a file and Microsoft Defender's log recorded a detection, never which file or what was detected; the first and last time Windows PowerShell's log recorded a script block PowerShell itself flagged as suspicious, never what the script said; and the oldest and newest change the journal holds for each folder above. It also shows how far back each of these records reaches — for each event log, Prefetch, BAM, Program Compatibility Assistant, the change journal and FiveM's folders, how many entries it holds and the oldest time still there, never a name — beside the dates above, and, when Prefetch or BAM reaches back further than FiveM's folders were last written and holds none of the names above, one statement that puts the two side by side with the ordinary reasons for it; and, for each FiveM edition, one statement that puts its last session — when it began and ended, from a FiveM process running now, Prefetch or BAM, never compared with the scan's time — beside how long before or after its start its own folders were written, with the ordinary reasons for that. Its own code sends nothing anywhere. Your user name is hidden in paths. A hosts line's address is shown only as its kind: loopback, unspecified, private or public. The name of a Run value or a scheduled task is not shown.\n\
-            You may refuse.\n\
-            Continue? [y/N] "
-            .to_owned(),
-        Lang::Th => "โหมด SS — ตรวจระหว่างแชร์หน้าจอ\n\
-            โปรแกรมจะอ่านข้อมูลเหล่านี้บนเครื่องนี้:\n\
-            \x20 - การตั้งค่าความปลอดภัย เช่น Secure Boot (ทั้งตามที่ Windows และเฟิร์มแวร์รายงาน) memory integrity และนโยบายการบันทึกของ PowerShell ทั้งของเครื่องและของบัญชี Windows ที่ใช้รันการสแกน และการป้องกัน speculative execution, SEHOP กับ object namespace ของเคอร์เนล ถูกปิดไว้หรือไม่ และ firmware ประกาศ IOMMU หรือไม่\n\
-            \x20 - โปรแกรมที่กำลังรันอยู่และเวลาที่แต่ละตัวเริ่ม ไฟล์ในโฟลเดอร์ plugin ของ FiveM ทั้ง GTA V Legacy และ Enhanced และตัว FiveM.exe พร้อมลายเซ็นของไฟล์ (Authenticode)\n\
-            \x20 - โฟลเดอร์ log, crash และ cache ของ FiveM ทั้ง GTA V Legacy และ Enhanced: จำนวนไฟล์และโฟลเดอร์ย่อย ขนาดรวม และเวลาของไฟล์ที่เก่าสุดกับใหม่สุด และสำหรับโฟลเดอร์ cache ของแต่ละเซิร์ฟเวอร์ใน Enhanced เวลาที่สร้างกับเวลาที่แก้ไขล่าสุด และจำนวนรายการข้างใน และสำหรับ resource cache ของ Legacy เวลาของโฟลเดอร์ดัชนีเอง จำนวนไฟล์ในนั้น และเวลาล่าสุดของไฟล์เหล่านั้น โดยไม่เก็บชื่อไฟล์หรือชื่อโฟลเดอร์ เวลาเหล่านี้ทำให้จับคู่รายงานสองฉบับจากเครื่องเดียวกันได้\n\
-            \x20 - สิ่งที่ Windows บันทึกไว้เกี่ยวกับโปรแกรมที่เคยรัน (Prefetch, BAM, Program Compatibility Assistant) และ Prefetch เปิดอยู่หรือไม่ และสำหรับโปรแกรมที่กำลังรันหรือบันทึกเหล่านี้ที่ไฟล์อยู่ใต้โฟลเดอร์โปรแกรมของ FiveM ว่าเป็นของ edition ไหน (Legacy หรือ Enhanced) โดยไม่แสดง path\n\
-            \x20 - จำนวน event แต่ละแบบใน event log ของ Windows โดยไม่อ่านว่า event นั้นเขียนว่าอะไร และไฟล์กับขนาดที่ Windows ตั้งไว้ให้ log แต่ละตัว\n\
-            \x20 - ไฟล์ Prefetch หรือไฟล์ event log ถูกตั้งเป็นอ่านอย่างเดียวหรือไม่\n\
-            \x20 - จำนวน record ใน change journal ของไดรฟ์ Windows และเวลาของ record เก่าสุดกับใหม่สุด และสำหรับโฟลเดอร์ Prefetch, event log, Program Compatibility Assistant โฟลเดอร์ plugin ของ FiveM และโฟลเดอร์ที่ PowerShell เก็บประวัติคำสั่ง ว่ามี record ที่อ้างถึงแต่ละโฟลเดอร์กี่รายการ และในนั้นเป็นการสร้าง ลบ เปลี่ยนชื่อ หรือแก้ไขไฟล์กี่รายการ โดยไม่เก็บชื่อไฟล์\n\
-            \x20 - ไดรเวอร์ที่ลงทะเบียนไว้กับ Windows: ชื่อและการตั้งค่าการเริ่มทำงานของ driver service แต่ละตัว ตำแหน่งไฟล์ และ SHA-256 ของไฟล์นั้น\n\
-            \x20 - อุปกรณ์ PCI ที่ Windows จำไว้ ทั้งที่ต่ออยู่และไม่อยู่แล้ว: หมายเลขผู้ผลิต อุปกรณ์ และ subsystem กับ class ที่ Windows บันทึก ไดรเวอร์ที่ผูกกับแต่ละตัว problem code และเวลาที่ Windows ตั้งค่ามัน เห็นมันล่าสุดตอน Windows เริ่มทำงาน และบันทึกการถอด ไม่มีหมายเลขซีเรียล เวลาเหล่านี้ใช้จับคู่รายงานสองฉบับของเครื่องนี้ได้\n\
-            \x20 - Windows เริ่มทำงานแบบไหนในแต่ละครั้งที่ log System ยังจำไว้: ตัวเลขหนึ่งตัวต่อการเริ่มทำงาน ที่บอกว่าต่อจากการปิดเครื่องแบบเต็มหรือแบบ Fast Startup และไม่อ่านอย่างอื่นของ event นั้น\n\
-            \x20 - สิ่งที่ Windows เริ่มเอง: ชื่อและการตั้งค่าการเริ่มทำงานของ service แต่ละตัว ชื่อค่าใน Run และ RunOnce แต่ละค่า และชื่อ scheduled task แต่ละตัว ว่าเปิดอยู่หรือไม่และอะไรทำให้มันเริ่ม พร้อมไฟล์ที่แต่ละรายการเริ่ม — ตำแหน่ง และถ้าอยู่นอกโฟลเดอร์ Windows ก็ SHA-256 กับลายเซ็น (Authenticode) โดยไม่อ่าน argument ที่โปรแกรมได้รับเลย\n\
-            \x20 - exclusion ของ Microsoft Defender: โฟลเดอร์ โปรแกรม และชนิดไฟล์แต่ละรายการที่ Defender ถูกสั่งไม่ให้สแกน และจำนวน address ของเครือข่ายที่ถูกยกเว้น โดยไม่อ่านตัว address\n\
-            \x20 - การตั้งค่าที่กำหนดว่า traffic ของเครือข่ายไปที่ไหน โดยไม่อ่านบันทึกว่าเคยไปที่ไหน: บรรทัดในไฟล์ hosts ที่กำหนด address ให้ชื่อใต้ roblox.com, rbxcdn.com, robloxlabs.com, cfx.re, fivem.net หรือ rockstargames.com พร้อม address นั้น (บรรทัดอื่นแค่นับจำนวน) proxy เปิดอยู่หรือไม่ และตั้ง proxy server หรือสคริปต์ตั้งค่า proxy ไว้หรือไม่ โดยไม่อ่าน address ของมัน และ rule ของ Windows Firewall สำหรับโปรแกรมในโฟลเดอร์ของ FiveM พร้อมจำนวน rule ทั้งหมด\n\
-            \x20 - สิ่งที่ Windows บอกว่าตัวเองเป็นอะไร — edition, build, ชื่อองค์กรที่จดทะเบียนไว้ และชื่อผู้ผลิต รุ่นเครื่อง กับลิงก์ฝ่ายสนับสนุนที่ Settings แสดง โดยไม่อ่านชื่อเจ้าของที่จดทะเบียนไว้ — และเซอร์วิสที่ Windows มีมาให้แต่ละตัว (Defender, Windows Update, Error Reporting, Event Log, SysMain, Diagnostic Policy, Search, telemetry) ถูกตั้งให้เริ่มทำงานแบบไหน หรือไม่มีคีย์ของมันอยู่\n\
-            \x20 - มีที่ที่ระบุชื่อไว้ 6 แห่งอยู่บนเครื่องนี้หรือไม่: ห้าแห่งที่โปรแกรมดัดแปลง Windows อย่าง Atlas และ ReviOS ติดตั้ง กับโฟลเดอร์ที่ Windows เก็บเอนจิ้นของ Defender ไว้ — อ่านแค่ว่ามีอยู่หรือไม่ ไม่อ่านว่าข้างในมีอะไร\n\
-            \x20 - ส่วนต่าง ๆ ของเครื่องนี้ถูกติดตั้งเมื่อไร เป็นวันที่ ไม่ใช่เวลา: Windows ชุดนี้ติดตั้งหรืออัปเกรด feature ครั้งล่าสุดเมื่อไร วันติดตั้งเก่าสุดที่ Windows Setup เก็บไว้และเก็บไว้กี่รายการ change journal ของไดรฟ์ Windows, root ของไดรฟ์ และ $Recycle.Bin ถูกสร้างเมื่อไร และโฟลเดอร์โปรแกรมของ FiveM ถูกสร้างเมื่อไร วันที่เหล่านี้ทำให้จับคู่รายงานสองฉบับจากเครื่องเดียวกันได้\n\
-            \x20 - ส่วนของ Roblox เอง: ตัวเล่น RobloxPlayerBeta.exe และโปรแกรมหรือ DLL ที่อยู่ข้างกัน พร้อม SHA-256 และลายเซ็น (Authenticode) จำนวนค่าที่ ClientAppSettings.json ตั้งไว้ (ไม่อ่านค่า) จำนวนไฟล์ log ของ Roblox กับเวลาเก่าสุดและใหม่สุด (ไม่เปิดอ่าน log) และติดตั้ง Bloxstrap, Fishstrap หรือ Voidstrap หรือไม่\n\
-            \x20 - ภายในตัวเล่น Roblox ที่กำลังรัน เมื่อระบบกันโกงของ Roblox (Hyperion) อนุญาต: module ที่ RobloxPlayerBeta.exe โหลดจากนอกโฟลเดอร์ Windows พร้อม SHA-256 และลายเซ็น และจำนวนหน่วยความจำที่รันโค้ดได้แยกตามชนิด โดยไม่อ่านเนื้อหาในหน่วยความจำ และโปรแกรมที่รันจาก Temp, Downloads, Desktop, Documents, AppData หรือถังขยะ พร้อม SHA-256 และลายเซ็น\n\
-            \x20 - โฟลเดอร์ที่จัดวางแบบ script executor ของ Roblox (มีโฟลเดอร์ autoexec และ workspace อยู่คู่กัน) ใน Desktop, Downloads, Documents, AppData และ Temp ลึกสองชั้น: ตัวโฟลเดอร์ โปรแกรมข้างในพร้อม SHA-256 และลายเซ็น และฟังก์ชันที่มีเฉพาะใน executor ที่ script แต่ละตัวใน autoexec เรียกใช้ โดยไม่เก็บ script และโฟลเดอร์ที่ชื่อตรงกับ executor ที่รู้จักกันทั่วไป\n\
-            \x20 - ชื่อที่ตรงกับรายการเครื่องมือของ Roblox (Bloxstrap, FFlagManager, FPS unlocker, executor, injector และชื่อสะกดแบบอื่น) เฉพาะชื่อที่ตรงเท่านั้น: ไฟล์และโฟลเดอร์ใน AppData, Temp, ProgramData, Program Files, Downloads, Desktop และ Documents ชื่อภายในไฟล์ .zip (ไม่แตกไฟล์) และรายการใน $Recycle.Bin ของบัญชีนี้ พร้อมตำแหน่งเดิมและเวลาที่ลบ โปรแกรมที่ตรงจะมี SHA-256 และลายเซ็น\n\
-            \x20 - shortcut (.lnk) บน Desktop, Start menu, taskbar และ Recent ที่ชี้ไปยังเครื่องมือของ Roblox หรือโปรแกรมในโฟลเดอร์ของคุณ: ที่อยู่เป้าหมาย ยังอยู่หรือไม่ และเวลาที่บันทึกใน shortcut โดยไม่อ่าน arguments\n\
-            \x20 - Amcache.hve รายการโปรแกรมที่ Windows เก็บ อ่านจาก shadow copy ที่มีอยู่แล้ว (ไม่สร้างใหม่): เฉพาะเครื่องมือของ Roblox และโปรแกรมในโฟลเดอร์ของคุณ\n\
-            \x20 - ฐานข้อมูล SRUM (SRUDB.dat) อ่านจาก shadow copy ที่มีอยู่แล้วเช่นกัน: เวลา CPU และปริมาณเครือข่ายรายชั่วโมงของโปรแกรมที่มีชื่อเหมือนเครื่องมือ Roblox หรืออยู่ในโฟลเดอร์ของคุณ\n\
-            \x20 - การสมัครรับเหตุการณ์ WMI แบบถาวร: ชื่อ query และโปรแกรมที่ consumer เรียก พร้อม SHA-256 และลายเซ็น ไม่เก็บเนื้อหา script หรือ argument\n\
-            \x20 - สถานะของบริการ Windows ห้าตัว (PcaSvc, DiagTrack, DPS, SysMain, EventLog) ตามที่ Service Control Manager รายงานตอนนี้ ด้วยสิทธิ์อ่านอย่างเดียว และเหตุการณ์สถานะ ประเภทการเริ่ม และการติดตั้ง (7034, 7036, 7040, 7045) ใน log System ไม่มีการเริ่ม หยุด หรือแก้ไขบริการใด\n\
-            \x20 - $Recycle.Bin ของบัญชีนี้บนไดรฟ์ระบบ: ไฟล์ $I ของแต่ละรายการ (ตำแหน่งเดิม ขนาด เวลาที่ลบ) และเวลาของรายการ $I และ $R ไม่เปิดไฟล์ที่ถูกลบ ไม่กู้คืนหรือลบสิ่งใด และโหมด SS แสดงเพียงสรุปที่ไม่มีชื่อและรายการที่ตรงกับรายการเครื่องมือ Roblox\n\
-            \x20 - ไฟล์ FastFlag ของ Roblox (ClientAppSettings.json ในโฟลเดอร์ Roblox และ bootstrapper และไฟล์ตั้งค่าของเครื่องมือ FastFlag): ขนาด เวลา SHA-256 จำนวน flag แต่ละชนิด และชื่อ flag ด้านเครือข่าย/ฟิสิกส์ โดยไม่อ่านค่า\n\
-            \x20 - ชื่อไฟล์ใน change journal ที่ตรงกับรายการเครื่องมือของ Roblox พร้อมจำนวนครั้งที่ถูกสร้าง ลบ หรือเปลี่ยนชื่อ\n\
-            \x20 - สิ่งที่ Explorer บันทึกเกี่ยวกับโปรแกรมที่บัญชี Windows นี้เปิด: UserAssist (กี่ครั้งและครั้งล่าสุดเมื่อไร), MuiCache (ชื่อผลิตภัณฑ์และบริษัทของโปรแกรม), FeatureUsage (ตัวนับของ taskbar) และ AppCompatCache พร้อม path ของแต่ละโปรแกรม\n\
-            \x20 - การตั้งค่าใน registry ที่ทำให้มีโปรแกรมถูกเริ่มหรือโหลดแทนหรือเข้าไปในโปรแกรมอื่น: debugger ใน Image File Execution Options, SilentProcessExit, AppInit_DLLs, AppCertDlls และ Shell กับ Userinit ของ Winlogon เฉพาะโปรแกรมที่ระบุ ไม่อ่าน argument\n\
-            \x20 - โปรแกรมในรายการโปรแกรมที่ติดตั้งของ Windows (ชื่อ ผู้เผยแพร่ เวอร์ชัน วันติดตั้ง และโฟลเดอร์) จัดกลุ่มเป็นเครื่องมือ macro, Cheat Engine และเครื่องมือหน่วยความจำอื่น ซอฟต์แวร์อุปกรณ์ต่อพ่วง โปรแกรมล้างข้อมูล VPN และ virtual machine\n\
-            \x20 - อุปกรณ์ USB และ HID ที่ Windows จำไว้ ทั้งที่ต่ออยู่และไม่อยู่แล้ว: หมายเลขผู้ผลิตและสินค้า (ไม่มีหมายเลขซีเรียล) ผู้ผลิตทำบอร์ดแบบ Arduino หรือไม่ และเวลาที่ติดตั้ง เสียบล่าสุด และถอด รุ่นของ USB storage ที่ Windows จำไว้ และการติดตั้งอุปกรณ์ที่ setupapi.dev.log บันทึกพร้อมเวลาท้องถิ่น\n\
-            \x20 - network adapter ที่มีไดรเวอร์ (คำอธิบาย component และผู้ให้บริการ เป็น adapter ซอฟต์แวร์หรือ TAP/tunnel หรือไม่) มีการตั้ง proxy ของ WinHTTP หรือไม่ และตัวแปร environment ของ proxy ตัวไหนถูกตั้งไว้ โดยไม่อ่าน address\n\
-            \x20 - สิ่งที่ firmware บอกว่าเครื่องนี้คืออะไร (SMBIOS: ผู้ผลิต รุ่น เมนบอร์ด ผู้ผลิต BIOS เวอร์ชันและวันที่) Windows เริ่มผ่าน UEFI หรือไม่ และมีไดรเวอร์ guest ของ virtual machine ลงทะเบียนอยู่หรือไม่\n\
-            \x20 - เวลาที่ Windows เริ่มทำงานครั้งล่าสุด ซึ่งแอดมินจะเห็นเป็นเวลาเดียวที่ด้านบนของรายงาน\n\
-            แสดงสิ่งที่ตรง rule และ timeline ของ: เวลาที่ Windows บันทึกไว้ (Prefetch, BAM, Program Compatibility Assistant) สำหรับโปรแกรมที่ชื่อ FiveM.exe, GTA5.exe, GTA5_Enhanced.exe, PlayGTAV.exe หรือ FiveM_b<ตัวเลข>_GTAProcess.exe ซึ่งชื่อไม่ได้บอกว่าเป็นโปรแกรมไหน เวลาที่ UserAssist, AppCompatCache และ FeatureUsage เก็บไว้ของโปรแกรมที่ชื่อไฟล์ขึ้นต้นด้วย Solara, Xeno, Celery, Fluxus, KRNL, JJSploit, Synapse, Seliware, Nihon หรือ Script-Ware ซึ่งชื่อก็ไม่ได้บอกว่าเป็นโปรแกรมไหนเช่นกัน เวลาของโฟลเดอร์ log, crash และ cache ของ FiveM ข้างต้น เวลาของ record เก่าสุดกับใหม่สุดของ event log แต่ละตัว เวลาครั้งแรกและครั้งล่าสุดที่ log ของ Code Integrity บันทึกว่า Windows ปฏิเสธไม่โหลดไฟล์ และที่ log ของ Microsoft Defender บันทึกว่าตรวจพบบางอย่าง โดยไม่บอกว่าเป็นไฟล์ไหนหรือตรวจพบอะไร เวลาครั้งแรกและครั้งล่าสุดที่ log ของ Windows PowerShell บันทึก script block ที่ PowerShell เองตั้งธงว่าน่าสงสัย โดยไม่บอกว่า script เขียนว่าอะไร และเวลาของการเปลี่ยนแปลงเก่าสุดกับใหม่สุดที่ journal เก็บไว้ของแต่ละโฟลเดอร์ข้างต้น และยังแสดงว่าบันทึกเหล่านี้แต่ละแหล่งย้อนกลับไปได้ไกลแค่ไหน — สำหรับ event log แต่ละตัว, Prefetch, BAM, Program Compatibility Assistant, change journal และโฟลเดอร์ของ FiveM ว่ามีกี่รายการและเวลาเก่าสุดที่ยังอยู่ โดยไม่แสดงชื่อ — เทียบกับวันที่ข้างต้น และเมื่อ Prefetch หรือ BAM ย้อนกลับไปได้ไกลกว่าครั้งล่าสุดที่โฟลเดอร์ของ FiveM ถูกเขียนแต่ไม่มีชื่อข้างต้นเลย จะมีข้อความหนึ่งข้อที่วางสองอย่างนี้ไว้ข้างกันพร้อมเหตุผลปกติที่ทำให้เกิดผลแบบนั้น และสำหรับ FiveM แต่ละ edition จะมีข้อความหนึ่งข้อที่วางเซสชันล่าสุด — เริ่มและจบเมื่อไร จาก process ของ FiveM ที่กำลังรัน, Prefetch หรือ BAM โดยไม่เทียบกับเวลาที่สแกน — ไว้ข้างว่าโฟลเดอร์ของ FiveM เองถูกเขียนก่อนหรือหลังเซสชันเริ่มนานเท่าไร พร้อมเหตุผลปกติที่ทำให้เกิดผลแบบนั้น โค้ดของโปรแกรมไม่ส่งอะไรออกไปไหน ชื่อผู้ใช้ใน path จะถูกซ่อน address ในบรรทัดของไฟล์ hosts จะแสดงแค่ชนิด: loopback, unspecified, private หรือ public ชื่อค่าใน Run และชื่อ scheduled task จะไม่แสดง\n\
-            คุณปฏิเสธได้\n\
-            ดำเนินการต่อ? [y/N] "
-            .to_owned(),
-    }
-}
-
 /// What a full scan reads beyond the standard one, in the words `PRIVACY.md` uses (ADR 0052, ADR 0055).
 fn full_reads(lang: Lang) -> [&'static str; 7] {
     match lang {
@@ -439,13 +314,13 @@ fn full_reads(lang: Lang) -> [&'static str; 7] {
              named FiveM — from the history of commands typed into a PowerShell window, the scripts \
              Windows PowerShell flagged as suspicious, and the command lines it was started with, with \
              how many and when. No command is kept or shown; the one thing kept is the name of a website \
-             a command downloaded from, which SS mode shows only if you agree to that separately",
+             a command downloaded from",
             "the extensions in each Chrome, Edge, Brave, Opera, Vivaldi and Firefox profile: id, name, \
              version and whether they can reach roblox.com or every site, run user scripts or control \
              DevTools — never history, cookies, passwords or what a page holds",
             "in Downloads, Desktop and Documents, one level deep: programs, archives and scripts by \
              name and time, with SHA-256, signature and the Mark of the Web Windows attached when they \
-             were downloaded — the website's name shown in SS mode only if you agree separately — which \
+             were downloaded, with the website's name, which \
              executor-only functions each .lua script calls, never its text, and the names of AutoHotkey, \
              AutoIt and other macro files",
             "Explorer's lists: programs started from the Run box (RunMRU, never their arguments), \
@@ -467,13 +342,13 @@ fn full_reads(lang: Lang) -> [&'static str; 7] {
             "คำในคำสั่ง PowerShell โดยเก็บไว้แค่เป็นชนิด — คำสั่งนั้นดาวน์โหลดแล้วรันอะไรหรือไม่ สั่งให้ Microsoft Defender \
              มองข้ามบางอย่างหรือไม่ ล้าง log หรือประวัติหรือไม่ หรือพูดถึง FiveM หรือไม่ — จากประวัติคำสั่งที่พิมพ์ในหน้าต่าง \
              PowerShell, script ที่ Windows PowerShell ตั้งธงว่าน่าสงสัย และ command line ที่ใช้เปิดมัน พร้อมจำนวนและเวลา \
-             ไม่เก็บและไม่แสดงคำสั่งใด ๆ สิ่งเดียวที่เก็บคือชื่อเว็บไซต์ที่คำสั่งดาวน์โหลดมา ซึ่งโหมด SS จะแสดงก็ต่อเมื่อคุณยินยอมแยกอีกข้อหนึ่ง",
+             ไม่เก็บและไม่แสดงคำสั่งใด ๆ สิ่งเดียวที่เก็บคือชื่อเว็บไซต์ที่คำสั่งดาวน์โหลดมา",
             "extension ในแต่ละโปรไฟล์ของ Chrome, Edge, Brave, Opera, Vivaldi และ Firefox: id ชื่อ เวอร์ชัน \
              และเข้าถึง roblox.com หรือทุกเว็บได้หรือไม่ รัน user script หรือควบคุม DevTools ได้หรือไม่ \
              ไม่อ่านประวัติ คุกกี้ รหัสผ่าน หรือเนื้อหาของหน้าเว็บ",
             "ใน Downloads, Desktop และ Documents ลึกหนึ่งชั้น: โปรแกรม ไฟล์บีบอัด และ script ตามชื่อและเวลา \
-             พร้อม SHA-256 ลายเซ็น และ Mark of the Web ที่ Windows แนบตอนดาวน์โหลด ชื่อเว็บไซต์จะแสดงในโหมด SS \
-             เมื่อคุณยินยอมแยกเท่านั้น ฟังก์ชันที่มีเฉพาะใน executor ที่ script .lua แต่ละไฟล์เรียกใช้ โดยไม่เก็บเนื้อหา \
+             พร้อม SHA-256 ลายเซ็น และ Mark of the Web ที่ Windows แนบตอนดาวน์โหลด พร้อมชื่อเว็บไซต์ \
+             ฟังก์ชันที่มีเฉพาะใน executor ที่ script .lua แต่ละไฟล์เรียกใช้ โดยไม่เก็บเนื้อหา \
              และชื่อไฟล์ macro ของ AutoHotkey, AutoIt และอื่น ๆ",
             "รายการของ Explorer: โปรแกรมที่เปิดจากกล่อง Run (RunMRU ไม่อ่าน argument) โฟลเดอร์ที่พิมพ์ในแถบที่อยู่ \
              (TypedPaths) โปรแกรม script และไฟล์บีบอัดที่เปิดล่าสุด (RecentDocs เฉพาะชนิดไฟล์เหล่านั้น) \
@@ -492,14 +367,12 @@ pub fn full_question(lang: Lang) -> String {
         Lang::Pt => crate::pt::full_question(&full_reads(lang).join("\n  - ")),
         Lang::En => format!(
             "Full scan — this reads more than the standard scan:\n  - {}\nNothing is sent \
-             anywhere. In SS mode a server's name and a website's name are each shown only if you \
-             agree to that separately.\nType yes for the full scan; anything else starts the \
+             anywhere.\nType yes for the full scan; anything else starts the \
              standard scan: ",
             full_reads(lang).join("\n  - ")
         ),
         Lang::Th => format!(
-            "การสแกนแบบ Full — อ่านมากกว่าการสแกนแบบมาตรฐาน:\n  - {}\nไม่ส่งอะไรออกไปไหน \
-             ในโหมด SS ชื่อเซิร์ฟเวอร์และชื่อเว็บไซต์จะแสดงก็ต่อเมื่อคุณยินยอมแยกทีละข้อ\n\
+            "การสแกนแบบ Full — อ่านมากกว่าการสแกนแบบมาตรฐาน:\n  - {}\nไม่ส่งอะไรออกไปไหน\n\
              พิมพ์ yes เพื่อสแกนแบบ Full พิมพ์อย่างอื่นจะเป็นการสแกนแบบมาตรฐาน: ",
             full_reads(lang).join("\n  - ")
         ),
@@ -511,50 +384,9 @@ pub fn full_declined(lang: Lang) -> &'static str {
     scan_text(lang, "full_declined")
 }
 
-/// The SS-mode question about one kind of sensitive value (ADR 0052). Default no.
-pub fn sensitive_question(lang: Lang, kind: SensitiveKind) -> &'static str {
-    match kind {
-        SensitiveKind::ServerIdentity => scan_text(lang, "server_identity_question"),
-        SensitiveKind::AccountIdentifier => scan_text(lang, "account_identifier_question"),
-        SensitiveKind::DownloadHost => scan_text(lang, "download_host_question"),
-    }
-}
-
-/// The SS-mode consent question for a scan at `tier`: the standard one, and for a full scan what
-/// the full scan read as well (ADR 0052).
-pub fn consent_for(lang: Lang, tier: ScanTier) -> String {
-    let question = consent(lang);
-    if tier == ScanTier::Standard {
-        return question;
-    }
-    let (marker, label) = match lang {
-        Lang::Pt => (
-            "  - quando o Windows iniciou pela última vez",
-            "(verificação avançada) ",
-        ),
-        Lang::En => ("  - when Windows last started", "(full scan) "),
-        Lang::Th => ("  - เวลาที่ Windows เริ่มทำงานครั้งล่าสุด", "(สแกนแบบ Full) "),
-    };
-    let items = full_reads(lang)
-        .iter()
-        .fold(String::new(), |mut items, item| {
-            items.push_str("  - ");
-            items.push_str(label);
-            items.push_str(item);
-            items.push('\n');
-            items
-        });
-    question.replacen(marker, &format!("{items}{marker}"), 1)
-}
-
 /// Line shown before an elevated copy waits for Enter, so its window does not close on the report.
 pub fn pause_at_exit(lang: Lang) -> &'static str {
     text(lang, "pause_at_exit")
-}
-
-/// Message printed when consent is refused.
-pub fn declined(lang: Lang) -> &'static str {
-    text(lang, "declined")
 }
 
 /// Message printed once the elevated restart has been requested.
@@ -602,10 +434,6 @@ pub fn render(view: &ReportView, bundle: &Bundle, lang: Lang) -> String {
         Some(false) => text(lang, "elevated_no"),
         None => text(lang, "elevated_unknown"),
     };
-    let mode = match view.mode {
-        Mode::SelfCheck => "self",
-        Mode::Ss => "ss",
-    };
     let platform = match &header.os_build {
         Some(build) => format!("{} {build}", header.platform),
         None => header.platform.clone(),
@@ -616,7 +444,7 @@ pub fn render(view: &ReportView, bundle: &Bundle, lang: Lang) -> String {
     };
     let _ = writeln!(
         out,
-        "mode: {mode} · {tier} · {platform} · {elevated} · rules: {} ({})",
+        "{tier} · {platform} · {elevated} · rules: {} ({})",
         header.rules_bundle.rule_count,
         short(&header.rules_bundle.sha256),
     );
@@ -654,33 +482,18 @@ pub fn render(view: &ReportView, bundle: &Bundle, lang: Lang) -> String {
 
     out.push_str(&evidence_section(view, bundle, lang));
 
-    // Above the timeline, in both modes, only when its conditions hold (ADR 0061 section 3).
+    // Above the timeline, only when its conditions hold (ADR 0061 section 3).
     out.push_str(&crate::trace_ages::statement(&view.cross_source, lang));
 
     out.push_str(&timeline_section(&view.timeline, bundle, lang));
 
-    // Beside the timeline, in both modes: how far back each source reaches (ADR 0061).
+    // Beside the timeline: how far back each source reaches (ADR 0061).
     out.push_str(&crate::trace_ages::section(&view.trace_ages, bundle, lang));
 
     // Both sections come after the evidence and clearly apart from it, in this order.
     out.push_str(&own_traces_section(view, lang));
     out.push_str(&unmatched_section(view, lang));
 
-    if view.mode == Mode::Ss {
-        let _ = writeln!(
-            out,
-            "\n{}: {} {} · {} {} · {} {} · {} {}",
-            text(lang, "hidden"),
-            text(lang, "not_found"),
-            view.hidden.not_found,
-            text(lang, "unmeasured_expected"),
-            view.hidden.unmeasured_expected,
-            text(lang, "unmeasured_unexpected"),
-            view.hidden.unmeasured_unexpected,
-            text(lang, "unmatched"),
-            view.hidden.unmatched
-        );
-    }
     let code = if provenance.code_commit().is_some() {
         "code"
     } else {
@@ -995,8 +808,7 @@ fn own_traces_section(view: &ReportView, lang: Lang) -> String {
     out
 }
 
-/// What the collectors saw that no rule matched. Self mode lists these; in SS mode the list arrives
-/// empty and they appear only as a number in the hidden line (ADR 0014).
+/// What the collectors saw that no rule matched (ADR 0014).
 fn unmatched_section(view: &ReportView, lang: Lang) -> String {
     let mut out = String::new();
     if view.unmatched.is_empty() {
@@ -1029,7 +841,7 @@ fn short(sha: &str) -> &str {
 #[cfg(test)]
 mod tests {
     use bope_core::model::{
-        Evidence, EvidenceState, Mode, Observation, OwnTraceEntry, REPORT_SCHEMA_VERSION, Report,
+        Evidence, EvidenceState, Observation, OwnTraceEntry, REPORT_SCHEMA_VERSION, Report,
         ReportHeader, Strength, UnmatchedGroup,
     };
     use bope_core::provenance::Provenance;
@@ -1068,7 +880,6 @@ mod tests {
                 booted_at: "2025-12-28T21:56:56Z".to_owned(),
                 seconds_since_boot: 266_584,
             },
-            profiles_directory: None,
             scan_tier: bope_core::model::ScanTier::Standard,
             anchors: Vec::new(),
         };
@@ -1098,7 +909,6 @@ mod tests {
                 discriminators: std::collections::BTreeMap::new(),
                 coverage_fields: std::collections::BTreeMap::new(),
                 unmeasured_sources: Vec::new(),
-                sensitive_fields: std::collections::BTreeMap::new(),
                 age_fields: std::collections::BTreeMap::new(),
                 timeline_selectors: std::collections::BTreeMap::new(),
             },
@@ -1114,7 +924,7 @@ mod tests {
             (Lang::En, "not an order of events"),
             (Lang::Th, "ไม่ใช่ลำดับของเหตุการณ์"),
         ] {
-            let text = render(&view::for_mode(&report, Mode::Ss), &bundle, lang);
+            let text = render(&view::for_report(&report), &bundle, lang);
             assert!(text.contains(note), "{text}");
             assert!(
                 text.contains(&format!(
@@ -1177,19 +987,19 @@ mod tests {
     #[test]
     fn unofficial_build_is_announced() {
         let (report, bundle) = report(false);
-        let text = render(&view::for_mode(&report, Mode::SelfCheck), &bundle, Lang::En);
+        let text = render(&view::for_report(&report), &bundle, Lang::En);
         assert!(text.contains("UNOFFICIAL BUILD"), "{text}");
-        let thai = render(&view::for_mode(&report, Mode::SelfCheck), &bundle, Lang::Th);
+        let thai = render(&view::for_report(&report), &bundle, Lang::Th);
         assert!(thai.contains("UNOFFICIAL BUILD"), "{thai}");
     }
 
-    /// One line above the evidence, in both modes and both languages, carrying the caveat that stops
+    /// One line above the evidence, in both languages, carrying the caveat that stops
     /// a start days ago being read as something the player did (ADR 0039).
     #[test]
     fn the_boot_time_is_one_line_of_context_above_the_evidence() {
         let (report, bundle) = report(false);
-        for mode in [Mode::SelfCheck, Mode::Ss] {
-            let text = render(&view::for_mode(&report, mode), &bundle, Lang::En);
+        {
+            let text = render(&view::for_report(&report), &bundle, Lang::En);
             let (above, below) = text
                 .split_once("[FOUND]")
                 .expect("the evidence is rendered");
@@ -1211,7 +1021,7 @@ mod tests {
                 "{text}"
             );
 
-            let thai = render(&view::for_mode(&report, mode), &bundle, Lang::Th);
+            let thai = render(&view::for_report(&report), &bundle, Lang::Th);
             assert!(
                 thai.contains("Windows เริ่มทำงาน: 2025-12-28T21:56:56Z"),
                 "{thai}"
@@ -1229,7 +1039,7 @@ mod tests {
         report.header.boot_time = bope_core::model::BootTime::Unmeasured {
             reason: UnmeasuredReason::NotWindows,
         };
-        let text = render(&view::for_mode(&report, Mode::SelfCheck), &bundle, Lang::En);
+        let text = render(&view::for_report(&report), &bundle, Lang::En);
         assert!(
             text.contains("Windows start: not measured — not running on Windows"),
             "{text}"
@@ -1249,275 +1059,8 @@ mod tests {
     #[test]
     fn official_build_has_no_banner() {
         let (report, bundle) = report(true);
-        let text = render(&view::for_mode(&report, Mode::SelfCheck), &bundle, Lang::En);
+        let text = render(&view::for_report(&report), &bundle, Lang::En);
         assert!(!text.contains("UNOFFICIAL BUILD"), "{text}");
-    }
-
-    #[test]
-    fn thai_uses_translated_rule_title_and_ss_shows_hidden_counts() {
-        let (report, bundle) = report(false);
-        let text = render(&view::for_mode(&report, Mode::Ss), &bundle, Lang::Th);
-        assert!(text.contains("Secure Boot ถูกปิดอยู่"), "{text}");
-        assert!(text.contains("ซ่อนในโหมด SS"), "{text}");
-        assert!(text.contains("พิสูจน์ไม่ได้ว่าเครื่องสะอาด"), "{text}");
-    }
-
-    /// What the tool itself left in what the collectors saw is listed apart from the evidence and
-    /// said to be excluded, so that a reader cannot mistake it for something found on the PC.
-    /// Every collector in this build is named in the consent question, in both languages. The
-    /// words are keyed by collector id and the ids are compared with `bope_collectors::all()`, so
-    /// adding a collector without saying so here fails this test rather than widening what a player
-    /// agreed to without telling them.
-    /// What the consent question says about each collector, in both languages (see the test below).
-    const CONSENT_WORDS: &[(&str, &[&str])] = &[
-        ("amcache", &["Amcache.hve", "shadow copy"]),
-        (
-            "autostart",
-            &["Run", "RunOnce", "scheduled task", "SHA-256"],
-        ),
-        ("bam", &["BAM"]),
-        ("browser_ext", &["Chrome", "Firefox"]),
-        ("defender_exclusion", &["Microsoft Defender", "exclusion"]),
-        ("driver_service", &["driver"]),
-        ("evtx", &["event log"]),
-        ("executor_footprint", &["autoexec", "workspace"]),
-        ("fastflags", &["FastFlag", "ClientAppSettings.json"]),
-        ("feature_usage", &["FeatureUsage"]),
-        (
-            "fivem_dir",
-            &[
-                "FiveM",
-                "plugin",
-                "Legacy",
-                "Enhanced",
-                "FiveM.exe",
-                "Authenticode",
-            ],
-        ),
-        ("fivem_servers", &["FiveM for GTA V Enhanced"]),
-        (
-            "hijack",
-            &["Image File Execution Options", "AppInit_DLLs", "Winlogon"],
-        ),
-        ("install_marker", &["Atlas", "ReviOS", "Defender"]),
-        ("installed_programs", &["Cheat Engine", "VPN"]),
-        ("machine_identity", &["SMBIOS"]),
-        ("mft", &["Master File Table"]),
-        ("muicache", &["MuiCache"]),
-        ("net_adapter", &["WinHTTP", "TAP"]),
-        (
-            "net_config",
-            &[
-                "hosts",
-                "cfx.re, fivem.net",
-                "rockstargames.com",
-                "roblox.com",
-                "proxy",
-                "Windows Firewall",
-                "loopback, unspecified, private",
-            ],
-        ),
-        ("os_image", &["Defender", "Windows Update", "Event Log"]),
-        ("pca", &["Program Compatibility Assistant"]),
-        ("pci_device", &["PCI", "Windows"]),
-        (
-            "posture",
-            &["Secure Boot", "memory integrity", "PowerShell"],
-        ),
-        (
-            "powershell_text",
-            &["PowerShell", "Microsoft Defender", "SS"],
-        ),
-        ("prefetch", &["Prefetch"]),
-        ("process", &[]),
-        ("recycle_bin", &["$Recycle.Bin", "$I", "$R"]),
-        ("roblox", &["Roblox", "ClientAppSettings.json", "Bloxstrap"]),
-        ("roblox_files", &["$Recycle.Bin", ".zip"]),
-        ("roblox_process", &["RobloxPlayerBeta.exe", "Hyperion"]),
-        ("roblox_trace", &["FFlagManager"]),
-        ("shell_mru", &["RunMRU", "TypedPaths"]),
-        ("shellbags", &["ShellBags", "OpenSavePidlMRU"]),
-        ("shimcache", &["AppCompatCache"]),
-        ("shortcuts", &[".lnk"]),
-        ("srum", &["SRUM", "SRUDB.dat"]),
-        ("usb_device", &["USB", "setupapi.dev.log", "Arduino"]),
-        ("user_files", &["Mark of the Web", ".lua"]),
-        ("userassist", &["UserAssist", "Solara"]),
-        ("usn", &["change journal"]),
-        (
-            "windows_service",
-            &["SysMain", "Service Control Manager", "7036"],
-        ),
-        ("windows_start", &["System", "Fast Startup"]),
-        ("wmi_subscription", &["WMI"]),
-    ];
-
-    #[test]
-    fn consent_names_every_kind_of_source() {
-        let named = CONSENT_WORDS;
-        let mut ids: Vec<&str> = bope_collectors::all().iter().map(|c| c.id()).collect();
-        ids.sort_unstable();
-        let listed: Vec<&str> = named.iter().map(|(id, _)| *id).collect();
-        assert_eq!(
-            ids, listed,
-            "a collector was added or removed; say what it reads in `consent`"
-        );
-        // Not a collector, so not in the list above: the report header's boot time is a new read of
-        // its own, and a player agrees to it like any other (ADR 0039).
-        let running = [
-            (
-                Lang::Pt,
-                "programas rodando agora",
-                "quando o Windows iniciou pela última vez",
-                [
-                    "somente leitura",
-                    "tamanho que o Windows define",
-                    "conta do Windows que executa a verificação",
-                ],
-            ),
-            (
-                Lang::En,
-                "programs running now",
-                "when Windows last started",
-                [
-                    "read-only",
-                    "size Windows sets",
-                    "Windows account running the scan",
-                ],
-            ),
-            (
-                Lang::Th,
-                "โปรแกรมที่กำลังรันอยู่",
-                "เวลาที่ Windows เริ่มทำงานครั้งล่าสุด",
-                [
-                    "อ่านอย่างเดียว",
-                    "ขนาดที่ Windows ตั้งไว้",
-                    "บัญชี Windows ที่ใช้รันการสแกน",
-                ],
-            ),
-        ];
-        // ADR 0051 decision 2: the consent names the programs whose times the timeline shows, not a
-        // description of them.
-        let timeline = [
-            "timeline",
-            "FiveM.exe, GTA5.exe, GTA5_Enhanced.exe, PlayGTAV.exe",
-            "_GTAProcess.exe",
-        ];
-        for lang in [Lang::Pt, Lang::En, Lang::Th] {
-            let question = consent(lang);
-            for words in timeline {
-                assert!(question.contains(words), "{words} missing from {question}");
-            }
-        }
-        for (lang, process_words, boot_time_words, later_reads) in running {
-            // A full scan's question names what only a full scan reads; the standard one does not
-            // (ADR 0052).
-            assert!(!consent(lang).contains("FiveM for GTA V Enhanced"));
-            let question = consent_for(lang, ScanTier::Full);
-            assert!(question.contains(process_words), "{question}");
-            assert!(question.contains(boot_time_words), "{question}");
-            for words in later_reads {
-                assert!(question.contains(words), "{words} missing from {question}");
-            }
-            for word in named.iter().flat_map(|(_, words)| words.iter()) {
-                assert!(question.contains(word), "{word} missing from {question}");
-            }
-        }
-    }
-
-    /// A full scan's two questions name what ADR 0064's collector reads, that no command is kept, and the
-    /// separate answer for a website's name; the standard scan's question names none of it.
-    #[test]
-    fn a_full_scan_names_powershell_text_and_the_website_question() {
-        for (lang, words) in [
-            (
-                Lang::En,
-                [
-                    "PowerShell's commands",
-                    "No command is kept or shown",
-                    "a website's name",
-                ],
-            ),
-            (
-                Lang::Th,
-                ["คำในคำสั่ง PowerShell", "ไม่เก็บและไม่แสดงคำสั่งใด ๆ", "ชื่อเว็บไซต์"],
-            ),
-        ] {
-            let full = format!(
-                "{}{}",
-                consent_for(lang, ScanTier::Full),
-                full_question(lang)
-            );
-            for word in words {
-                assert!(full.contains(word), "{word} missing from {full}");
-            }
-            assert!(!consent(lang).contains(words[0]));
-            assert!(
-                sensitive_question(lang, SensitiveKind::DownloadHost).contains("%DOWNLOAD_HOST%")
-            );
-        }
-    }
-
-    #[test]
-    fn consent_names_the_trace_ages_the_anchors_and_the_statement() {
-        // ADR 0061 decision 8: the anchor dates, the per-source counts and oldest times, and the
-        // statement are named in the change that shows them.
-        for (lang, words) in [
-            (
-                Lang::En,
-                [
-                    "installed or last feature-upgraded",
-                    "$Recycle.Bin",
-                    "how far back each of these records reaches",
-                    "one statement",
-                ],
-            ),
-            (
-                Lang::Th,
-                [
-                    "ติดตั้งหรืออัปเกรด feature ครั้งล่าสุด",
-                    "$Recycle.Bin",
-                    "ย้อนกลับไปได้ไกลแค่ไหน",
-                    "ข้อความหนึ่งข้อ",
-                ],
-            ),
-        ] {
-            let question = consent(lang);
-            for word in words {
-                assert!(question.contains(word), "{word} missing from {question}");
-            }
-        }
-    }
-
-    #[test]
-    fn consent_names_the_session_reads_and_the_session_statement() {
-        // ADR 0062 owner decision 9: process start times, the edition word and the index times are
-        // named in the change that ships the session statement, and so is the statement.
-        for (lang, words) in [
-            (
-                Lang::En,
-                [
-                    "when each started",
-                    "which edition's it was (Legacy or Enhanced), never the path",
-                    "its index folder's own times",
-                    "puts its last session",
-                ],
-            ),
-            (
-                Lang::Th,
-                [
-                    "เวลาที่แต่ละตัวเริ่ม",
-                    "ว่าเป็นของ edition ไหน (Legacy หรือ Enhanced) โดยไม่แสดง path",
-                    "เวลาของโฟลเดอร์ดัชนีเอง",
-                    "วางเซสชันล่าสุด",
-                ],
-            ),
-        ] {
-            let question = consent(lang);
-            for word in words {
-                assert!(question.contains(word), "{word} missing from {question}");
-            }
-        }
     }
 
     #[test]
@@ -1540,7 +1083,7 @@ mod tests {
                 .into(),
             },
         }];
-        let view = view::for_mode(&report, Mode::SelfCheck);
+        let view = view::for_report(&report);
         let text = render(&view, &bundle, Lang::En);
 
         let (above, section) = text
@@ -1582,7 +1125,7 @@ mod tests {
     fn unmatched_observations_are_rendered_in_their_own_section() {
         let (mut report, bundle) = report(false);
         report.unmatched = plugin_file();
-        let view = view::for_mode(&report, Mode::SelfCheck);
+        let view = view::for_report(&report);
         let text = render(&view, &bundle, Lang::En);
 
         let (above, section) = text
@@ -1597,21 +1140,10 @@ mod tests {
         assert!(thai.contains("ไม่ตรง rule ใดเลย"), "{thai}");
     }
 
-    /// SS mode says how many there were and names none of them: a raw listing of what a collector
-    /// saw is exactly what that mode promises not to show (ADR 0014).
-    #[test]
-    fn ss_mode_counts_unmatched_observations_without_listing_them() {
-        let (mut report, bundle) = report(false);
-        report.unmatched = plugin_file();
-        let text = render(&view::for_mode(&report, Mode::Ss), &bundle, Lang::En);
-        assert!(!text.contains("overlay.dll"), "{text}");
-        assert!(text.contains("unmatched observations 1"), "{text}");
-    }
-
     #[test]
     fn no_unmatched_section_when_every_observation_matched_a_rule() {
         let (report, bundle) = report(false);
-        let text = render(&view::for_mode(&report, Mode::SelfCheck), &bundle, Lang::En);
+        let text = render(&view::for_report(&report), &bundle, Lang::En);
         assert!(!text.contains("unmatched observations"), "{text}");
     }
 
@@ -1622,7 +1154,7 @@ mod tests {
     fn a_found_entry_shows_its_description_and_its_false_positives() {
         let (report, bundle) = report(false);
         let rule = subject(&bundle);
-        let view = view::for_mode(&report, Mode::SelfCheck);
+        let view = view::for_report(&report);
 
         let english = render(&view, &bundle, Lang::En);
         assert!(english.contains("About this check"), "{english}");
@@ -1655,7 +1187,7 @@ mod tests {
         report.evidence[0].state = EvidenceState::NotFound {
             retention: rule.retention.clone(),
         };
-        let text = render(&view::for_mode(&report, Mode::SelfCheck), &bundle, Lang::En);
+        let text = render(&view::for_report(&report), &bundle, Lang::En);
         assert!(text.contains(&rule.description), "{text}");
         assert!(
             !text.contains("Ordinary things that also produce this"),
@@ -1678,7 +1210,7 @@ mod tests {
             to: "2026-09-30T11:03:00Z".to_owned(),
         };
         let found = {
-            let mut view = view::for_mode(&report, Mode::SelfCheck);
+            let mut view = view::for_report(&report);
             view.row_bands.insert(rule.id.clone(), band.clone());
             render(&view, &bundle, Lang::En)
         };
@@ -1692,7 +1224,7 @@ mod tests {
         report.evidence[0].state = EvidenceState::NotFound {
             retention: rule.retention.clone(),
         };
-        let mut view = view::for_mode(&report, Mode::SelfCheck);
+        let mut view = view::for_report(&report);
         view.row_bands.insert(rule.id.clone(), band);
         let english = render(&view, &bundle, Lang::En);
         assert!(
@@ -1725,13 +1257,13 @@ mod tests {
                 expected: false,
             };
         }
-        let view = view::for_mode(&report, Mode::SelfCheck);
+        let view = view::for_report(&report);
 
         let text = render(&view, &bundle, Lang::En);
         let (scope, below) = text
             .split_once("Scope: 2 check(s)")
             .expect("the scope statement is printed once, with the count");
-        assert!(scope.contains("mode: self"), "{scope}");
+        assert!(scope.contains("standard scan"), "{scope}");
         assert!(!below.contains("Scope: "), "{below}");
         assert!(below.contains("[NOT MEASURED (not expected)]"), "{below}");
 
@@ -1748,7 +1280,7 @@ mod tests {
             reason: bope_core::model::UnmeasuredReason::SourceAbsent,
             expected: true,
         };
-        let text = render(&view::for_mode(&report, Mode::SelfCheck), &bundle, Lang::En);
+        let text = render(&view::for_report(&report), &bundle, Lang::En);
         assert!(text.contains("[NOT MEASURED (expected here)]"), "{text}");
         assert!(!text.contains("(not expected)"), "{text}");
     }
@@ -1769,7 +1301,7 @@ mod tests {
                 "รายการที่แสดง: เจอ 1 · ไม่เจอ 0 · ยังไม่ได้วัด 0",
             ),
         ] {
-            let text = render(&view::for_mode(&report, Mode::SelfCheck), &bundle, lang);
+            let text = render(&view::for_report(&report), &bundle, lang);
             let (above, _) = text.split_once(marker).expect("the evidence is rendered");
             assert_eq!(above.lines().filter(|l| *l == line).count(), 1, "{text}");
         }
@@ -1780,7 +1312,7 @@ mod tests {
         let (mut report, bundle) = report(true);
         report.header.provenance.commit =
             Some("2c673c54aeb084cd3773057efbb9ed3b98fd2dbc".to_owned());
-        let text = render(&view::for_mode(&report, Mode::Ss), &bundle, Lang::En);
+        let text = render(&view::for_report(&report), &bundle, Lang::En);
         let (before_footer, _) = text.split_once("Evidence only.").expect("footer");
         assert!(
             before_footer.contains(
@@ -1793,7 +1325,7 @@ mod tests {
     #[test]
     fn an_unofficial_build_links_the_repository_and_says_its_code_is_not_known() {
         let (report, bundle) = report(false);
-        let text = render(&view::for_mode(&report, Mode::SelfCheck), &bundle, Lang::En);
+        let text = render(&view::for_report(&report), &bundle, Lang::En);
         assert!(
             text.contains(
                 "Code: https://github.com/aeterna/aeterna-rongroi (the code this build was made from is not known)"
@@ -1801,7 +1333,7 @@ mod tests {
             "{text}"
         );
         assert!(!text.contains("/tree/"), "{text}");
-        let thai = render(&view::for_mode(&report, Mode::SelfCheck), &bundle, Lang::Th);
+        let thai = render(&view::for_report(&report), &bundle, Lang::Th);
         assert!(
             thai.contains(
                 "โค้ด: https://github.com/aeterna/aeterna-rongroi (ไม่รู้ว่า build นี้สร้างจากโค้ดของ commit ไหน)"
@@ -1817,7 +1349,7 @@ mod tests {
         report.evidence[0].state = EvidenceState::NotFound {
             retention: english.clone(),
         };
-        let view = view::for_mode(&report, Mode::SelfCheck);
+        let view = view::for_report(&report);
 
         let thai = render(&view, &bundle, Lang::Th);
         assert!(thai.contains("เป็นค่าที่ตั้งไว้ตอนนี้เท่านั้น"), "{thai}");

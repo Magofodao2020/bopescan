@@ -13,7 +13,10 @@ use crate::bundle::BundleInfo;
 use crate::provenance::Provenance;
 
 /// Version of the report JSON format. A breaking change is a major application release.
-pub const REPORT_SCHEMA_VERSION: u32 = 1;
+///
+/// 2 (B.O.P.E 0.11): the screenshare view, its consent options and the header's `profiles_directory`
+/// were removed, and the forensic collectors were added.
+pub const REPORT_SCHEMA_VERSION: u32 = 2;
 
 /// One typed fact a collector saw on the host, for example `{"secure_boot": "disabled"}`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -254,17 +257,6 @@ impl Strength {
     }
 }
 
-/// Who is looking at the report.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum Mode {
-    /// The player checking their own PC: everything is shown.
-    #[serde(rename = "self")]
-    SelfCheck,
-    /// Screenshare with staff: consent first, only matches, redacted paths.
-    Ss,
-}
-
 /// The result of one rule.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "state", rename_all = "snake_case")]
@@ -404,11 +396,6 @@ pub struct ReportHeader {
     /// `unmeasured` / `not_attempted`.
     #[serde(default)]
     pub boot_time: BootTime,
-    /// The machine's `ProfilesDirectory`, expanded, when the scan could read it (ADR 0049). It is
-    /// what SS-mode redaction treats as a profile root besides the fixed ones, and nothing else reads
-    /// it; the SS view drops it. Additive, and [`REPORT_SCHEMA_VERSION`] stays at 1.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub profiles_directory: Option<String>,
     /// Which scan the player chose before it started (ADR 0052). Additive, and
     /// [`REPORT_SCHEMA_VERSION`] stays at 1: a report written before it existed was a standard scan.
     #[serde(default)]
@@ -518,29 +505,6 @@ impl ScanTier {
         match self {
             Self::Standard => "standard",
             Self::Full => "full",
-        }
-    }
-}
-
-/// A kind of value SS mode hides even after a full scan, each behind its own answer (ADR 0052).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum SensitiveKind {
-    /// A value that identifies a game server: an endpoint, a server cache folder's name.
-    ServerIdentity,
-    /// A value that identifies an account.
-    AccountIdentifier,
-    /// The host a PowerShell command downloaded from (ADR 0064): one name the player may not want shown.
-    DownloadHost,
-}
-
-impl SensitiveKind {
-    /// Stable identifier used in JSON.
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Self::ServerIdentity => "server_identity",
-            Self::AccountIdentifier => "account_identifier",
-            Self::DownloadHost => "download_host",
         }
     }
 }
@@ -730,10 +694,6 @@ pub struct Report {
     /// Additive.
     #[serde(default)]
     pub unmeasured_sources: Vec<UnmeasuredSource>,
-    /// For each collector that declares one, the fields SS mode hides and the kind of each
-    /// (ADR 0052). Copied from the collectors' declarations, which the core cannot see. Additive.
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub sensitive_fields: BTreeMap<String, BTreeMap<String, SensitiveKind>>,
     /// For each collector that declares one, how its observations say how far back its source reaches
     /// (ADR 0061). Additive, and [`REPORT_SCHEMA_VERSION`] stays at 1.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]

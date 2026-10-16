@@ -18,19 +18,18 @@
 //! No rule reads this collector (ADR 0023), so what it sees is listed in Self mode as unmatched
 //! observations and counted, never listed, in SS mode (ADR 0014).
 //!
-//! # The account is never reported, and the path usually is not either
+//! # The account is never reported; the path is
 //!
 //! - **The SID is withheld whole**, and no part of it goes out: not the SID, not a hash of it, not
 //!   its last segment, not an index invented per run. It names one account *and* — through the
 //!   installation identifier in the middle of it — one machine, which is the linkage ADR 0021
 //!   refused to create for a volume serial number. What is reported is how many accounts had
 //!   records, which is a count and not an identifier.
-//! - **A path is emitted only when it begins with a drive letter**, the one shape
-//!   `bope_core::view::redact_profile_paths` can reach, exactly as `pca` decides it. BAM is expected
-//!   to spell paths in the `\Device\HarddiskVolumeN\…` form — unverified, see ADR 0023 — and such a
-//!   path carries `\Users\<account>\` with no drive letter in front of it, so it would reach an SS
-//!   viewer unredacted while the code around it says paths are redacted.
-//! - **Which of `FiveM`'s editions a path is below is emitted, and the path is not.** `fivem_edition`
+//! - **The path is emitted as BAM spelled it**, with `path_form` saying whether it begins with a
+//!   drive letter (`drive`), is a `\Device\HarddiskVolumeN\…` path (`device`) or neither (`other`).
+//!   Before B.O.P.E 0.11 a path without a drive letter was withheld because the screenshare view could
+//!   not redact it; that view is gone and the path is the evidence.
+//! - **Which of `FiveM`'s editions a path is below is emitted beside it.** `fivem_edition`
 //!   (`legacy` or `enhanced`) is read from the value name in whatever form BAM spelled it, device path
 //!   included, by `crate::fivem_edition`; it is one word, and it is omitted for a path below neither of
 //!   `FiveM`'s program folders (ADR 0062).
@@ -48,7 +47,7 @@ use bope_parsers::bam::{self, BamEntry};
 use bope_parsers::error::ParseError;
 
 use crate::failure::{read_failure, reason_for};
-use crate::paths::{UNREDACTABLE_FORM, file_name, is_drive_rooted};
+use crate::paths::{file_name, path_form};
 use crate::{Age, AgeCount, AgeRows, Collector, Field, fivem_edition};
 
 /// The key holding one subkey per user account that BAM has recorded anything for.
@@ -106,7 +105,7 @@ const FIELDS: [Field; 15] = [
     Field::number("moderation_state"),
     Field::text("name"),
     Field::text("path"),
-    Field::text("path_withheld"),
+    Field::text("path_form"),
     Field::text("read"),
     Field::number("rejected"),
     Field::text("sid_withheld"),
@@ -126,7 +125,7 @@ const RECORD_FIELDS: [&str; 7] = [
     "moderation_state",
     "name",
     "path",
-    "path_withheld",
+    "path_form",
     "value_bytes",
 ];
 
@@ -339,7 +338,7 @@ fn execution(path: &str, value_bytes: usize, entry: &BamEntry) -> Observation {
         fields.insert("name".to_owned(), serde_json::Value::from(name));
     }
     insert_path(&mut fields, path);
-    // From the value name, which `insert_path` may have just withheld: one word, never the path.
+    // From the value name, in whatever form BAM spelled it.
     if let Some(edition) = fivem_edition::of_path(path) {
         fields.insert(
             fivem_edition::FIELD.to_owned(),
@@ -444,19 +443,14 @@ fn status(path: Option<&str>, read: &'static str) -> Observation {
     }
 }
 
-/// Writes the path the artifact spelled, or says that it was withheld.
-///
-/// Silently omitting it would read as "BAM recorded no path", which is never what happened: the
-/// path is the value's name and is always there.
+/// Writes the path the artifact spelled, and the form it is written in. BAM names most programs by
+/// their `\Device\HarddiskVolumeN\…` path, which is kept as read: it is the record.
 fn insert_path(fields: &mut BTreeMap<String, serde_json::Value>, path: &str) {
-    if is_drive_rooted(path) {
-        fields.insert("path".to_owned(), serde_json::Value::from(path));
-    } else {
-        fields.insert(
-            "path_withheld".to_owned(),
-            serde_json::Value::from(UNREDACTABLE_FORM),
-        );
-    }
+    fields.insert("path".to_owned(), serde_json::Value::from(path));
+    fields.insert(
+        "path_form".to_owned(),
+        serde_json::Value::from(path_form(path)),
+    );
 }
 
 /// Value of the `read` field for a value whose bytes arrived and did not decode.
@@ -563,46 +557,34 @@ mod tests {
         assert_eq!(text(account, "sid_withheld"), Some(SID_WITHHELD));
     }
 
-    /// **The whole point of this collector's field list.** BAM is keyed by SID and its value names
-    /// are executable paths in a form redaction cannot reach. The fixture's own account name is long
-    /// enough to assert absent, which a real machine's need not be — the upstream Prefetch corpus
-    /// has a one-letter one, and `contains("a")` is true of almost any JSON — so the assertion that
-    /// carries the weight is on the *shapes*: no SID, no device path, no `\Users\` segment, and no
-    /// field carrying the account under any name.
+    /// BAM is keyed by SID, and the SID identifies one account and one installation: it never reaches
+    /// an observation under any name. The value names, the programs' paths, are the record and are
+    /// kept as read, with the form they are written in.
     #[test]
-    fn no_account_and_no_device_path_reaches_an_observation() {
+    fn no_account_reaches_an_observation_and_the_device_path_is_kept() {
         let run = Bam.collect(&fixture("bam-device-paths"));
         let (observations, _) = measured(&run);
         let json = serde_json::to_string(&observations).unwrap().to_uppercase();
 
-        for leaked in [
-            "S-1-5-",
-            "HARDDISKVOLUME",
-            "\\\\DEVICE\\\\",
-            "\\\\USERS\\\\",
-            "USERSETTINGS",
-            "SID\"",
-            "USER_SID",
-            "ACCOUNT",
-            "DEVICEUSER",
-        ] {
+        for leaked in ["S-1-5-", "USERSETTINGS", "SID\"", "USER_SID"] {
             assert!(
                 !json.contains(leaked),
                 "{leaked} reached an observation: {json}"
             );
         }
 
-        // The device-path record is still reported, with the path withheld and the name kept.
         let records = executions(observations);
         assert_eq!(records.len(), 1, "{records:?}");
         assert_eq!(text(records[0], "name"), Some("tool.exe"));
-        assert_eq!(field(records[0], "path"), None);
-        assert_eq!(text(records[0], "path_withheld"), Some(UNREDACTABLE_FORM));
+        assert!(
+            text(records[0], "path").is_some_and(|p| p.starts_with(r"\Device\")),
+            "{records:?}"
+        );
+        assert_eq!(text(records[0], "path_form"), Some("device"));
     }
 
-    /// The edition is read from the value name in either spelling, and only the word reaches the
-    /// observation: a device path stays withheld, and no segment of it — not the account, not the
-    /// folder — is emitted beside the word (ADR 0062).
+    /// The edition is read from the value name in either spelling (ADR 0062), whatever form the path
+    /// is written in.
     #[test]
     fn a_record_below_one_of_fivems_folders_says_which_edition_and_no_more() {
         let run = Bam.collect(&fixture("bam-fivem-editions"));
@@ -615,7 +597,7 @@ mod tests {
                 (
                     text(record, "name"),
                     text(record, "fivem_edition"),
-                    text(record, "path"),
+                    text(record, "path_form"),
                 )
             })
             .collect();
@@ -623,40 +605,24 @@ mod tests {
         assert_eq!(
             records,
             [
-                (Some("fivem.exe"), None, None),
-                (Some("fivem.exe"), Some("enhanced"), None),
-                (Some("fivem.exe"), Some("legacy"), None),
+                (Some("fivem.exe"), None, Some("device")),
+                (Some("fivem.exe"), Some("enhanced"), Some("device")),
+                (Some("fivem.exe"), Some("legacy"), Some("device")),
+                (Some("fivem.exe"), Some("legacy"), Some("drive")),
                 (
-                    Some("fivem.exe"),
+                    Some("fivem_b2802_gtaprocess.exe"),
                     Some("legacy"),
-                    Some(r"C:\Users\deviceuser\AppData\Local\FiveM\FiveM.exe")
+                    Some("device")
                 ),
-                (Some("fivem_b2802_gtaprocess.exe"), Some("legacy"), None),
-                (Some("notepad.exe"), None, None),
+                (Some("notepad.exe"), None, Some("device")),
             ]
         );
 
-        // The withheld device paths stay withheld: no part of one is in the report.
-        let device_records: Vec<&Observation> = executions(observations)
+        let device_records = executions(observations)
             .into_iter()
-            .filter(|record| record.fields.contains_key("path_withheld"))
-            .collect();
-        assert_eq!(device_records.len(), 5, "{device_records:?}");
-        let json = serde_json::to_string(&device_records)
-            .unwrap()
-            .to_uppercase();
-        for leaked in [
-            "HARDDISKVOLUME",
-            "DEVICEUSER",
-            "APPDATA",
-            "FIVEM2",
-            "ENHANCED\\",
-        ] {
-            assert!(
-                !json.contains(leaked),
-                "{leaked} reached an observation: {json}"
-            );
-        }
+            .filter(|record| text(record, "path_form") == Some("device"))
+            .count();
+        assert_eq!(device_records, 5);
     }
 
     /// **Every account key measured on Windows 11 holds `Version` and `SequenceNumber`, two

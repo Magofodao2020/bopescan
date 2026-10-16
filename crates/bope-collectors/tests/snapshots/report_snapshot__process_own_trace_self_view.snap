@@ -3,9 +3,8 @@ source: crates/bope-collectors/tests/report_snapshot.rs
 expression: view
 ---
 {
-  "mode": "self",
   "header": {
-    "schema_version": 1,
+    "schema_version": 2,
     "provenance": {
       "official": false,
       "version": "0.0.0-test",
@@ -1417,12 +1416,6 @@ expression: view
     "found": 0,
     "not_found": 40,
     "unmeasured": 86
-  },
-  "hidden": {
-    "not_found": 0,
-    "unmeasured_expected": 0,
-    "unmeasured_unexpected": 0,
-    "unmatched": 0
   },
   "timeline": {
     "entries": [
