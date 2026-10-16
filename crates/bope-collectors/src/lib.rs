@@ -18,12 +18,14 @@ pub mod executor_footprint;
 pub mod failure;
 pub mod fastflags;
 pub mod feature_usage;
+pub mod file_inventory;
 pub mod fivem_dir;
 pub mod fivem_edition;
 pub mod fivem_servers;
 pub mod hijack;
 pub mod install_marker;
 pub mod installed_programs;
+pub mod integrity;
 pub mod location;
 pub mod machine_identity;
 pub mod mft;
@@ -225,6 +227,58 @@ pub trait Collector {
     }
     /// Looks at the host.
     fn collect(&self, host: &dyn Host) -> CollectorRun;
+    /// Looks at the host, checking `context` for a stop and telling it what is being read. A
+    /// collector that reads for long — the file inventory, process memory — overrides this; every
+    /// other one is [`Collector::collect`] (B.O.P.E, ADR 0133). A collector that stops on request
+    /// returns what it has, and the scan then discards the run along with the whole report.
+    fn collect_with(&self, host: &dyn Host, context: &CollectContext<'_>) -> CollectorRun {
+        let _ = context;
+        self.collect(host)
+    }
+}
+
+/// What a long collector may ask of the scan while it runs (B.O.P.E, ADR 0133).
+#[derive(Clone, Copy, Default)]
+pub struct CollectContext<'a> {
+    cancel: Option<&'a std::sync::atomic::AtomicBool>,
+    note: Option<&'a (dyn Fn(&str) + Sync)>,
+}
+
+impl std::fmt::Debug for CollectContext<'_> {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("CollectContext")
+            .field("cancelled", &self.cancelled())
+            .finish_non_exhaustive()
+    }
+}
+
+impl<'a> CollectContext<'a> {
+    /// A context that never stops and tells no one.
+    pub fn none() -> Self {
+        Self::default()
+    }
+
+    /// A context that stops when `cancel` is set and passes notes to `note`.
+    pub fn new(cancel: &'a std::sync::atomic::AtomicBool, note: &'a (dyn Fn(&str) + Sync)) -> Self {
+        Self {
+            cancel: Some(cancel),
+            note: Some(note),
+        }
+    }
+
+    /// Whether a stop was asked for.
+    pub fn cancelled(&self) -> bool {
+        self.cancel
+            .is_some_and(|flag| flag.load(std::sync::atomic::Ordering::Relaxed))
+    }
+
+    /// Tells the person watching what is being read now.
+    pub fn note(&self, text: &str) {
+        if let Some(note) = self.note {
+            note(text);
+        }
+    }
 }
 
 /// What [`Collector::coverage`] declares.
@@ -334,6 +388,8 @@ pub fn all() -> Vec<Box<dyn Collector>> {
         Box::new(windows_service::WindowsService),
         Box::new(windows_start::WindowsStart),
         Box::new(wmi_subscription::WmiSubscription),
+        // The long reads run after the quick ones, so a stopped scan has had them (B.O.P.E, ADR 0133).
+        Box::new(file_inventory::FileInventory),
         // Last: it correlates the runs before it (ADR 0123).
         Box::new(roblox_trace::RobloxTrace),
     ]

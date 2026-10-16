@@ -100,9 +100,10 @@ SPDX-FileCopyrightText = "2018 The Mali Project Authors (https://github.com/cads
 SPDX-License-Identifier = "OFL-1.1"
 
 # B.O.P.E 0.10.0 synthetic binary fixtures (an ESE database and an NTFS volume image), written by
-# `cargo run -p bope-parsers --example synthetic_fixtures`; see fixtures/hosts/PROVENANCE.md.
+# `cargo run -p bope-parsers --example synthetic_fixtures`; see fixtures/hosts/PROVENANCE.md. B.O.P.E 0.11
+# adds `sample.dll`, a 1 KiB hand-built PE image with one section and no code that does anything.
 [[annotations]]
-path = ["fixtures/hosts/*/SRUDB.dat", "fixtures/hosts/*/volume-c.img"]
+path = ["fixtures/hosts/*/SRUDB.dat", "fixtures/hosts/*/volume-c.img", "fixtures/hosts/*/sample.dll"]
 precedence = "override"
 SPDX-FileCopyrightText = "2026 B.O.P.E Scanner contributors"
 SPDX-License-Identifier = "GPL-3.0-or-later"

@@ -42,6 +42,8 @@ struct Inner {
     phase: Phase,
     steps: Vec<Progress>,
     started_at: Option<String>,
+    /// What the running collector last said it is reading (B.O.P.E, ADR 0133).
+    detail: Option<String>,
 }
 
 /// The shared state of the one scan.
@@ -58,6 +60,7 @@ impl Default for ScanSlot {
                 phase: Phase::Idle,
                 steps: Vec::new(),
                 started_at: None,
+                detail: None,
             })),
             cancel: Arc::new(AtomicBool::new(false)),
         }
@@ -84,6 +87,8 @@ pub struct Status {
     pub current: Option<String>,
     /// Whether a stop was asked for and the scan has not stopped yet.
     pub cancel_requested: bool,
+    /// What the running collector last said it is reading, while it runs.
+    pub detail: Option<String>,
 }
 
 impl ScanSlot {
@@ -99,6 +104,7 @@ impl ScanSlot {
         let generated_at = jiff::Timestamp::now().to_string();
         inner.phase = Phase::Running { tier };
         inner.steps.clear();
+        inner.detail = None;
         inner.started_at = Some(generated_at.clone());
         self.cancel.store(false, Ordering::SeqCst);
         drop(inner);
@@ -131,6 +137,7 @@ impl ScanSlot {
                 tier: None,
                 current: None,
                 cancel_requested: false,
+                detail: None,
             };
         };
         let (state, message, tier) = match &inner.phase {
@@ -157,6 +164,7 @@ impl ScanSlot {
             tier,
             current,
             cancel_requested: running && self.cancel.load(Ordering::SeqCst),
+            detail: if running { inner.detail.clone() } else { None },
         }
     }
 
@@ -190,12 +198,25 @@ fn run(slot: &ScanSlot, tier: ScanTier, provenance: Provenance, generated_at: St
         tier,
     };
     let host = crate::live_host();
-    let result = scan::run_with_progress(host.as_ref(), &bundle, context, &mut |step| {
+    let note = |text: &str| {
         if let Ok(mut inner) = slot.inner.lock() {
-            inner.steps.push(step);
+            inner.detail = Some(text.to_owned());
         }
-        !slot.cancel.load(Ordering::SeqCst)
-    });
+    };
+    let live = bope_collectors::CollectContext::new(&slot.cancel, &note);
+    let result = scan::run_with_live(
+        host.as_ref(),
+        &bundle,
+        context,
+        &mut |step| {
+            if let Ok(mut inner) = slot.inner.lock() {
+                inner.steps.push(step);
+                inner.detail = None;
+            }
+            !slot.cancel.load(Ordering::SeqCst)
+        },
+        &live,
+    );
     match result {
         Ok(report) => Phase::Done(Box::new(report)),
         Err(scan::Cancelled) => Phase::Cancelled,

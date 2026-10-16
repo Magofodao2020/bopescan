@@ -1,0 +1,61 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# A synthetic machine for the file inventory (B.O.P.E, ADR 0133): two fixed drives and a network
+# share; Windows' own catalog-listed DLL; a validly signed game DLL; an unsigned DLL named like a
+# System32 file in Downloads; an image disguised as a picture; a DLL whose signature does not verify;
+# an unsigned mod on D:; a junction that loops back; and a folder the account may not list. Every
+# image is the same 1 KiB hand-built sample.dll; no file is a real program.
+platform: windows
+elevated: true
+env:
+  SystemRoot: 'C:\Windows'
+  SystemDrive: 'C:'
+  LOCALAPPDATA: 'C:\Users\fixtureuser\AppData\Local'
+  ProgramData: 'C:\ProgramData'
+  ProgramFiles: 'C:\Program Files'
+drives:
+  - { root: 'C:\', kind: fixed, filesystem: NTFS }
+  - { root: 'D:\', kind: fixed, filesystem: NTFS }
+  - { root: 'Z:\', kind: network }
+access_denied:
+  - 'C:\System Volume Information'
+filesystem:
+  'C:\':
+    - { name: Windows, directory: true }
+    - { name: Users, directory: true }
+    - { name: Program Files, directory: true }
+    - { name: System Volume Information, directory: true }
+    - { name: pagefile.sys, size: 1024 }
+  'C:\Windows':
+    - { name: System32, directory: true }
+  'C:\Windows\System32':
+    - { name: kernel32.dll, from: sample.dll, size: 1024, signature: { state: no_embedded_signature }, catalog: { state: signed, catalog: 'Package_for_RollupFix.cat', signer: Microsoft Windows, signer_cert_sha256: '1111111111111111111111111111111111111111111111111111111111111111' } }
+    - { name: version.dll, from: sample.dll, size: 1024, signature: { state: no_embedded_signature }, catalog: { state: signed, catalog: 'Package_for_RollupFix.cat', signer: Microsoft Windows, signer_cert_sha256: '1111111111111111111111111111111111111111111111111111111111111111' } }
+  'C:\Program Files':
+    - { name: Game, directory: true }
+  'C:\Program Files\Game':
+    - { name: game.dll, from: sample.dll, size: 1024, signature: { state: valid, signer: Example Games, signer_cert_sha256: '0000000000000000000000000000000000000000000000000000000000000000' } }
+  'C:\Users':
+    - { name: fixtureuser, directory: true }
+  'C:\Users\fixtureuser':
+    - { name: Downloads, directory: true }
+    - { name: Looped, directory: true, link: true }
+    - { name: AppData, directory: true }
+  'C:\Users\fixtureuser\AppData':
+    - { name: Local, directory: true }
+  'C:\Users\fixtureuser\AppData\Local':
+    - { name: Temp, directory: true }
+  'C:\Users\fixtureuser\AppData\Local\Temp': []
+  'C:\Users\fixtureuser\Downloads':
+    - { name: version.dll, from: sample.dll, size: 1024, signature: { state: no_embedded_signature }, catalog: { state: not_in_catalog } }
+    - { name: cover.jpg, from: sample.dll, size: 1024, signature: { state: no_embedded_signature }, catalog: { state: not_in_catalog } }
+    - { name: patched.dll, from: sample.dll, size: 1024, signature: { state: invalid } }
+    - { name: notes.txt, content: 'MZ but a text file', size: 18 }
+  'C:\Users\fixtureuser\Looped':
+    - { name: never.dll, from: sample.dll, size: 1024, signature: { state: no_embedded_signature }, catalog: { state: not_in_catalog } }
+  'D:\':
+    - { name: Games, directory: true }
+  'D:\Games':
+    - { name: Mods, directory: true }
+  'D:\Games\Mods':
+    - { name: mod.dll, from: sample.dll, size: 1024, signature: { state: no_embedded_signature }, catalog: { state: not_in_catalog } }

@@ -82,6 +82,15 @@ pub fn run(host: &dyn Host, bundle: &Bundle, context: ScanContext) -> Report {
 
 /// One collector's run, or `not_consented` when it is above the scan's tier.
 fn run_one(collector: &dyn crate::Collector, host: &dyn Host, tier: ScanTier) -> CollectorRun {
+    run_one_with(collector, host, tier, &crate::CollectContext::none())
+}
+
+fn run_one_with(
+    collector: &dyn crate::Collector,
+    host: &dyn Host,
+    tier: ScanTier,
+    live: &crate::CollectContext<'_>,
+) -> CollectorRun {
     if collector.tier() > tier {
         // Not called at all: no function of it touches the machine (ADR 0052).
         CollectorRun::Unmeasured {
@@ -89,7 +98,7 @@ fn run_one(collector: &dyn crate::Collector, host: &dyn Host, tier: ScanTier) ->
             reason: UnmeasuredReason::NotConsented,
         }
     } else {
-        collector.collect(host)
+        collector.collect_with(host, live)
     }
 }
 
@@ -102,6 +111,25 @@ pub fn run_with_progress(
     bundle: &Bundle,
     context: ScanContext,
     progress: &mut dyn FnMut(Progress) -> bool,
+) -> Result<Report, Cancelled> {
+    run_with_live(
+        host,
+        bundle,
+        context,
+        progress,
+        &crate::CollectContext::none(),
+    )
+}
+
+/// [`run_with_progress`], with `live` handed to each collector so a long one can stop inside its own
+/// reads and say what it is reading (B.O.P.E, ADR 0133). A stop asked for through `live` while a
+/// collector runs ends the scan as soon as that collector returns, with no report.
+pub fn run_with_live(
+    host: &dyn Host,
+    bundle: &Bundle,
+    context: ScanContext,
+    progress: &mut dyn FnMut(Progress) -> bool,
+    live: &crate::CollectContext<'_>,
 ) -> Result<Report, Cancelled> {
     // Before the collectors, so that the count is read as close as possible to `generated_at`, which
     // the caller took just before this call: the `evtx` collector alone may run for 30 seconds, and
@@ -117,8 +145,11 @@ pub fn run_with_progress(
         let run = if collector.id() == crate::roblox_trace::ID {
             crate::roblox_trace::correlate(host, &runs)
         } else {
-            run_one(collector.as_ref(), host, tier)
+            run_one_with(collector.as_ref(), host, tier, live)
         };
+        if live.cancelled() {
+            return Err(Cancelled);
+        }
         let mut step = progress_of(
             bundle,
             &run,
