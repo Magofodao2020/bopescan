@@ -2,9 +2,12 @@
 
 > **B.O.P.E Scanner** (modified version of aeterna-rongroi). The section "B.O.P.E Scanner additions" just
 > below lists what this version reads beyond the original; everything after it is the original text and
-> still applies. Resumo em português: o programa não envia dados, não altera nada, não lê senhas, cookies,
-> tokens, mensagens, conteúdo de documentos nem dados de pagamento, e só lê as fontes mais pessoais na
-> verificação avançada escolhida antes de começar.
+> still applies, except where B.O.P.E 0.11 changed it (one view, no screenshare mode; one network request
+> for a public reference file). Resumo em português: o programa não envia dados sobre o PC, a verificação
+> ou você; a única requisição de rede baixa o arquivo público de referência de FastFlags do GitHub quando
+> você pede ou quando a verificação automática (que pode ser desligada) está ligada. Não altera nada, não
+> lê senhas, cookies, tokens, mensagens, conteúdo de documentos nem dados de pagamento, e só lê as
+> fontes mais pessoais na verificação avançada escolhida antes de começar.
 
 ## B.O.P.E Scanner additions
 
@@ -18,8 +21,8 @@ Standard scan:
   the *names* of flags in `ClientAppSettings.json` (never values), log folder counts/sizes/times (never
   log text), bootstrapper presence.
 - **The running Roblox player**, when it is open: its parent process, the paths of loaded modules that are
-  not Windows' or Roblox's, and *counts* of executable memory regions by type. Memory contents are never
-  read; the process is never changed.
+  not Windows' or Roblox's, and *counts* of executable memory regions by type (`roblox_process`). The
+  memory analysis added in 0.11 is described below; the process is never changed.
 - **Programs running from Downloads, Desktop or Temp**: their paths, hashes and signatures.
 - **Executor folders**: the folder layout, file names, and for scripts in them the *names of
   executor-only functions* they mention and counts. **Script text is never stored or shown.**
@@ -52,15 +55,15 @@ Standard scan:
 - **Windows services** (ADR 0130): for PcaSvc, DiagTrack, DPS, SysMain and EventLog, what the Service
   Control Manager reports now (state, process id, start type, account, program path), asked with query
   rights only, and their state, start-type and install events (7034, 7036, 7040, 7045) in the System log,
-  read as a file. No service is started, stopped or changed. Shown in both modes.
+  read as a file. No service is started, stopped or changed.
 - **Recycle Bin times** (ADR 0131): for this account's Recycle Bin on the system drive, each `$I` file
   (original path, size, deletion time) and the times of the `$I` and `$R` entries; the deleted files are
-  never opened and nothing is restored or removed. SS mode shows only a summary without names and the
-  items whose name matches the Roblox tool catalog, with paths redacted.
+  never opened and nothing is restored or removed.
 - **Change journal names** (ADR 0121): names of files matching the Roblox tool catalog, with counts of
   creations, deletions and renames and first/last times. Every other name is dropped after comparison.
 - **FastFlag files** (ADR 0122): size, times, SHA-256, counts of flags by kind and the names of
-  network/physics flags; never values.
+  network/physics flags (`fastflags`). Since 0.11 `roblox_flags` also reads the **values** the
+  player's and bootstrappers' settings files set, to compare them with the reference (below).
 - **Correlation** (ADR 0123) reads nothing new: it combines the rows above and says which sources
   could be read.
 
@@ -82,8 +85,48 @@ Advanced scan only (chosen on the start screen before anything is read):
 Saved reports may be HTML, TXT, JSON or PDF (ADR 0129); the PDF carries the SHA-256 of the JSON export
 of the same view.
 
-Saved reports go only to the folder the person picks; screenshare-mode reports hide the user name as
-the screen does. Nothing is uploaded.
+Saved reports go only to the folder the person picks. Nothing is uploaded.
+
+### Added in B.O.P.E 0.11 (ADR 0133–0138)
+
+Standard scan:
+- **Modules and executable memory of running processes** (`process_modules`, ADR 0134): the path,
+  hash, signature, catalog state and PE structure of loaded DLLs that are not routine signed Windows
+  modules, which processes loaded them, and the address, size and protection of private executable
+  memory and of image mappings the loader does not list. Opened with query and read rights only.
+- **The Roblox player's memory** (`roblox_memory`, ADR 0134), when Windows and Roblox's anti-cheat allow
+  it (usually they do not; the report then says "refused"): its identity checks; code of its modules
+  compared with their files (only counts and address ranges of differing bytes are kept); jumps written
+  at exported functions and where they go; executable memory no module accounts for; and **strings of
+  fixed categories only** — executor function names, injection API names, FastFlag names and JSON
+  assignments, module paths, URLs, script loaders — at most 40 per category, with address and encoding.
+  **Chat, page text and any uncategorised text are never kept.** Nothing is written to the process.
+- **FastFlag values** (`roblox_flags`, ADR 0135–0136): the values set in the player's and bootstrappers'
+  settings files, other copies of them (backups, older version folders) with their file times, and the
+  FastFlag assignments in Roblox crash dumps (`%LOCALAPPDATA%\CrashDumps`, `Roblox\logs`) with the dump's
+  time. Nothing else of a dump is kept.
+
+Full scan:
+- **File inventory of every accessible drive** (`file_inventory`, ADR 0133): every folder is listed and
+  every DLL, executable and driver is counted; the hash, signature, catalog state and PE structure of
+  those that are not routine are reported with their path and times. Files are read, never run.
+
+Only when the person starts it:
+- **Monitoring mode** (`roblox_monitor`, ADR 0137): samples of the Roblox player's modules, executable
+  memory and FastFlag values, and the settings files' hashes and values, at the interval chosen, while the
+  window (or console) that started it stays open. Kept in memory for the next report, or written only to
+  the file named on the command line.
+
+**The one network request** (ADR 0136): the FastFlag reference file
+`MaximumADHD/Roblox-FFlag-Tracker/PCDesktopClient.json` is downloaded from `api.github.com` /
+`raw.githubusercontent.com` when you press "Atualizar agora", run `fflags sync`, or — unless you turn it off
+on the Roblox page — at most every six hours when the window opens. The request carries the file's address,
+a fixed program name and version, and a tag GitHub gave for the copy you already have. Nothing from the
+scan, your PC or you is sent; GitHub sees your IP address as with any download. A scan never makes a
+request; it uses the copy on disk (`%LOCALAPPDATA%\BOPE Scanner\fflag-reference`) or says there is none.
+
+**The screenshare mode is removed** (ADR 0138). There is one view of the report, described under
+[What is shown](#what-is-shown).
 
 
 ## What the tool reads
@@ -125,13 +168,12 @@ and a server folder's name identifies the server. The times are what Windows rec
 they copy and extract files; they are specific enough to match two reports of the same PC (ADR 0050).
 Of each of FiveM for GTA V Legacy's resource caches it also reads its **index**, the `db` folder inside it:
 the folder's own creation and last-write times, how many files it holds, and the latest creation and
-last-write time among them — no file name (ADR 0062).
-SS mode shows these times on its [timeline](#the-timeline) (ADR 0051).
+last-write time among them — no file name (ADR 0062). These times are on the
+[timeline](#the-timeline) (ADR 0051).
 
-**Since ADR 0036 rules read these files, so SS mode shows them.** Each file in a plugin folder, and
-`FiveM.exe` when its signature is not the expected one, matches a rule and is shown to the person
-watching — its path with your user name replaced, its hash, its signature and the signer's name. The
-consent question names them before anything is read.
+**Since ADR 0036 rules read these files.** Each file in a plugin folder, and `FiveM.exe` when its
+signature is not the expected one, matches a rule and is shown with its path, its hash, its signature and
+the signer's name.
 
 Of a running process it reads the name of the program and, when Windows will say, where that program
 is on disk and when that process started (ADR 0062). When that place is below one of FiveM's two program
@@ -153,8 +195,7 @@ removed. It never reads a serial number, a device's position on the board, a nam
 USB device, phone, camera or drive. The list names some of your hardware, as the driver list does. The first-
 set-up times of a PC's devices are close to unique to one Windows installation, so **two reports of the same
 PC can be matched through them**, as file times can (ADR 0050); this tool sends nothing, but whoever receives
-two of your reports can make that match. SS mode shows the device rows a rule matched — a device with no
-driver, a device that is not present now — and only a count of the rest. Beside them it reads how Windows
+two of your reports can make that match. Beside the device rows it reads how Windows
 started each time its System log remembers, one number per start (see the event logs below), because a
 device taken out before a full shutdown has no removal time and one taken out during a Fast Startup
 shutdown has one.
@@ -180,18 +221,15 @@ folder** it reads a SHA-256 and what Windows says about its embedded signature, 
 files inside the Windows folder are reported by their path alone. The list names software you
 installed — launchers, chat apps, peripheral and RGB utilities — because they set themselves to start.
 
-**In SS mode, the name of a `Run` value and of a scheduled task is never shown**: a task's name can
-carry your account's security identifier, and a `Run` value's name is whatever the program chose. The
-service's name, where the entry is registered, and the file it starts — with your user name hidden —
-are shown when a rule matches.
+The name of a `Run` value and of a scheduled task is shown as Windows holds it: a task's name can carry
+your account's security identifier, and a `Run` value's name is whatever the program chose.
 
 Of **Microsoft Defender's exclusions** — the folders, programs and file types Defender is told not to
 scan — it reads each one as Defender holds it, whether Defender's own settings or a policy set it, and,
 for a folder or a program, whether it covers one of FiveM's folders (ADR 0060). Of the network addresses
 Defender is told to skip it reads **only how many there are, never an address**, which can name your or
 your employer's network. Windows lets only administrators read the exclusions, so a scan without
-administrator rights says it could not. An exclusion is shown in SS mode only when it covers a FiveM
-folder, with your user name hidden.
+administrator rights says it could not.
 
 Of the **network settings** it reads three things, and never a record of where traffic went: not which
 sites or servers you connected to, not the DNS cache, not the connections open now, not the firewall log,
@@ -200,8 +238,7 @@ and nothing captured off the network (ADR 0054).
 - **The hosts file.** It counts the lines in effect. Of a line that gives a name under `cfx.re`,
   `fivem.net` or `rockstargames.com` an address, it reads that name, the address and the line's number.
   **Every other line is counted and never reported**: they are your own choices about the rest of the
-  internet. In SS mode the address is shown only as its kind — loopback, unspecified, private or public —
-  because an address can name your own server.
+  internet.
 - **The proxy.** Whether your Windows account has a proxy switched on, and whether a proxy server or a
   setup script is set. **Never the address of either**, which can name your employer's or your own
   server, and never the list of your VPN and dial-up connections Windows keeps beside it.
@@ -210,7 +247,7 @@ and nothing captured off the network (ADR 0054).
   the program's path. **Never a rule's name or description**, which anyone who made the rule could write
   anything in. Rules for other programs are only counted.
 
-No rule reads the proxy or the firewall rules, so SS mode shows only how many of them there were.
+No rule reads the proxy or the firewall rules; they are listed among what no rule matched.
 
 Of **what Windows says this installation is** it reads the edition and build values `winver` shows, the
 registered organisation, and the manufacturer, model and support link Settings shows — the last three are
@@ -238,10 +275,9 @@ that list is read for one word only: when it is below one of FiveM's two program
 Of Windows' Background Activity Moderator it reads which programs ran and when. That record is kept
 **per user account**, and the account is named by a SID — an identifier of the account *and* of the
 Windows installation it belongs to. **No part of that SID is reported**, hashed or otherwise: the report
-says how many accounts had records and nothing else about them. The path of a program is reported only
-when it starts with a drive letter, because that is a shape SS mode knows how to redact. A path
-written any other way can carry your account name with nothing to replace it, so it is withheld rather
-than shown — and the report says it was withheld, rather than leaving you to notice it is missing. When
+says how many accounts had records and nothing else about them. The path of a program is reported as BAM
+wrote it, with `path_form` saying whether it starts with a drive letter, names a device, or neither
+(B.O.P.E 0.11). When
 the path is below one of FiveM's two program folders, the record also carries which one — `legacy` or
 `enhanced` — whether the path is shown or withheld (ADR 0062).
 Of the Windows event logs it reads **how many events of each kind each log holds** — the channel, who
@@ -273,7 +309,7 @@ changed on the drive, and the program's parser skips the name without keeping it
 identifier and no file number, because each would identify your PC across two reports.
 
 **Four rules read the deletions and renames of FiveM's two plugin folders** (ADR 0047, amendment of
-2026-09-30). When one matches, SS mode shows that folder's counts and the time of its first and last
+2026-09-30). When one matches, the report shows that folder's counts and the time of its first and last
 record, beside the span the journal held — still no file name, because none was read. The journal does not
 say which program deleted or renamed a file, and the row says so. **Two rules read the deletions and renames of PowerShell's command history folder** (ADR 0063), in the
 same way: counts and times, never the file's name and **never anything the file holds** — this program does
@@ -305,7 +341,7 @@ It also reads one Windows setting about itself: whether Windows is writing a rec
 launched (`EnablePrefetcher`). That is a machine setting and names no person. It is read so that "there
 is no record of this program" can be told apart from "Windows is not keeping such records on this PC",
 which are not the same statement about you. The value, and whether the Prefetch folder is there at all,
-are shown in Self mode as they were read; nothing is concluded from them.
+are shown as they were read; nothing is concluded from them.
 
 Of each Prefetch file and each event log file it reads **one attribute: whether the file is marked
 read-only**. Not when the file was made or changed, not who owns it, not its other attributes. Of each
@@ -316,12 +352,12 @@ person, and none is a conclusion — a file can be read-only because it was rest
 log can be in a file Windows no longer writes because it was archived or exported.
 
 It also reads **when Windows last started counting** — one number Windows keeps about the machine, the
-time since it started — and puts it at the top of the report as a time, in both modes, so that the times
+time since it started — and puts it at the top of the report as a time, so that the times
 on other rows can be read against it. It names no person and says nothing about who used the PC. It is
 not a conclusion and not "when you turned your PC on": a "Shut down" with Fast Startup, which is how
 Windows ships, and sleep and hibernation do not start the count again, so on an ordinary PC it is often
 days old. It does say roughly when the PC was last restarted, which is a small fact about your day, and
-two reports taken before the next restart show the same time. The consent question names it (ADR 0039).
+two reports taken before the next restart show the same time (ADR 0039).
 
 It also reads **when parts of this PC were set up**, and keeps each as a **date, never a time**
 (ADR 0061): when this Windows installation was installed or last upgraded to a new feature version
@@ -392,8 +428,9 @@ or allow remote access.
 
 ## What leaves the machine
 
-- **aeterna-rongroi's own code sends nothing.** There is no network code; CI rejects dependencies and APIs
-  that could add it.
+- **B.O.P.E Scanner's own code sends nothing about you, your PC or the scan.** Its one network request
+  downloads the public FastFlag reference file from GitHub, as described above (ADR 0136); it lives in one
+  function, and CI rejects any other network dependency or API.
 - **The GUI uses Microsoft WebView2**, a Windows component. Microsoft documents that WebView2 collects
   some required diagnostic data regardless of settings and follows the Windows *Diagnostic data* setting
   for optional data; crash reports may be sent to Microsoft. aeterna-rongroi turns off SmartScreen inside
@@ -404,159 +441,47 @@ or allow remote access.
 
 ## What is shown
 
-| | Self mode | SS mode (screenshare) |
-|---|---|---|
-| Consent screen | no | yes — you may refuse |
-| Evidence shown | everything | rule matches, plus counts of what was not found or could not be answered for a reason the rule itself said is ordinary. A check this program stopped short of is shown, because that is its own limit and not a fact about your PC |
-| What a collector saw that no rule matched | listed | **not listed** — only how many there were |
-| Paths | full | your user-profile folder is replaced with `%USERPROFILE%` — see below for which folders that covers |
-| A hosts line's address | shown | **not shown** — only its kind: loopback, unspecified, private or public |
-| The name of a `Run` value or a scheduled task | shown | **not shown** |
-| What a full scan read | shown | listed on the consent screen and shown after you agree; **a server's name is shown as `%SERVER_IDENTITY%`** unless you also agree to show server names, and **a website's name as `%DOWNLOAD_HOST%`** unless you agree to show website names — two separate choices, each off until you turn it on |
-| When Windows last started | shown | shown, as one time at the top of the report |
-| When parts of this PC were set up (dates) | shown | shown — [below](#how-far-back-the-traces-reach) |
-| How far back each source reaches | shown | shown — [below](#how-far-back-the-traces-reach) |
-| Each FiveM edition's last session beside its folders | shown | shown — [below](#how-far-back-the-traces-reach) |
-| Timeline | every time the report holds | the times of the evidence it shows, and the times listed [below](#the-timeline) |
+There is one view of the report (ADR 0138): everything the scan read is shown to the person who ran it —
+the evidence, what the collectors saw that no rule matched, paths as Windows wrote them, the timeline and
+how far back each source reaches. Whoever you show the window or a saved report to sees the same. If a
+report will be seen by someone else, read it first.
 
 ### The timeline
 
-Both modes show the times the report holds in one list, oldest first, with the span each Windows log and
+The view shows the times the report holds in one list, oldest first, with the span each Windows log and
 the change journal could see, and the sources whose times could not be read (ADR 0051). The list never
-calls anything a gap or a cleaning: an order of recorded times is not an order of events.
-
-In Self mode the list holds every time the scan read, except when each running process started, which is
-read only to place FiveM's folders beside its session (ADR 0062) and is never on the list. In SS mode it holds the times of the evidence SS mode
-shows, when this scan ran and when Windows last started, and these, which SS mode did not show before
-ADR 0051:
-
-- **the times Windows recorded (Prefetch, BAM, Program Compatibility Assistant) for programs named
-  `FiveM.exe`, `GTA5.exe`, `GTA5_Enhanced.exe`, `PlayGTAV.exe`, and any name that begins `FiveM_b` and ends `_GTAProcess.exe`**, with that name. Windows records only a name, so this says when a program of that
-  name ran, not which program it was. Programs of any other name are still only counted;
-- the times of FiveM's log, crash and cache folders, and of each Enhanced server cache folder, without its
-  name. These times can match two reports of this PC;
-- the oldest and newest record each Windows event log holds, with the log's path;
-- the first and last time the Code Integrity log recorded Windows refusing to load a file (events 3033
-  and 3077), and the first and last time Microsoft Defender's log recorded a detection or an action on one
-  (events 1116 and 1117), ADR 0059. The events' contents are not read, so this never says which file
-  was refused, which program asked, or what Defender detected;
-- the first and last time Windows PowerShell's log recorded a script block that PowerShell itself flagged as
-  suspicious (event 4104 at level 3), ADR 0063. The script's text is not read, so this never says what the
-  script was, who ran it or what it did;
-- the oldest and newest change the change journal holds for each folder it counts.
-
-The same list is on the consent screen. Each entry that comes from this list is shown with the ordinary
-things that produce it.
+calls anything a gap or a cleaning: an order of recorded times is not an order of events. When each running
+process started is read only to place FiveM's folders beside its session (ADR 0062) and is never on the
+list.
 
 ### How far back the traces reach
 
-Both modes show a section that puts **how far back each source reaches** beside **when parts of this PC
-were set up** (ADR 0061). For each event log, Windows Prefetch, the Background Activity Moderator, the
-Program Compatibility Assistant, the change journal and each of FiveM's log, crash and cache folders, it
-shows how many entries the source holds and the oldest time still in it, with what that source ordinarily
-keeps. **It names no program and no file**: event logs by their file name, the rest by the source alone.
-The event logs this program's rules read are listed one by one; the others are one line with how many
-there are.
-
-For Prefetch, BAM and the Program Compatibility Assistant this is **new in SS mode**: before ADR 0061 SS
-mode counted their records without saying how many or how old the oldest was (ADR 0034 decision 2). It
-now shows those two numbers. It still shows no program name from them beyond the ones the timeline names
-[above](#the-timeline).
-
-When **FiveM's folders were written more recently than Prefetch or BAM reaches back**, and neither holds
-an entry for the names the timeline lists, both modes also show **one statement** that puts the two side by
-side: whether `FiveM.exe` is there and in which edition, when FiveM's folders were last written, how many
-Enhanced server cache folders there are, and for each of Prefetch, BAM and the Program Compatibility
-Assistant whether it holds those names, how many entries it holds and its oldest date — or that it was not
-read, and so whether it holds one is not known. **It is not evidence and not a finding**: it is always shown
-with the ordinary things that produce the same result, and it names no path, file, user or server.
-
-For each FiveM edition, both modes also show **one session statement** (ADR 0062): when that edition's last
-session began and ended — from a FiveM process running now (its start time), else from Prefetch and BAM —
-to the second, and, for Legacy's logs, cache and resource cache index and Enhanced's logs, how long before or
-after that start each was last written, as minutes, hours or days. It is shown whatever the
-session's age; nothing is compared with the scan's own time, and nothing is kept between scans. Without
-administrator rights and with nothing of FiveM's running, it says when FiveM last ran is not known. **It is
-not evidence and not a finding**: it is always shown with the ordinary things that produce the same result,
-and it names no path, file, user or server. Under Legacy's resource cache in the section above, each launch
-mode's index folder creation date is shown beside its oldest cache file's.
-
-A source the scan could not read — for example Prefetch, BAM or the change journal without administrator
-rights — is shown as **not known**, never as empty.
-
-The consent question names all of this before anything is read.
-
-### Which folders count as your user-profile folder
-
-SS mode replaces the folder that holds your profile and the name after it, wherever a path names it:
-
-- `Users\<your name>` directly under any drive, such as `D:\Users\<your name>`, in any upper or lower case;
-- `Documents and Settings\<your name>`, the older name Windows still answers to, and its usual short 8.3
-  form;
-- the same folders reached through a drive's administrative share, such as `\\<pc>\C$\Users\<your name>`.
-  The PC name before `C$` is shown as written;
-- the folder your PC creates new profiles in, when it has been moved away from `Users`. The scan reads that
-  setting (`ProfilesDirectory`) so that SS mode can use it. A Self-mode report carries it; an SS-mode
-  report does not, and neither does the part of the app that is shown before you choose a mode.
-
-It reads `\` and `/` alike and applies `.` and `..` in a path, and it still finds the name
-when a second path follows the first with nothing between them.
-
-What it does **not** cover, so a path in one of these is shown as it is, with your account name in it if
-the folder carries one (ADR 0049):
-
-- a profile moved for one account on its own, to a folder that is neither of the above. Reading every
-  account's profile location to redact it would put the list of accounts on your PC into the report, which
-  is more than this check needs;
-- a path written without a drive letter — a device or volume path, or a network share other than a drive's
-  administrative share. Background Activity Moderator paths of that kind are withheld, as described above;
-  the path of a running program is reported as Windows gives it;
-- the short 8.3 name of a moved profile folder, and the rarer short names Windows makes when many folders
-  begin alike;
-- a moved profile folder whose name has non-ASCII letters, written in a different case.
-
-If any of these could apply to you, look at the report in Self mode first.
-
-### Program names are not redacted, and that can matter
-
-SS mode replaces your user-profile folder inside **paths**: `C:\Users\<your name>\…` is shown as
-`%USERPROFILE%\…`. A program's **name** is not a path and is not changed. Some installers and tools
-produce an executable named after the account that installed it, so the name of a running program can
-carry a real person's name to whoever is watching the screenshare.
-
-There is no reliable way to recognise an account name inside an arbitrary name, and a guess that looks
-like a guarantee would be worse than none — so aeterna-rongroi does not guess, and tells you instead.
-If that matters to you, look at the report in Self mode first: you see exactly what SS mode would show,
-before anyone else does.
+The view puts **how far back each source reaches** beside **when parts of this PC were set up** (ADR 0061):
+for each event log, Prefetch, the Background Activity Moderator, the Program Compatibility Assistant, the
+change journal and FiveM's folders, how many entries it holds and the oldest time still in it, with what
+that source ordinarily keeps. A source the scan could not read is shown as **not known**, never as empty.
+The FiveM statements of ADR 0061 and ADR 0062 are not evidence and not findings; they are always shown with
+the ordinary things that produce the same result.
 
 ### aeterna-rongroi's own traces
 
-aeterna-rongroi is running while it scans, so it is in the list of running programs it reads. The report
-keeps what it saw of **itself** in a separate "own traces" section instead of deleting it, and shows that
-section in both modes: it is not evidence about your PC, and hiding it would tell you less about what the
-tool did, not more. That includes when the tool's own process started. Paths in it are redacted in SS mode
-like any other.
+The program is running while it scans, so it is in the list of running programs it reads. The report keeps
+what it saw of **itself** in a separate "own traces" section instead of deleting it: it is not evidence about
+your PC, and hiding it would tell you less about what the tool did, not more.
 
 ### What a collector saw that no rule matched
 
-Some collectors read things no rule asks about — the list of programs you are running, the drivers
-registered with Windows, the PCI devices Windows remembers, what Windows recorded about programs that ran, whether each FiveM plugin folder was there, the counts and times of FiveM's log, crash and cache folders, and how many records the
-Windows drive's change journal holds and how many named each folder it reads. **Self mode lists them**, under "unmatched observations", so that you
-can read what the tool saw and judge it yourself.
-
-**SS mode does not list them.** It says how many there were and nothing more, except for the times its
-[timeline](#the-timeline) names, program by program, on the consent screen. That mode promises to show
-what matches a rule and that list, and the names of every file and every running program on your PC are not that:
-they would tell whoever is watching what you have open, which is none of the check's business. Replacing
-your user name in paths would not change that, so the list is withheld rather than redacted.
-
-If you want to know what SS mode will show before anyone sees it, run Self mode first. What SS mode adds
-is nothing; what it removes is this list and the evidence that did not match.
+Some collectors read things no rule asks about — the programs you are running, drivers, PCI devices, what
+Windows recorded about programs that ran, FiveM folders, change-journal counts. They are listed under
+"unmatched observations", so that you can read what the tool saw and judge it yourself.
 
 ## What is stored
 
-Nothing. The window version has no export or save button. The CLI prints the view it was asked for,
-as text or with `--json` as JSON, and writes a file only if you redirect that output into one yourself;
-it contains the view you asked for (SS-mode output is redacted). If you send such a file to a server's
-staff, that server becomes responsible for how it keeps it. Such a file is not signed: anyone who holds
-it can change it, and nothing in it shows whether they did (ADR 0040).
+Nothing unless you ask. The window saves a report only when you press save, in the folder you choose, as
+HTML, TXT, JSON or PDF with a `.sha256` file beside each (ADR 0116, ADR 0129). The CLI writes files only with
+`--export-dir`, or when you redirect its output. The monitoring mode keeps its session in memory (desktop)
+or in the file you name (`monitor --out`). The FastFlag reference copy and its update record are kept in
+`%LOCALAPPDATA%\BOPE Scanner\fflag-reference`; delete the folder to remove them. If you send a report to a
+server's staff, that server becomes responsible for how it keeps it. A report file is not signed: anyone who
+holds it can change it, and the `.sha256` beside it only shows whether it changed since it was written by
+someone who kept the hash elsewhere (ADR 0040).

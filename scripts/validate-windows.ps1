@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
 #
-# Validação reproduzível do B.O.P.E Scanner 0.10.0 num Windows 10/11 real (docs/bope/validacao-windows.md).
+# Validação reproduzível do B.O.P.E Scanner 0.11.0 num Windows 10/11 real (docs/bope/validacao-windows.md).
 # Execute numa máquina de teste, num PowerShell **como administrador**, na pasta onde o .zip foi extraído:
 #
 #   powershell -ExecutionPolicy Bypass -File .\validate-windows.ps1 -Dir . [-SkipGui]
@@ -76,13 +76,15 @@ Check "shadow copies existentes" ($shadowBefore -ge 0) "$shadowBefore (sem nenhu
 # 4. CLI: verificação padrão e avançada, todos os formatos
 $std = Join-Path $out "padrao"; $full = Join-Path $out "avancada"
 $t0 = Get-Date
-& $cli scan --mode self --lang pt --export-dir $std --export-format json,html,txt,pdf *> (Join-Path $out "cli-padrao.log")
+& $cli scan --lang pt --export-dir $std --export-format json,html,txt,pdf *> (Join-Path $out "cli-padrao.log")
 Check "cli padrão" ($LASTEXITCODE -eq 0) ("código $LASTEXITCODE em {0:N0} s" -f ((Get-Date) - $t0).TotalSeconds)
 $t0 = Get-Date
-"sim" | & $cli scan --full --mode self --lang pt --export-dir $full --export-format json,html,txt,pdf *> (Join-Path $out "cli-avancada.log")
+"sim" | & $cli scan --full --lang pt --export-dir $full --export-format json,html,txt,pdf *> (Join-Path $out "cli-avancada.log")
 Check "cli avançada" ($LASTEXITCODE -eq 0) ("código $LASTEXITCODE em {0:N0} s" -f ((Get-Date) - $t0).TotalSeconds)
-"nao" | & $cli scan --mode ss --lang pt *> (Join-Path $out "cli-ss-recusa.log")
-Check "modo SS recusado não lê nada" ($LASTEXITCODE -ne 0 -or (Get-Content (Join-Path $out "cli-ss-recusa.log") -Raw) -notmatch "EVID") "código $LASTEXITCODE"
+& $cli scan --mode ss --lang pt *> (Join-Path $out "cli-ss-removido.log")
+Check "modo SS removido (opção recusada)" ($LASTEXITCODE -ne 0) "código $LASTEXITCODE"
+& $cli fflags status --lang pt *> (Join-Path $out "cli-fflags-status.log")
+Check "referência de FastFlags (status, sem rede)" ($LASTEXITCODE -eq 0) (Get-Content (Join-Path $out "cli-fflags-status.log") -Raw)
 
 # 5. Exportações e hashes
 foreach ($d in @($std, $full)) {
@@ -113,7 +115,20 @@ if ($json) {
         # "measured" é o esperado como admin; not_measured com motivo é aceitável e precisa ser explicado.
         Check "fonte $src" ($state -ne "error" -and $state -ne "ausente") "$state$reason"
     }
-    Check "versão no relatório" ($report.view.header.provenance.version -eq "0.10.0") $report.view.header.provenance.version
+    Check "versão no relatório" ($report.view.header.provenance.version -eq "0.11.0") $report.view.header.provenance.version
+    # Coletores forenses (ADR 0133–0137): cada um deve dizer se terminou; nunca "error" sem motivo.
+    $f = $report.view.forensics
+    Check "forensics presente" ($null -ne $f) ""
+    if ($f) {
+        $inv = $f.file_inventory | Where-Object { $_.fields.scope -eq "summary" } | Select-Object -First 1
+        Check "inventário de arquivos" ($null -ne $inv) $(if ($inv) { "completo: $($inv.fields.complete) parado por: $($inv.fields.stopped_by) arquivos: $($inv.fields.files_listed) imagens avaliadas: $($inv.fields.images_assessed)" } else { "sem resumo" })
+        $pm = $f.process_modules | Where-Object { $_.fields.scope -eq "summary" } | Select-Object -First 1
+        Check "módulos de processos" ($null -ne $pm) $(if ($pm) { "abertos: $($pm.fields.processes_opened) recusados: $($pm.fields.processes_refused)" } else { "sem resumo" })
+        $players = $f.roblox_memory | Where-Object { $_.fields.scope -eq "player" }
+        Check "player do Roblox (abra o Roblox antes para testar)" $true "$(@($players).Count) player(s); acesso: $(@($players | ForEach-Object { $_.fields.access }) -join ',')"
+        $ref = $f.roblox_flags | Where-Object { $_.fields.scope -eq "reference" } | Select-Object -First 1
+        Check "linha de referência de FastFlags" ($null -ne $ref) $(if ($ref) { "disponível: $($ref.fields.available) correspondência: $($ref.fields.version_correspondence)" } else { "ausente" })
+    }
 }
 
 # 7. Somente leitura: nada criado
@@ -131,12 +146,12 @@ if (-not $SkipGui) {
     $win = if ($alive) { (Get-Process -Id $p.Id).MainWindowTitle } else { "" }
     $webview = @(Get-Process -Name msedgewebview2 -ErrorAction SilentlyContinue).Count
     Check "gui iniciou" $alive "janela: '$win'; processos WebView2: $webview"
-    Check "gui carregou WebView2" ($webview -gt 0) "confira na tela: título, consentimento, UNOFFICIAL BUILD"
+    Check "gui carregou WebView2" ($webview -gt 0) "confira na tela: título, página Forense do Roblox, Sobre com UNOFFICIAL BUILD"
     if ($alive) { Stop-Process -Id $p.Id }
 }
 
 $results | ConvertTo-Json -Depth 4 | Set-Content -Encoding UTF8 (Join-Path $out "resultado.json")
-$md = @("# Validação B.O.P.E Scanner 0.10.0 — $stamp", "", "| Verificação | Resultado | Detalhe |", "|---|---|---|")
+$md = @("# Validação B.O.P.E Scanner 0.11.0 — $stamp", "", "| Verificação | Resultado | Detalhe |", "|---|---|---|")
 foreach ($k in $results.Keys) { $md += "| $k | $(if ($results[$k].ok) { 'OK' } else { 'FALHA' }) | $($results[$k].detail) |" }
 $md | Set-Content -Encoding UTF8 (Join-Path $out "resultado.md")
 $failed = @($results.Values | Where-Object { -not $_.ok }).Count

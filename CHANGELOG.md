@@ -5,6 +5,42 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [B.O.P.E 0.11.0] - 2026-10-16
+
+Advanced forensic analysis for Roblox. Everything is read-only and was verified by cross-compilation and
+synthetic hosts, not on a real Windows PC (see `docs/bope/validacao-windows.md`).
+
+### Removed
+- The screenshare (SS) mode, end to end: view masking, hidden counts, CLI `--mode`/`--yes` and consent,
+  desktop mode choice, routes, states, filters, locale keys and guides. Report schema version 2
+  (ADR 0138).
+
+### Added
+- `bope_parsers::pe` (sections, permissions, entropy, imports/delay imports, exports, relocations, TLS
+  callbacks, version resource, checksum, overlay, anomalies, loader layout and relocation),
+  `bope_parsers::memory` (categorised strings in ASCII/UTF-8/UTF-16LE, flag assignments and identifiers,
+  pointer counts, inline-hook decoding, range diffs), `bope_parsers::minidump`,
+  `bope_parsers::fflag_reference`.
+- Host: process memory (`ProcessMemory`: modules, regions, reads; query + VM read rights only), catalog
+  signatures and signing time, volumes, reparse-point detection.
+- `file_inventory` (full scan): every accessible drive, links not followed, bounded, cancellable, with
+  counts and an honest incomplete state; eight integrity classes with reasons and limitations (ADR 0133).
+- `process_modules` and `roblox_memory`: modules and executable memory of every process; for the Roblox
+  player, identity checks, code vs file, inline hooks with target attribution, unbacked executable memory,
+  categorised strings, flag values and identifiers (ADR 0134).
+- `roblox_flags`: FastFlag values compared with the reference, values that differ between copies with both
+  file times, values in crash dumps, version correspondence (ADR 0135, ADR 0136).
+- `bope-reference` and `fflags status|sync|import`: the Roblox-FFlag-Tracker reference copy with
+  conditional requests, validation, atomic replacement, offline last-valid copy and an attempt record; the
+  program's one network request, in `bope-host-windows::https_get` (ADR 0136; AGENTS.md rule 1 amended).
+- Monitoring mode: `monitor` in the CLI and Start/Stop in the desktop; read-only samples, change events,
+  `flag_value_restored`; `roblox_monitor` puts the session in the report (ADR 0137).
+- 20 rules with fixtures and pt-BR text; assessment categories and source families for the new
+  collectors (one live process state counts once).
+- Desktop: Roblox forensics page (reference panel with manual update and automatic check, monitoring
+  panel, players, code and hooks, strings, flags vs reference, earlier values, processes, inventory, each
+  section stating when its read did not finish); scan screen shows what the running collector reads.
+
 ### Interface rework (B.O.P.E, ADR 0130–0132)
 
 - New identity from the B.O.P.E badge (black, red, gold, white), app icons from the badge, side

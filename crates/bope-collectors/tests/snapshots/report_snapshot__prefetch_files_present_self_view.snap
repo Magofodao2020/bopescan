@@ -14,7 +14,7 @@ expression: view
     "rules_bundle": {
       "schema_version": 4,
       "sha256": "[bundle sha256]",
-      "rule_count": 152
+      "rule_count": 172
     },
     "platform": "windows",
     "os_build": "26100",
@@ -240,6 +240,22 @@ expression: view
       "strength": "context",
       "state": "not_found",
       "retention": "The file as it is at scan time."
+    },
+    {
+      "rule_id": "d55afe49-df1d-4c4b-9c0e-9c3ea54d30b0",
+      "collector": "file_inventory",
+      "strength": "presence",
+      "state": "unmeasured",
+      "reason": "not_consented",
+      "expected": true
+    },
+    {
+      "rule_id": "33bea129-93b3-4c72-98db-2c51803a8c95",
+      "collector": "file_inventory",
+      "strength": "presence",
+      "state": "unmeasured",
+      "reason": "not_consented",
+      "expected": true
     },
     {
       "rule_id": "2dc11b64-72a2-48f5-a273-985e906d5a9e",
@@ -721,6 +737,22 @@ expression: view
       "expected": false
     },
     {
+      "rule_id": "d125476c-6df4-4a34-a61a-2b9741cf1cc1",
+      "collector": "process_modules",
+      "strength": "context",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
+    {
+      "rule_id": "e3f4cb04-3fce-4104-b0ab-8a4bdf6797a1",
+      "collector": "process_modules",
+      "strength": "presence",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
+    {
       "rule_id": "e315d48a-2cf4-4e84-8a0b-4fd9ccfac04e",
       "collector": "roblox",
       "strength": "context",
@@ -791,6 +823,131 @@ expression: view
       "state": "unmeasured",
       "reason": "read_failed",
       "expected": false
+    },
+    {
+      "rule_id": "be178c93-0089-47af-8571-a384b17ee4bc",
+      "collector": "roblox_flags",
+      "strength": "context",
+      "state": "not_found",
+      "retention": "The files as they are at the moment of the scan; Roblox removes old version folders after updates."
+    },
+    {
+      "rule_id": "714ce486-7753-4ed6-87e1-e4295d029911",
+      "collector": "roblox_flags",
+      "strength": "context",
+      "state": "not_found",
+      "retention": "Crash dumps stay until Windows Error Reporting or the person removes them."
+    },
+    {
+      "rule_id": "684df0e4-28ef-4e00-ae34-f7667369dce8",
+      "collector": "roblox_flags",
+      "strength": "context",
+      "state": "not_found",
+      "retention": "The files as they are at the moment of the scan."
+    },
+    {
+      "rule_id": "917fecbb-4032-4fae-9091-4ccd4417b0bd",
+      "collector": "roblox_memory",
+      "strength": "context",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
+    {
+      "rule_id": "5e3c39ce-bb82-4237-9a0f-460f1b3b6f96",
+      "collector": "roblox_memory",
+      "strength": "context",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
+    {
+      "rule_id": "cd24dd82-84f7-4793-87ad-3b34234387ba",
+      "collector": "roblox_memory",
+      "strength": "presence",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
+    {
+      "rule_id": "b056ea61-e39f-4a49-9ee1-85d0aa26ffd9",
+      "collector": "roblox_memory",
+      "strength": "presence",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
+    {
+      "rule_id": "299b8a02-1b4a-4e1d-b284-d8d40144203e",
+      "collector": "roblox_memory",
+      "strength": "presence",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
+    {
+      "rule_id": "605f730e-2931-4b08-9b1a-18462982fb00",
+      "collector": "roblox_memory",
+      "strength": "presence",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
+    {
+      "rule_id": "3f2e4519-7570-456c-b8c3-e8f2c1f950c6",
+      "collector": "roblox_memory",
+      "strength": "presence",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
+    {
+      "rule_id": "62f97fca-6c7f-4827-8c18-bf6145e33f44",
+      "collector": "roblox_memory",
+      "strength": "presence",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
+    {
+      "rule_id": "f781498a-f336-47ab-9ab9-320aa30fb581",
+      "collector": "roblox_memory",
+      "strength": "context",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
+    {
+      "rule_id": "ea2b718b-d6f9-4251-866e-6df8d2e896e7",
+      "collector": "roblox_memory",
+      "strength": "context",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
+    {
+      "rule_id": "17477da4-decd-4b47-9444-b5ece71e203c",
+      "collector": "roblox_memory",
+      "strength": "context",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
+    {
+      "rule_id": "ad2ce9ff-df8f-4ce5-b1b0-71ca8a86502c",
+      "collector": "roblox_monitor",
+      "strength": "context",
+      "state": "unmeasured",
+      "reason": "source_absent",
+      "expected": true
+    },
+    {
+      "rule_id": "f77a8580-bed0-44a7-bfdf-be13e2a1116a",
+      "collector": "roblox_monitor",
+      "strength": "context",
+      "state": "unmeasured",
+      "reason": "source_absent",
+      "expected": true
     },
     {
       "rule_id": "da5a1b8d-6278-432a-9172-81b365f22e1b",
@@ -1194,6 +1351,20 @@ expression: view
       ]
     },
     {
+      "collector": "roblox_flags",
+      "observations": [
+        {
+          "collector": "roblox_flags",
+          "fields": {
+            "available": false,
+            "scope": "reference",
+            "unavailable_reason": "no_reference_copy",
+            "version_correspondence": "unavailable"
+          }
+        }
+      ]
+    },
+    {
       "collector": "roblox_trace",
       "observations": [
         {
@@ -1428,12 +1599,12 @@ expression: view
   "scope": {
     "not_admin": 0,
     "not_attempted": 0,
-    "not_consented": 17
+    "not_consented": 19
   },
   "listed": {
     "found": 0,
-    "not_found": 36,
-    "unmeasured": 90
+    "not_found": 39,
+    "unmeasured": 107
   },
   "timeline": {
     "entries": [
@@ -1539,6 +1710,9 @@ expression: view
     "roblox_trace",
     "roblox",
     "roblox_process",
+    "roblox_memory",
+    "roblox_monitor",
+    "roblox_flags",
     "executor_footprint",
     "roblox_files",
     "recycle_bin",
@@ -1567,6 +1741,8 @@ expression: view
     "net_config",
     "net_adapter",
     "process",
+    "process_modules",
+    "file_inventory",
     "evtx",
     "powershell_text",
     "prefetch",
@@ -1937,5 +2113,22 @@ expression: view
         }
       }
     ]
+  },
+  "forensics": {
+    "roblox_memory": [],
+    "roblox_flags": [
+      {
+        "collector": "roblox_flags",
+        "fields": {
+          "available": false,
+          "scope": "reference",
+          "unavailable_reason": "no_reference_copy",
+          "version_correspondence": "unavailable"
+        }
+      }
+    ],
+    "roblox_monitor": [],
+    "process_modules": [],
+    "file_inventory": []
   }
 }

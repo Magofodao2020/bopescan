@@ -5,10 +5,10 @@ sobre programas, arquivos, dispositivos e configurações, correlaciona fontes i
 achado com as explicações legítimas que também o produzem e mostra tudo na tela enquanto o jogador
 compartilha. **Nunca diz que um PC está limpo** — e nunca declara culpa sozinho.
 
-**Versão atual: 0.10.0** — baseada no [aeterna-rongroi](https://github.com/aeterna/aeterna-rongroi) 0.9.0
+**Versão atual: 0.11.0** — baseada no [aeterna-rongroi](https://github.com/aeterna/aeterna-rongroi) 0.9.0
 (GPL-3.0-or-later). Esta é uma **versão modificada**: toda build mostra `UNOFFICIAL BUILD` em relação ao
 aeterna-rongroi, como a seção 7(c) do [NOTICE](NOTICE) exige. Confira o arquivo baixado pelo SHA-256 que
-sua comunidade publica (`bope-scanner-0.10.0-windows-x64.exe`, `bope-scanner-cli-0.10.0-windows-x64.exe`).
+sua comunidade publica (`bope-scanner-0.11.0-windows-x64.exe`, `bope-scanner-cli-0.11.0-windows-x64.exe`).
 
 ## Por que esta base
 
@@ -40,7 +40,7 @@ Auditei os três candidatos lendo o código real, não só os README ([auditoria
 - **Camada de avaliação separada das evidências**: OK / INFO / WARN / FLAG / NÃO VERIFICADO por
   categoria e uma conclusão geral que conta **fontes independentes** (duas regras sobre a mesma fonte
   contam uma vez) e lista proximidade temporal entre fontes — sem nunca declarar "limpo".
-- **Interface nova em português**: tela inicial com o que será examinado, direitos, modo SS/próprio,
+- **Interface nova em português**: tela inicial com o que será examinado, direitos,
   padrão/avançada e consentimento **antes** de ler qualquer coisa; progresso real com cancelamento;
   painel de categorias, pesquisa, filtros e ordenação; relatório salvo em **HTML, JSON, TXT e PDF com
   SHA-256** na pasta escolhida.
@@ -60,6 +60,29 @@ Auditei os três candidatos lendo o código real, não só os README ([auditoria
   dentro de **`.rar` e `.7z`** (só o índice, com limites contra decompression bomb), exportação
   **PDF** nativa e as descrições das 71 regras herdadas em português. 152 regras no total. Validação em
   Windows real ainda pendente: [docs/bope/validacao-windows.md](docs/bope/validacao-windows.md).
+- **Novo na 0.11.0 (ADRs 0133–0138):**
+  - **Inventário de arquivos de todas as unidades** (verificação avançada): percorre as unidades fixas e
+    removíveis acessíveis sem seguir junções/links, com orçamento, cancelamento e progresso real;
+    conta arquivos listados, pastas inacessíveis, links ignorados, imagens avaliadas / só contadas / não
+    avaliadas, e nunca apresenta uma varredura parcial como completa.
+  - **Verificação de DLLs e executáveis** em oito classes (referência verificada, assinatura válida,
+    desconhecido, suspeito, integridade comprometida, malicioso com evidência corroborada, não
+    verificado, inconclusivo), cada uma com motivos e limitações: SHA-256, Authenticode com data da
+    assinatura, **catálogo do Windows**, cabeçalhos PE, arquitetura, seções e permissões, importações e
+    exportações, TLS callbacks, recurso de versão, checksum, overlay. Nenhum arquivo é executado.
+  - **Módulos e memória de processos** e **análise do player do Roblox**: identidade além do nome
+    (caminho, assinatura, signatário), código em memória × arquivo (realocado como o loader faz, tabelas
+    preenchidas pelo loader ignoradas), **hooks inline** com destino e dono do destino, imagens mapeadas à
+    mão, mapeamentos que o loader não lista, **strings categorizadas** (ASCII, UTF-8, UTF-16LE) e
+    identificadores de FastFlags de rede/física sem offsets fixos. Só leitura: nada é escrito no Roblox.
+  - **Referência de FastFlags** do [Roblox-FFlag-Tracker](https://github.com/MaximumADHD/Roblox-FFlag-Tracker)
+    (`PCDesktopClient.json`): sincronização condicional com validação, substituição atômica, cópia
+    offline e atualização manual; comparação de valores observados (arquivos, memória, dumps de falha)
+    com revisão e correspondência de versão do cliente.
+  - **Valores anteriores**: cópias das configurações com valores diferentes e as datas dos arquivos,
+    dumps de falha do Roblox, e o **modo de monitoramento** explícito e visível (detecta flag alterada e
+    depois restaurada entre amostras).
+  - **Modo SS removido** por completo (interface, rotas, estados, opções da CLI e filtros).
 - Guia manual: [docs/bope/guia-pc-check-roblox.md](docs/bope/guia-pc-check-roblox.md).
 
 ## Capacidades e limites
@@ -67,19 +90,24 @@ Auditei os três candidatos lendo o código real, não só os README ([auditoria
 Leia [docs/bope/capacidades.md](docs/bope/capacidades.md): para cada área da especificação, o que é
 **detectado**, o que é só **investigável** e o que **não pode ser verificado** por software dentro do
 Windows (outro PC, DMA que imita hardware comum, firmware comprometido, Windows reinstalado, macros
-guardadas na memória do mouse…). Para essas, o [guia de screenshare](docs/bope/guia-screenshare.md) traz
-uma checklist de inspeção visual.
+guardadas na memória do mouse…). Para essas, o [guia de PC check](docs/bope/guia-pc-check-roblox.md) traz
+uma checklist de inspeção manual.
 
 ## Privacidade
 
-- O código do programa **não envia nada** a lugar nenhum; não há código de rede (o CI bloqueia).
+- O código do programa **não envia nada** sobre o PC, a verificação ou você. A única requisição de rede
+  é baixar o arquivo público de referência de FastFlags do GitHub — pelo botão "Atualizar agora", pelo
+  comando `fflags sync` ou pela verificação automática que pode ser desligada na página do Roblox
+  (ADR 0136). Uma verificação nunca acessa a rede.
 - **Somente leitura**: nenhum arquivo, chave, serviço, driver ou configuração examinado é alterado.
 - Nunca lê senhas, cookies, tokens, mensagens, conteúdo de documentos ou dados de pagamento; de linhas
   de comando guarda só o programa, nunca argumentos; de scripts guarda só quais funções aparecem.
 - Fontes mais pessoais (extensões, arquivos do usuário, MRUs, ShellBags, Master File Table, comandos do
   PowerShell) só na
   **verificação avançada**, escolhida antes de começar.
-- O modo SS oculta o nome de usuário nos caminhos e lista só o que corresponde a uma regra.
+- Da memória do Roblox só guarda strings de categorias fixas (nunca chat ou texto qualquer).
+- O modo de monitoramento só roda enquanto você o deixa ligado, mostra cada mudança e não persiste
+  nada além do relatório (ou do arquivo que você indicar na CLI).
 
 Detalhes: [PRIVACY.md](PRIVACY.md).
 
@@ -87,9 +115,11 @@ Detalhes: [PRIVACY.md](PRIVACY.md).
 
 Requisitos: Windows 10/11 x64, Rust 1.98 (`rust-toolchain.toml`), Node 22 + pnpm, WebView2.
 
-Binários Windows já compilados acompanham a entrega em `bope-scanner-0.10.0-windows-x64.zip` (alvo `x86_64-pc-windows-gnu`,
-compilados em Linux com MinGW-w64; o `WebView2Loader.dll` precisa ficar ao lado do `bope-scanner.exe`).
-Para compilar você mesmo no Windows (alvo MSVC, recomendado):
+A 0.11.0 ainda não tem binários publicados: o código foi verificado por compilação cruzada para
+`x86_64-pc-windows-msvc` e por testes com hosts sintéticos, não em um Windows real
+([docs/bope/validacao-windows.md](docs/bope/validacao-windows.md)). Os binários da 0.10.0 eram compilados em
+Linux com MinGW-w64 (alvo `x86_64-pc-windows-gnu`; o `WebView2Loader.dll` precisa ficar ao lado do
+`bope-scanner.exe`). Para compilar no Windows (alvo MSVC, recomendado):
 
 ```bat
 pnpm -C apps/desktop install --frozen-lockfile

@@ -39,9 +39,10 @@ teste). O scanner nunca cria uma.
    (padrão e avançada, em JSON/HTML/TXT/PDF) e dos logs da CLI. O código de saída é o número de falhas.
 
 O script verifica: versão do Windows e se é admin; runtime do WebView2; presença dos arquivos e
-SHA-256 contra `SHA256SUMS.txt`; verificação padrão e avançada pela CLI; recusa do consentimento no
-modo SS; cada exportação contra o seu `.sha256`; cabeçalho do PDF; estado das fontes `srum`, `mft`,
-`shellbags`, `wmi_subscription`, `amcache`, `usn` e `roblox_files`; versão `0.10.0` no relatório;
+SHA-256 contra `SHA256SUMS.txt`; verificação padrão e avançada pela CLI; que a opção `--mode ss` não
+existe mais; `fflags status` (sem rede); cada exportação contra o seu `.sha256`; cabeçalho do PDF; estado
+das fontes `srum`, `mft`, `shellbags`, `wmi_subscription`, `amcache`, `usn` e `roblox_files`; o resumo de
+`file_inventory`, `process_modules`, `roblox_memory` e `roblox_flags`; versão `0.11.0` no relatório;
 **que nenhuma shadow copy e nenhuma assinatura WMI foram criadas**; e se a interface inicia e carrega o
 WebView2.
 
@@ -121,3 +122,18 @@ Só numa VM de teste, nunca no PC de um jogador:
 | Data | Windows (build) | Admin | Script (falhas) | Interface | Observações | Quem testou |
 |---|---|---|---|---|---|---|
 | — | — | — | — | — | ainda não executado | — |
+
+## O que a 0.11.0 ainda precisa de um Windows real para confirmar
+
+Nada disto foi executado num Windows durante o desenvolvimento; tudo foi verificado por compilação cruzada
+(`x86_64-pc-windows-msvc`) e por hosts sintéticos:
+
+- `ReadProcessMemory`/`VirtualQueryEx` no player do Roblox: espera-se `access: refused` na maioria dos PCs
+  (o anticheat Hyperion recusa); anote o que aparece com e sem administrador.
+- A comparação de código × arquivo e a detecção de hooks em um processo comum (por exemplo o Bloco de
+  Notas com e sem um overlay) — quantos bytes diferem num processo sem nada injetado.
+- A verificação por **catálogo** do Windows em DLLs do sistema (`in_catalog`) e o tempo do inventário de
+  arquivos numa unidade cheia (orçamento de 25 minutos).
+- `fflags sync` atrás de um proxy corporativo (WinHTTP usa o proxy automático do Windows) e a resposta
+  do GitHub quando o limite da API é atingido (deve cair para o arquivo do `main`).
+- O modo de monitoramento por alguns minutos com o Roblox aberto, e a CPU que ele usa a cada amostra.

@@ -1068,8 +1068,12 @@ date: 2026-09-11
                     "evtx",
                     "executor_footprint",
                     "fastflags",
+                    "file_inventory",
                     "mft",
+                    "process_modules",
                     "roblox_files",
+                    "roblox_flags",
+                    "roblox_memory",
                     "roblox_process",
                     "shellbags",
                     "shortcuts",
@@ -1091,7 +1095,7 @@ date: 2026-09-11
                 assert!(
                     !reports(other.id(), reason),
                     "`{}` also reports `{reason}`; the ADR 0030 table, as amended by ADR 0047, \
-                     ADR 0048, ADR 0060 and B.O.P.E ADR 0102, 0108, 0110 and 0118–0122, names only {owners:?} as owners",
+                     ADR 0048, ADR 0060 and B.O.P.E ADR 0102, 0108, 0110, 0118–0122 and 0133–0136, names only {owners:?} as owners",
                     other.id()
                 );
             }

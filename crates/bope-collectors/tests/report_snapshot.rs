@@ -246,7 +246,8 @@ fn process_own_trace_self_view() {
     // on a fixture without registry, and `roblox_process` lists the fixture's other program running
     // from a user folder (ADR 0102, ADR 0112). `roblox_trace` lists which of its sources it could
     // read, on every scan (ADR 0123). `process_modules` and `roblox_memory` state how many processes
-    // and players they read, on every scan (ADR 0134).
+    // and players they read, and `roblox_flags` whether it had a reference, on every scan (ADR 0134,
+    // ADR 0136).
     assert_eq!(
         collectors,
         [
@@ -255,6 +256,7 @@ fn process_own_trace_self_view() {
             "posture",
             "process",
             "process_modules",
+            "roblox_flags",
             "roblox_process",
             "roblox_memory",
             "roblox_trace"

@@ -1,6 +1,6 @@
 # Guia manual de PC Check — Roblox
 
-Versão do programa descrita: B.O.P.E Scanner **0.10.0**.
+Versão do programa descrita: B.O.P.E Scanner **0.11.0**.
 
 Guia prático para uma sessão de PC Check por screenshare, com ou sem o B.O.P.E Scanner. Cada passo diz
 **onde olhar**, **o que é normal**, **o que merece pergunta** e **o que não se pode concluir**. Tudo é
@@ -227,6 +227,32 @@ ao lado dele. Caracteres fora do Windows-1252 (tailandês) saem como `?`: para e
 O procedimento e o checklist estão em [validacao-windows.md](validacao-windows.md). Até ele ser
 executado num Windows real, trate SRUM, MFT, WMI e a interface gráfica da 0.10.0 como **não validados
 em hardware real** (validados só com dados sintéticos).
+
+## 7B. Novo na versão 0.11.0
+
+Tudo continua **somente leitura**: nada é escrito no Roblox, nenhuma flag é alterada, nenhum arquivo
+suspeito é executado e nenhuma proteção do Windows é desativada. A página **Forense do Roblox** reúne:
+
+- **Referência de FastFlags** (Roblox-FFlag-Tracker, `PCDesktopClient.json`): estado, revisão, data,
+  número de entradas, versão do cliente citada no commit, última tentativa. Use **Atualizar agora** antes
+  da verificação (é a única requisição de rede do programa; a verificação em si nunca acessa a rede). Sem
+  referência, as comparações aparecem como "sem referência" — nunca como "igual".
+- **Modo de monitoramento**: ligue antes de pedir ao jogador para entrar num jogo e deixe rodar alguns
+  minutos; cada mudança aparece com o horário das amostras de cada lado. "Valor de flag restaurado" é uma
+  flag que mudou e voltou ao valor anterior **entre amostras**; uma mudança feita e desfeita entre duas
+  amostras não é vista. A sessão entra no próximo relatório.
+- **Player do Roblox**: identidade (nome, pasta Versions, assinatura da Roblox Corporation), e — quando o
+  anticheat permite leitura, o que é raro — código × arquivo, hooks com destino, memória executável sem
+  módulo, strings categorizadas e valores de flags em memória. "Acesso recusado" é o anticheat funcionando,
+  não um fato sobre o jogador.
+- **Valores anteriores**: outras cópias das configurações com outro valor e as datas dos arquivos, e
+  valores em dumps de falha do Roblox com a hora do dump.
+- **Inventário de arquivos** (verificação avançada): todas as unidades acessíveis, com as classes de
+  integridade das DLLs e executáveis (cada uma com motivos e limitações). Se o resumo disser que a
+  varredura **parou antes de terminar**, a ausência de um arquivo na lista não significa nada.
+
+Leia uma divergência de FastFlag junto da **correspondência de versão**: só "exata" torna a comparação
+mais que indicativa, e mesmo assim a referência é o que o canal ao vivo entrega, não o que o cliente usou.
 
 ## 8. Correlação com a linha do tempo
 

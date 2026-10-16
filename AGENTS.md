@@ -45,6 +45,11 @@ see [`SECURITY.md`](SECURITY.md). Do not write bypass details into issues, PRs, 
 
 1. **No network code.** No HTTP/socket crates, no `std::net`, no `fetch`/`WebSocket` in the UI.
    `cargo deny check` and ESLint fail the build.
+   *B.O.P.E amendment (ADR 0136):* one request is allowed — the WinHTTP `GET` of the public FastFlag
+   reference file in `bope-host-windows::https_get`, to `api.github.com` / `raw.githubusercontent.com`
+   only, made when the person asks or by the desktop's automatic check they can turn off. `WinHttp*` is
+   banned everywhere else in `clippy.toml`. No scan, collector or page makes a request, and nothing about
+   the PC, the scan or the person is ever sent.
 2. **Collectors are read-only.** They never write, delete, move or lock files, keys or logs on the
    scanned machine. The one change they may make is to this program's own process token: enabling a
    privilege the token already holds, for one read an ADR names, and putting it back straight after

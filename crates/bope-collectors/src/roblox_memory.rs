@@ -761,7 +761,12 @@ impl Collector for RobloxMemory {
                     observations.append(&mut player.rows);
                 }
                 Err(error) => {
-                    let reason = crate::common::reason(host, &error);
+                    // A refusal comes from the player's anti-cheat whatever this program's rights, so
+                    // it is `access_denied`, never "run as administrator" (`not_admin`).
+                    let reason = match error {
+                        bope_host::SourceError::AccessDenied => UnmeasuredReason::AccessDenied,
+                        other => crate::common::reason(host, &other),
+                    };
                     refused.push(reason);
                     observations.push(
                         row.with(

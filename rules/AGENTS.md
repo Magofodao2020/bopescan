@@ -15,7 +15,9 @@ Adds to the root [`AGENTS.md`](../AGENTS.md); read that first. Authoring guide:
   producer, so the check is entirely about *which* collector: `not_on_this_os` is `pca` alone,
   `service_disabled` is `prefetch` alone, `not_attempted` is `evtx` alone, `other_volume` is `usn` alone
   (ADR 0047, amendment of 2026-09-30), and `budget_spent` is `evtx`, `usn` (ADR 0047),
-  `driver_service` (ADR 0048) and `autostart` (ADR 0060). Declaring a reason you have not thought
+  `driver_service` (ADR 0048), `autostart` (ADR 0060) and, in B.O.P.E, the collectors the ADR 0030
+  table in `xtask/src/check_rules.rs` names (among them `file_inventory`, `process_modules`,
+  `roblox_memory` and `roblox_flags`, ADR 0133–0136). Declaring a reason you have not thought
   about hides a result a reviewer should have seen.
 - **`partial`, `budget_spent` and `read_failed` cannot be declared away**, and since ADR 0032 naming
   any of them is a `check-rules` failure rather than a line that changes nothing. All three say the

@@ -51,10 +51,11 @@ The CLI and the desktop app both call `bope_collectors::scan::run`, so they cann
 | `bope-host` | `Host` and source traits (including `SignatureSource`, ADR 0035, `BootTimeSource`, ADR 0039, `EventLogConfigSource`, ADR 0042, and `FilesystemSource::times`, ADR 0061), `NonWindowsHost`, `FixtureHost` (feature `fixture`) | — |
 | `bope-host-windows` | `LiveHost`: the only crate that calls Windows APIs or uses `unsafe` | `bope-host` |
 | `bope-parsers` | artifact formats decoded from bytes into plain structs (BAM, PCA, Prefetch, EVTX), and PowerShell text classified into kinds without keeping it (ADR 0064): no OS calls, no `Host`, no clock (ADR 0013, ADR 0015, ADR 0018) | — |
-| `bope-collectors` | `Collector` trait, collectors, `scan::run` | core, host |
-| `bope-cli` | `bope-scanner-cli` binary, no WebView | core, host, collectors, host-windows (Windows) |
+| `bope-collectors` | `Collector` trait, collectors, `scan::run`, the monitoring session (`monitor`, ADR 0137) | core, host, parsers |
+| `bope-reference` | the FastFlag reference copy: when to ask for a new one, validation, atomic store, status (ADR 0136). Opens no connection itself; the transport is `bope-host-windows::https_get` | parsers, host-windows |
+| `bope-cli` | `bope-scanner-cli` binary, no WebView: `scan`, `monitor`, `fflags` | core, host, collectors, reference, host-windows (Windows) |
 | `xtask` | scaffolding and project checks | core (feature `source-tree`) |
-| `apps/desktop` | Tauri 2 GUI | core, host, collectors, host-windows (Windows) |
+| `apps/desktop` | Tauri 2 GUI | core, host, collectors, reference, host-windows (Windows) |
 
 Dependencies point one way. Parsers (from M2) are pure and depend on nothing platform-specific.
 
@@ -235,6 +236,11 @@ so every B.O.P.E build shows **UNOFFICIAL BUILD** in the CLI header, the GUI and
 | `shortcuts` | B.O.P.E, ADR 0119. `.lnk` files on Desktop, Start menu, taskbar and Recent: target path, whether it exists, saved target times; arguments never. | no | B.O.P.E 0.9.0 |
 | `amcache` | B.O.P.E, ADR 0120. `Amcache.hve` from the newest existing shadow copy (live file tried first): inventory rows for catalog names, Roblox paths and user folders. | yes | B.O.P.E 0.9.0 |
 | `fastflags` | B.O.P.E, ADR 0122. `ClientAppSettings.json` in Roblox and launcher version folders, launcher settings and FastFlag tools' JSON: counts by kind, network/physics flag names; never values. | no | B.O.P.E 0.9.0 |
+| `roblox_flags` | B.O.P.E, ADR 0135–0136. The values those files set, compared with the FastFlag reference the scan was given; values that differ between copies, with both files' times; FastFlag JSON assignments in Roblox crash dumps (`bope_parsers::minidump`); the reference row with version correspondence. | no | B.O.P.E 0.11.0 |
+| `process_modules` | B.O.P.E, ADR 0134. Every process opened with `PROCESS_QUERY_LIMITED_INFORMATION \| PROCESS_VM_READ`: modules (`EnumProcessModulesEx`) assessed with the integrity classes, private executable regions and PE headers in them, image mappings the loader does not list (`VirtualQueryEx`, `GetMappedFileNameW`). Nothing written. | for other accounts' processes | B.O.P.E 0.11.0 |
+| `roblox_memory` | B.O.P.E, ADR 0134. Each Roblox player: identity checks, module classes, code vs file (relocated, loader-written ranges skipped), inline hooks at exports with target attribution, unbacked executable memory, categorised strings (ASCII/UTF-8/UTF-16LE), JSON flag values vs the reference, network flag identifiers with pointer counts. A refused player makes every internal place a gap. | yes, and Roblox's anti-cheat usually refuses | B.O.P.E 0.11.0 |
+| `roblox_monitor` | B.O.P.E, ADR 0137. Reads nothing during the scan: reports the monitoring session the person ran (desktop, or `scan --monitor-log`), or `source_absent`. | no | B.O.P.E 0.11.0 |
+| `file_inventory` | B.O.P.E, ADR 0133. Full scan. Every accessible fixed and removable drive, links not followed, bounded and cancellable; images classified (`integrity.rs`: SHA-256, Authenticode with signing time, Windows catalog, PE structure). Incomplete walks are gaps, never `not_found`. | for folders other accounts own | B.O.P.E 0.11.0 |
 | `srum` | B.O.P.E, ADR 0124. `SRUDB.dat` from the newest existing shadow copy, through `bope_parsers::ese`: CPU time, timeline and network totals per program for catalog names, Roblox paths and user folders. | yes | B.O.P.E 0.10.0 |
 | `mft` | B.O.P.E, ADR 0125. Full scan. `$MFT` of the system volume read raw (`\\.\C:`, read-only): catalog names in records in use or freed, path, SI/FN times. | yes | B.O.P.E 0.10.0 |
 | `shellbags` | B.O.P.E, ADR 0126. Full scan. ShellBags (`UsrClass.dat`, `NTUSER.DAT`) and `OpenSavePidlMRU`, only paths with catalog names or naming Roblox. | no | B.O.P.E 0.10.0 |
@@ -249,7 +255,8 @@ The GUI is a Tauri 2 shell around the same scan. It scans before creating its wi
 profile in a temporary folder that is deleted on exit (a folder left by a copy that was stopped first is
 deleted at the next start, after the scan), keeps SmartScreen off inside the WebView, and has a
 content-security policy that allows no network connections. WebView2's own Windows diagnostics are outside
-the app's control and are disclosed in the consent screen (ADR 0001, PRIVACY.md).
+the app's control and are disclosed in PRIVACY.md (ADR 0001). The FastFlag reference request (ADR 0136) is
+made by Rust, not by the page, through the one function that may make it.
 
 Because the scan happens first, a collector that does not return is not a stalled progress bar — it is an
 app that never appears. That is why the `evtx` collector, the only one whose input is both large and
@@ -259,4 +266,11 @@ attacker-chosen, bounds its own wall-clock and reports the logs it did not reach
 
 - An offline tool shown on the player's own screen cannot prove innocence; a tampered OS can fake the display.
 - Hardware (DMA) cheats and capture-proof overlays are invisible to a user-mode program.
+- Process memory: Roblox's anti-cheat refuses read access on most PCs, so `roblox_memory` usually reports
+  the refusal; a kernel-mode cheat can hide modules and memory from every user-mode reader; a change made
+  and undone between two monitoring samples is not seen.
+- The FastFlag reference records what the live channel delivers, not what one client used; comparisons are
+  indicative unless the reference names the installed client version.
+- Signature revocation is not checked (verification is offline); a catalog-signed file is verified only
+  when the catalog database answers.
 - Traces age out: each `not_found` carries the retention window of its source for this reason.

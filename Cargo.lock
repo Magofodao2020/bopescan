@@ -239,7 +239,7 @@ dependencies = [
 
 [[package]]
 name = "bope-cli"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "anyhow",
  "bope-collectors",
@@ -254,7 +254,7 @@ dependencies = [
 
 [[package]]
 name = "bope-collectors"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "bope-core",
  "bope-host",
@@ -267,7 +267,7 @@ dependencies = [
 
 [[package]]
 name = "bope-core"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "jiff",
  "serde",
@@ -280,7 +280,7 @@ dependencies = [
 
 [[package]]
 name = "bope-desktop"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "bope-collectors",
  "bope-core",
@@ -297,7 +297,7 @@ dependencies = [
 
 [[package]]
 name = "bope-host"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "jiff",
  "serde",
@@ -308,7 +308,7 @@ dependencies = [
 
 [[package]]
 name = "bope-host-windows"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "bope-host",
  "bope-parsers",
@@ -320,7 +320,7 @@ dependencies = [
 
 [[package]]
 name = "bope-parsers"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "evtx",
  "jiff",
@@ -333,7 +333,7 @@ dependencies = [
 
 [[package]]
 name = "bope-reference"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "bope-host-windows",
  "bope-parsers",
@@ -5357,7 +5357,7 @@ checksum = "7ca9e40826ae2b2be66854381e4f5d4745aed3c295d7977ccfe8f405bc992b8f"
 
 [[package]]
 name = "xtask"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "anyhow",
  "bope-collectors",
