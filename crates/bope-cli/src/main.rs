@@ -128,6 +128,7 @@ fn scan(args: &ScanArgs) -> anyhow::Result<()> {
         generated_at: jiff::Timestamp::now().to_string(),
         self_identity,
         tier,
+        flag_reference: None,
     };
     let report = scan::run(host.as_ref(), &bundle, context);
     let view = view::for_report(&report).with_assessment(&report, &bundle);

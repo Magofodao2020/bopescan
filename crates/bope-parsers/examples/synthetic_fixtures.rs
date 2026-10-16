@@ -2,9 +2,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
 
-//! Writes the synthetic binary fixtures the B.O.P.E 0.10.0 fixture hosts read: an `SRUDB.dat` and a
-//! small NTFS volume image for `roblox-tool-history` and `baseline-roblox-win11` (ADR 0124, ADR 0125).
-//! Every name, number and time is invented. Run from the repository root:
+//! Writes the synthetic binary fixtures the B.O.P.E fixture hosts read: an `SRUDB.dat` and a small NTFS
+//! volume image for `roblox-tool-history` and `baseline-roblox-win11` (ADR 0124, ADR 0125); and, since
+//! 0.11, one synthetic PE image (`bope_parsers::pe::synthetic_dll`) for `file-inventory` and
+//! `roblox-memory`, its copy as the loader maps it at [`MODULE_BASE`] with a jump written over its
+//! exported function, and its copy mapped by hand at [`INJECTED_BASE`] (ADR 0133, ADR 0134). Every
+//! name, number and time is invented, and no instruction in the image does anything. Run from the repository root:
 //!
 //! ```text
 //! cargo run -p bope-parsers --example synthetic_fixtures
@@ -41,6 +44,37 @@ fn record(
         si_created: si,
         fn_created: fname,
     }
+}
+
+#[allow(clippy::too_many_lines, clippy::decimal_bitwise_operands)]
+/// Where `roblox-memory`'s module is loaded.
+const MODULE_BASE: u64 = 0x7ff6_1000_0000;
+/// Where its private executable allocation is.
+const INJECTED_BASE: u64 = 0x7ff6_0000_0000;
+
+/// The synthetic image, its loaded and hooked copy, and a hand-mapped copy.
+fn images(root: &Path) -> std::io::Result<()> {
+    use bope_parsers::pe;
+    let image = pe::synthetic_dll();
+    std::fs::write(root.join("file-inventory").join("sample.dll"), &image)?;
+    let host = root.join("roblox-memory");
+    std::fs::create_dir_all(&host)?;
+    std::fs::write(host.join("module.dll"), &image)?;
+    let parsed = pe::parse(&image).map_err(std::io::Error::other)?;
+    let mapped = pe::mapped_image(&parsed, &image, 1 << 20)
+        .ok_or_else(|| std::io::Error::other("the synthetic image does not map"))?;
+    let mut loaded = mapped.clone();
+    pe::relocate(&parsed, &mut loaded, MODULE_BASE);
+    // `Run`, at RVA 0x1000, now starts with a jump into the private allocation.
+    let from = MODULE_BASE + 0x1000 + 5;
+    let to = INJECTED_BASE + 0x1000;
+    let relative =
+        i32::try_from(to.cast_signed() - from.cast_signed()).map_err(std::io::Error::other)?;
+    loaded[0x1000] = 0xe9;
+    loaded[0x1001..0x1005].copy_from_slice(&relative.to_le_bytes());
+    std::fs::write(host.join("module-memory.bin"), &loaded)?;
+    std::fs::write(host.join("injected.bin"), &mapped)?;
+    Ok(())
 }
 
 #[allow(clippy::too_many_lines, clippy::decimal_bitwise_operands)]
@@ -263,5 +297,5 @@ fn main() -> std::io::Result<()> {
             shell_items::build_folder("BloxstrapInstaller.exe", fat, 0),
         ])
     );
-    Ok(())
+    images(root)
 }

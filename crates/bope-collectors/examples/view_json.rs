@@ -36,6 +36,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         generated_at,
         self_identity: SelfIdentity::default(),
         tier: ScanTier::Full,
+        flag_reference: None,
     };
     let report = scan::run(&host, &bundle, context);
     let views: BTreeMap<&str, view::ReportView> = BTreeMap::from([(

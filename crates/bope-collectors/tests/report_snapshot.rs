@@ -38,6 +38,7 @@ fn report_at(host: &str, self_identity: SelfIdentity, tier: ScanTier) -> bope_co
         generated_at: "2026-01-01T00:00:00Z".to_owned(),
         self_identity,
         tier,
+        flag_reference: None,
     };
     scan::run(&host, &bundle, context)
 }
@@ -220,8 +221,9 @@ fn process_own_trace_self_view() {
     let report = report_for_self("process-own-trace", scanning_ourselves());
     // One of the three processes the fixture describes is ours; the other two stayed in the run. It is
     // seen twice: by `process`, and by `roblox_process`, which lists programs running from user
-    // folders (B.O.P.E, ADR 0102) — both observations are ours and both are set apart.
-    assert_eq!(report.own_traces.len(), 2);
+    // folders (B.O.P.E, ADR 0102), and by `process_modules`, which reports every process run from a
+    // user folder (B.O.P.E, ADR 0134) — all three observations are ours and all are set apart.
+    assert_eq!(report.own_traces.len(), 3);
     // Those other two are unmatched observations — no rule reads `process`. Own traces are taken
     // out before any rule runs, so the one that is ours is not repeated among them (ADR 0014).
     // The fixture describes no registry, so `posture` also has one unmatched observation: its
@@ -242,7 +244,8 @@ fn process_own_trace_self_view() {
     // B.O.P.E adds two: `net_adapter` answers for the WinHTTP proxy and the four proxy variables even
     // on a fixture without registry, and `roblox_process` lists the fixture's other program running
     // from a user folder (ADR 0102, ADR 0112). `roblox_trace` lists which of its sources it could
-    // read, on every scan (ADR 0123).
+    // read, on every scan (ADR 0123). `process_modules` and `roblox_memory` state how many processes
+    // and players they read, on every scan (ADR 0134).
     assert_eq!(
         collectors,
         [
@@ -250,7 +253,9 @@ fn process_own_trace_self_view() {
             "net_adapter",
             "posture",
             "process",
+            "process_modules",
             "roblox_process",
+            "roblox_memory",
             "roblox_trace"
         ]
     );

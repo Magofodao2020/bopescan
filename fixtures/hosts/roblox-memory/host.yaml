@@ -1,0 +1,49 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# A synthetic machine with the Roblox player running (B.O.P.E, ADR 0134). Its memory holds: the
+# player's own image; an unsigned helper.dll from Temp whose exported function starts with a jump
+# into a private read-write-execute allocation; that allocation, which begins with a PE header (an
+# image mapped by hand); an image mapping the loader does not list; and a heap region with a FastFlag
+# JSON object, executor function names, an injection API name, a DLL path and one line of chat text.
+# A second player instance refuses the read, as Roblox's anti-cheat does. Every image is the one
+# synthetic module.dll (cargo run -p bope-parsers --example synthetic_fixtures); nothing is a real
+# program, account or message.
+platform: windows
+elevated: true
+env:
+  SystemRoot: 'C:\Windows'
+  SystemDrive: 'C:'
+  LOCALAPPDATA: 'C:\Users\fixtureuser\AppData\Local'
+filesystem:
+  'C:\Windows\System32':
+    - { name: ntdll.dll, from: module.dll, signature: { state: no_embedded_signature }, catalog: { state: signed, catalog: 'Package_for_RollupFix.cat', signer: Microsoft Windows, signer_cert_sha256: '1111111111111111111111111111111111111111111111111111111111111111' } }
+  'C:\Users\fixtureuser\AppData\Local\Roblox\Versions\version-0123456789abcdef':
+    - { name: RobloxPlayerBeta.exe, from: module.dll, signature: { state: valid, signer: Roblox Corporation, signer_cert_sha256: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' }, signed_at: '2026-10-10T12:00:00Z' }
+  'C:\Users\fixtureuser\AppData\Local\Temp':
+    - { name: helper.dll, from: module.dll, signature: { state: no_embedded_signature }, catalog: { state: not_in_catalog } }
+processes:
+  - { pid: 900, name: explorer.exe, path: 'C:\Windows\explorer.exe', started_at: '2026-10-16T08:00:00Z', loaded: [], regions: [] }
+  - pid: 1200
+    name: RobloxPlayerBeta.exe
+    path: 'C:\Users\fixtureuser\AppData\Local\Roblox\Versions\version-0123456789abcdef\RobloxPlayerBeta.exe'
+    started_at: '2026-10-16T09:00:00Z'
+    parent_pid: 900
+    pointer_width: 64
+    loaded:
+      - { base: 0x7ff700000000, size: 0x5000, path: 'C:\Users\fixtureuser\AppData\Local\Roblox\Versions\version-0123456789abcdef\RobloxPlayerBeta.exe' }
+      - { base: 0x7ffb00000000, size: 0x5000, path: 'C:\Windows\System32\ntdll.dll' }
+      - { base: 0x7ff610000000, size: 0x5000, path: 'C:\Users\fixtureuser\AppData\Local\Temp\helper.dll' }
+    regions:
+      - { base: 0x7ff700000000, size: 0x5000, allocation_base: 0x7ff700000000, protect: 0x20, kind: image, mapped_file: '\Device\HarddiskVolume3\Users\fixtureuser\AppData\Local\Roblox\Versions\version-0123456789abcdef\RobloxPlayerBeta.exe' }
+      - { base: 0x7ff610000000, size: 0x5000, allocation_base: 0x7ff610000000, protect: 0x20, kind: image, mapped_file: '\Device\HarddiskVolume3\Users\fixtureuser\AppData\Local\Temp\helper.dll' }
+      - { base: 0x7ff600000000, size: 0x5000, allocation_base: 0x7ff600000000, protect: 0x40, kind: private }
+      - { base: 0x7ff620000000, size: 0x1000, allocation_base: 0x7ff620000000, protect: 0x20, kind: image, mapped_file: '\Device\HarddiskVolume3\Users\fixtureuser\AppData\Local\Temp\x.dll' }
+      - { base: 0x20000000, size: 0x1000, allocation_base: 0x20000000, protect: 0x04, kind: private }
+    bytes:
+      - { address: 0x7ff700000000, from: module-memory.bin }
+      - { address: 0x7ff610000000, from: module-memory.bin }
+      - { address: 0x7ff600000000, from: injected.bin }
+      - address: 0x20000000
+        text: "\u0001hello there this is a chat line\u0000{\"DFIntS2PhysicsSenderRate\": 60, \"FFlagDebugGraphicsPreferVulkan\": \"True\"}\u0000\u0000getgenv\u0000hookfunction\u0000WriteProcessMemory\u0000C:\\Users\\fixtureuser\\Downloads\\inject.dll\u0000DFIntS2PhysicsSenderRate\u0000"
+  - { pid: 1300, name: protected.exe, path: 'C:\Windows\System32\protected.exe', denied: true }
+  - { pid: 1400, name: RobloxPlayerBeta.exe, path: 'C:\Users\fixtureuser\AppData\Local\Roblox\Versions\version-0123456789abcdef\RobloxPlayerBeta.exe', started_at: '2026-10-16T09:30:00Z', denied: true }

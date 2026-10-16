@@ -778,6 +778,7 @@ mod tests {
                 generated_at: "2026-01-01T00:00:00Z".to_owned(),
                 self_identity: bope_core::engine::SelfIdentity::default(),
                 tier: bope_core::model::ScanTier::Standard,
+                flag_reference: None,
             },
         );
         crate::output::render(&bope_core::view::for_report(&report), &bundle, lang)

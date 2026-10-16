@@ -166,6 +166,8 @@ pub struct ImportedDll {
     pub truncated: bool,
     /// Whether the entry is in the delay-load directory rather than the import directory.
     pub delay_loaded: bool,
+    /// The address table the loader writes resolved addresses into, `(rva, bytes)`.
+    pub address_table: Option<(u32, u32)>,
 }
 
 /// One exported function.
@@ -326,6 +328,8 @@ pub struct PeFile {
     pub version: Option<VersionInfo>,
     /// The certificate table (Authenticode) as `(file offset, size)`, when the directory names one.
     pub certificate_table: Option<(u32, u32)>,
+    /// The import address table directory, `(rva, size)`, when there is one: what the loader rewrites.
+    pub iat_directory: Option<(u32, u32)>,
     /// Whether a CLR (.NET) header is present.
     pub clr: bool,
     /// Bytes after the last section and the certificate table.
@@ -603,6 +607,7 @@ pub fn parse_with(bytes: &[u8], limits: Limits) -> Result<PeFile, ParseError> {
     // The certificate table's "RVA" is a file offset (PE Format, "The Attribute Certificate Table").
     let certificate_table = Some(directory(4)).filter(|(offset, size)| *offset != 0 && *size != 0);
     let (clr_rva, _) = directory(14);
+    let iat_directory = Some(directory(12)).filter(|(rva, size)| *rva != 0 && *size != 0);
 
     let computed_checksum = pe_checksum(bytes, checksum_offset);
     let end_of_sections = image
@@ -694,6 +699,7 @@ pub fn parse_with(bytes: &[u8], limits: Limits) -> Result<PeFile, ParseError> {
         relocations_truncated,
         version,
         certificate_table,
+        iat_directory,
         clr: clr_rva != 0,
         overlay_bytes,
         anomalies,
@@ -701,6 +707,7 @@ pub fn parse_with(bytes: &[u8], limits: Limits) -> Result<PeFile, ParseError> {
     })
 }
 
+#[allow(clippy::too_many_lines)]
 fn read_imports(
     image: &Image<'_>,
     directory_rva: u32,
@@ -727,9 +734,13 @@ fn read_imports(
         else {
             break;
         };
-        let (name_rva, thunks_rva) = if delay {
+        let (name_rva, thunks_rva, table_rva) = if delay {
             // Attributes, DllNameRVA, ModuleHandleRVA, ImportAddressTableRVA, ImportNameTableRVA, …
-            (image.u32_rva(at + 4), image.u32_rva(at + 16))
+            (
+                image.u32_rva(at + 4),
+                image.u32_rva(at + 16),
+                image.u32_rva(at + 12),
+            )
         } else {
             // OriginalFirstThunk, TimeDateStamp, ForwarderChain, Name, FirstThunk.
             let original = image.u32_rva(at);
@@ -740,6 +751,7 @@ fn read_imports(
                     Some(0) | None => first,
                     other => other,
                 },
+                first,
             )
         };
         let (Some(name_rva), Some(thunks_rva)) = (name_rva, thunks_rva) else {
@@ -795,11 +807,15 @@ fn read_imports(
                 }
             }
         }
+        let slots = u32::try_from(functions.len() + 1).unwrap_or(u32::MAX);
         dlls.push(ImportedDll {
             name,
             functions,
             truncated,
             delay_loaded: delay,
+            address_table: table_rva
+                .filter(|rva| *rva != 0)
+                .map(|rva| (rva, slots.saturating_mul(thunk_size))),
         });
     }
     dlls
@@ -1163,6 +1179,21 @@ pub fn mapped_image(pe: &PeFile, bytes: &[u8], max_image: usize) -> Option<Vec<u
     Some(image)
 }
 
+/// The ranges, relative to the image base, that the loader writes after mapping an image: the import
+/// address table directory and every import and delay-import address table. A comparison of the image
+/// in memory with the file skips them.
+pub fn loader_written_ranges(pe: &PeFile) -> Vec<(usize, usize)> {
+    let mut ranges: Vec<(usize, usize)> = pe
+        .imports
+        .iter()
+        .filter_map(|dll| dll.address_table)
+        .chain(pe.iat_directory)
+        .filter_map(|(rva, size)| Some((usize::try_from(rva).ok()?, usize::try_from(size).ok()?)))
+        .collect();
+    ranges.sort_unstable();
+    ranges
+}
+
 /// Applies `pe`'s base relocations to a [`mapped_image`] as the loader does when it maps the image at
 /// `loaded_base` instead of the preferred `ImageBase`.
 pub fn relocate(pe: &PeFile, image: &mut [u8], loaded_base: u64) {
@@ -1196,166 +1227,176 @@ pub fn relocate(pe: &PeFile, image: &mut [u8], loaded_base: u64) {
     }
 }
 
+/// A small, valid PE32+ DLL built byte by byte, for tests and the synthetic fixtures (B.O.P.E,
+/// ADR 0133): no instruction in it does anything but return. It holds headers, a `.text` section with code, a `.rdata`
+/// section holding an import of `kernel32.dll!GetTickCount64`, an export `Run` and a version
+/// resource, and a `.reloc` section with two `DIR64` fixups.
+#[allow(clippy::too_many_lines)]
+pub fn synthetic_dll() -> Vec<u8> {
+    let file_alignment = 0x200_usize;
+    let mut file = vec![0_u8; 0x200];
+    file[0..2].copy_from_slice(b"MZ");
+    file[0x3c..0x40].copy_from_slice(&0x40_u32.to_le_bytes());
+    file[0x40..0x44].copy_from_slice(b"PE\0\0");
+    let fh = 0x44;
+    file[fh..fh + 2].copy_from_slice(&0x8664_u16.to_le_bytes());
+    file[fh + 2..fh + 4].copy_from_slice(&4_u16.to_le_bytes());
+    file[fh + 4..fh + 8].copy_from_slice(&0x6000_0000_u32.to_le_bytes());
+    file[fh + 16..fh + 18].copy_from_slice(&240_u16.to_le_bytes());
+    file[fh + 18..fh + 20].copy_from_slice(&0x2022_u16.to_le_bytes()); // DLL | EXECUTABLE | LARGE_ADDRESS
+    let oh = fh + 20;
+    file[oh..oh + 2].copy_from_slice(&0x20b_u16.to_le_bytes());
+    file[oh + 16..oh + 20].copy_from_slice(&0x1000_u32.to_le_bytes()); // entry
+    file[oh + 24..oh + 32].copy_from_slice(&0x1_8000_0000_u64.to_le_bytes());
+    file[oh + 32..oh + 36].copy_from_slice(&0x1000_u32.to_le_bytes());
+    file[oh + 36..oh + 40].copy_from_slice(&0x200_u32.to_le_bytes());
+    file[oh + 56..oh + 60].copy_from_slice(&0x5000_u32.to_le_bytes()); // SizeOfImage
+    file[oh + 60..oh + 64].copy_from_slice(&0x200_u32.to_le_bytes()); // SizeOfHeaders
+    file[oh + 68..oh + 70].copy_from_slice(&2_u16.to_le_bytes());
+    file[oh + 70..oh + 72].copy_from_slice(&0x0160_u16.to_le_bytes());
+    file[oh + 108..oh + 112].copy_from_slice(&16_u32.to_le_bytes());
+    let dirs = oh + 112;
+    let set_dir = |file: &mut Vec<u8>, index: usize, rva: u32, size: u32| {
+        let at = dirs + index * 8;
+        file[at..at + 4].copy_from_slice(&rva.to_le_bytes());
+        file[at + 4..at + 8].copy_from_slice(&size.to_le_bytes());
+    };
+    set_dir(&mut file, 0, 0x2100, 0x100); // export
+    set_dir(&mut file, 1, 0x2000, 0x28); // import
+    set_dir(&mut file, 2, 0x3000, 0x200); // resource
+    set_dir(&mut file, 5, 0x4000, 0x0c); // reloc
+    let st = oh + 240;
+    let sections: [(&[u8], u32, u32, u32, u32); 4] = [
+        (b".text", 0x1000, 0x200, 0x200, 0x6000_0020),
+        (b".rdata", 0x2000, 0x400, 0x400, 0x4000_0040),
+        (b".rsrc", 0x3000, 0x200, 0x800, 0x4000_0040),
+        (b".reloc", 0x4000, 0x200, 0xa00, 0x4200_0040),
+    ];
+    for (index, (name, va, raw_size, raw_offset, flags)) in sections.iter().enumerate() {
+        let at = st + index * 40;
+        file[at..at + name.len()].copy_from_slice(name);
+        file[at + 8..at + 12].copy_from_slice(&raw_size.to_le_bytes());
+        file[at + 12..at + 16].copy_from_slice(&va.to_le_bytes());
+        file[at + 16..at + 20].copy_from_slice(&raw_size.to_le_bytes());
+        file[at + 20..at + 24].copy_from_slice(&raw_offset.to_le_bytes());
+        file[at + 36..at + 40].copy_from_slice(&flags.to_le_bytes());
+    }
+    // .text at 0x200: a prologue and pointers to relocate at 0x1010 and 0x1018.
+    let mut text = vec![0xcc_u8; file_alignment];
+    text[..4].copy_from_slice(&[0x48, 0x83, 0xec, 0x28]);
+    text[0x10..0x18].copy_from_slice(&0x1_8000_2000_u64.to_le_bytes());
+    text[0x18..0x20].copy_from_slice(&0x1_8000_1000_u64.to_le_bytes());
+    file.extend_from_slice(&text);
+    // .rdata at 0x400 (RVA 0x2000): import descriptor, ILT, name, dll name; export directory.
+    let mut rdata = vec![0_u8; 0x400];
+    let put32 = |buf: &mut Vec<u8>, at: usize, v: u32| {
+        buf[at..at + 4].copy_from_slice(&v.to_le_bytes());
+    };
+    put32(&mut rdata, 0x00, 0x2040); // OriginalFirstThunk
+    put32(&mut rdata, 0x0c, 0x2080); // Name
+    put32(&mut rdata, 0x10, 0x2040); // FirstThunk
+    rdata[0x40..0x48].copy_from_slice(&0x2060_u64.to_le_bytes());
+    rdata[0x62..0x62 + 15].copy_from_slice(b"GetTickCount64\0");
+    rdata[0x80..0x80 + 13].copy_from_slice(b"kernel32.dll\0");
+    // Export directory at RVA 0x2100.
+    put32(&mut rdata, 0x10c, 0x2180); // Name
+    put32(&mut rdata, 0x110, 1); // Base
+    put32(&mut rdata, 0x114, 1); // NumberOfFunctions
+    put32(&mut rdata, 0x118, 1); // NumberOfNames
+    put32(&mut rdata, 0x11c, 0x2140); // AddressOfFunctions
+    put32(&mut rdata, 0x120, 0x2150); // AddressOfNames
+    put32(&mut rdata, 0x124, 0x2160); // AddressOfNameOrdinals
+    put32(&mut rdata, 0x140, 0x1000);
+    put32(&mut rdata, 0x150, 0x2170);
+    rdata[0x170..0x174].copy_from_slice(b"Run\0");
+    rdata[0x180..0x188].copy_from_slice(b"one.dll\0");
+    file.extend_from_slice(&rdata);
+    // .rsrc at 0x800 (RVA 0x3000): type 16 → id 1 → lang 0 → data entry → VS_VERSIONINFO.
+    let mut rsrc = vec![0_u8; 0x200];
+    let dir = |buf: &mut Vec<u8>, at: usize, id: u32, target: u32| {
+        buf[at + 14..at + 16].copy_from_slice(&1_u16.to_le_bytes());
+        buf[at + 16..at + 20].copy_from_slice(&id.to_le_bytes());
+        buf[at + 20..at + 24].copy_from_slice(&target.to_le_bytes());
+    };
+    dir(&mut rsrc, 0x00, 16, 0x8000_0018);
+    dir(&mut rsrc, 0x18, 1, 0x8000_0030);
+    dir(&mut rsrc, 0x30, 0, 0x48);
+    let version = synthetic_version_resource();
+    put32(&mut rsrc, 0x48, 0x3060);
+    put32(&mut rsrc, 0x4c, u32::try_from(version.len()).unwrap_or(0));
+    rsrc[0x60..0x60 + version.len()].copy_from_slice(&version);
+    file.extend_from_slice(&rsrc);
+    // .reloc at 0xa00 (RVA 0x4000): one block for page 0x1000 with two DIR64 entries.
+    let mut reloc = vec![0_u8; 0x200];
+    put32(&mut reloc, 0, 0x1000);
+    put32(&mut reloc, 4, 0x0c);
+    reloc[8..10].copy_from_slice(&((10_u16 << 12) | 0x010).to_le_bytes());
+    reloc[10..12].copy_from_slice(&((10_u16 << 12) | 0x018).to_le_bytes());
+    file.extend_from_slice(&reloc);
+    let checksum = pe_checksum(&file, oh + 64);
+    file[oh + 64..oh + 68].copy_from_slice(&checksum.to_le_bytes());
+    file
+}
+
+fn synthetic_block(key: &str, value: &[u8], text: bool, children: &[u8]) -> Vec<u8> {
+    let mut out = vec![0_u8; 6];
+    for unit in key.encode_utf16().chain([0]) {
+        out.extend_from_slice(&unit.to_le_bytes());
+    }
+    while !out.len().is_multiple_of(4) {
+        out.push(0);
+    }
+    out.extend_from_slice(value);
+    while !out.len().is_multiple_of(4) {
+        out.push(0);
+    }
+    out.extend_from_slice(children);
+    let length = u16::try_from(out.len()).unwrap_or(u16::MAX);
+    let value_length = if text { value.len() / 2 } else { value.len() };
+    out[0..2].copy_from_slice(&length.to_le_bytes());
+    out[2..4].copy_from_slice(
+        &u16::try_from(value_length)
+            .unwrap_or(u16::MAX)
+            .to_le_bytes(),
+    );
+    out[4..6].copy_from_slice(&u16::from(text).to_le_bytes());
+    out
+}
+
+fn synthetic_wide(text: &str) -> Vec<u8> {
+    text.encode_utf16()
+        .chain([0])
+        .flat_map(u16::to_le_bytes)
+        .collect()
+}
+
+fn synthetic_version_resource() -> Vec<u8> {
+    let mut fixed = vec![0_u8; 52];
+    fixed[0..4].copy_from_slice(&0xfeef_04bd_u32.to_le_bytes());
+    fixed[8..12].copy_from_slice(&((1_u32 << 16) | 2).to_le_bytes());
+    fixed[12..16].copy_from_slice(&((3_u32 << 16) | 4).to_le_bytes());
+    let mut strings = synthetic_block("CompanyName", &synthetic_wide("Example Corp"), true, &[]);
+    while !strings.len().is_multiple_of(4) {
+        strings.push(0);
+    }
+    strings.extend(synthetic_block(
+        "OriginalFilename",
+        &synthetic_wide("one.dll"),
+        true,
+        &[],
+    ));
+    let table = synthetic_block("040904b0", &[], true, &strings);
+    let file_info = synthetic_block("StringFileInfo", &[], true, &table);
+    synthetic_block("VS_VERSION_INFO", &fixed, false, &file_info)
+}
+
 #[cfg(test)]
-pub(crate) mod tests {
+mod tests {
     use super::*;
-
-    /// A small, valid PE32+ DLL built byte by byte: headers, a `.text` section with code, a `.rdata`
-    /// section holding an import of `kernel32.dll!GetTickCount64`, an export `Run` and a version
-    /// resource, and a `.reloc` section with two `DIR64` fixups.
-    #[allow(clippy::too_many_lines)]
-    pub(crate) fn sample_dll() -> Vec<u8> {
-        let file_alignment = 0x200_usize;
-        let mut file = vec![0_u8; 0x200];
-        file[0..2].copy_from_slice(b"MZ");
-        file[0x3c..0x40].copy_from_slice(&0x40_u32.to_le_bytes());
-        file[0x40..0x44].copy_from_slice(b"PE\0\0");
-        let fh = 0x44;
-        file[fh..fh + 2].copy_from_slice(&0x8664_u16.to_le_bytes());
-        file[fh + 2..fh + 4].copy_from_slice(&4_u16.to_le_bytes());
-        file[fh + 4..fh + 8].copy_from_slice(&0x6000_0000_u32.to_le_bytes());
-        file[fh + 16..fh + 18].copy_from_slice(&240_u16.to_le_bytes());
-        file[fh + 18..fh + 20].copy_from_slice(&0x2022_u16.to_le_bytes()); // DLL | EXECUTABLE | LARGE_ADDRESS
-        let oh = fh + 20;
-        file[oh..oh + 2].copy_from_slice(&0x20b_u16.to_le_bytes());
-        file[oh + 16..oh + 20].copy_from_slice(&0x1000_u32.to_le_bytes()); // entry
-        file[oh + 24..oh + 32].copy_from_slice(&0x1_8000_0000_u64.to_le_bytes());
-        file[oh + 32..oh + 36].copy_from_slice(&0x1000_u32.to_le_bytes());
-        file[oh + 36..oh + 40].copy_from_slice(&0x200_u32.to_le_bytes());
-        file[oh + 56..oh + 60].copy_from_slice(&0x5000_u32.to_le_bytes()); // SizeOfImage
-        file[oh + 60..oh + 64].copy_from_slice(&0x200_u32.to_le_bytes()); // SizeOfHeaders
-        file[oh + 68..oh + 70].copy_from_slice(&2_u16.to_le_bytes());
-        file[oh + 70..oh + 72].copy_from_slice(&0x0160_u16.to_le_bytes());
-        file[oh + 108..oh + 112].copy_from_slice(&16_u32.to_le_bytes());
-        let dirs = oh + 112;
-        let set_dir = |file: &mut Vec<u8>, index: usize, rva: u32, size: u32| {
-            let at = dirs + index * 8;
-            file[at..at + 4].copy_from_slice(&rva.to_le_bytes());
-            file[at + 4..at + 8].copy_from_slice(&size.to_le_bytes());
-        };
-        set_dir(&mut file, 0, 0x2100, 0x100); // export
-        set_dir(&mut file, 1, 0x2000, 0x28); // import
-        set_dir(&mut file, 2, 0x3000, 0x200); // resource
-        set_dir(&mut file, 5, 0x4000, 0x0c); // reloc
-        let st = oh + 240;
-        let sections: [(&[u8], u32, u32, u32, u32); 4] = [
-            (b".text", 0x1000, 0x200, 0x200, 0x6000_0020),
-            (b".rdata", 0x2000, 0x400, 0x400, 0x4000_0040),
-            (b".rsrc", 0x3000, 0x200, 0x800, 0x4000_0040),
-            (b".reloc", 0x4000, 0x200, 0xa00, 0x4200_0040),
-        ];
-        for (index, (name, va, raw_size, raw_offset, flags)) in sections.iter().enumerate() {
-            let at = st + index * 40;
-            file[at..at + name.len()].copy_from_slice(name);
-            file[at + 8..at + 12].copy_from_slice(&raw_size.to_le_bytes());
-            file[at + 12..at + 16].copy_from_slice(&va.to_le_bytes());
-            file[at + 16..at + 20].copy_from_slice(&raw_size.to_le_bytes());
-            file[at + 20..at + 24].copy_from_slice(&raw_offset.to_le_bytes());
-            file[at + 36..at + 40].copy_from_slice(&flags.to_le_bytes());
-        }
-        // .text at 0x200: a prologue and pointers to relocate at 0x1010 and 0x1018.
-        let mut text = vec![0xcc_u8; file_alignment];
-        text[..4].copy_from_slice(&[0x48, 0x83, 0xec, 0x28]);
-        text[0x10..0x18].copy_from_slice(&0x1_8000_2000_u64.to_le_bytes());
-        text[0x18..0x20].copy_from_slice(&0x1_8000_1000_u64.to_le_bytes());
-        file.extend_from_slice(&text);
-        // .rdata at 0x400 (RVA 0x2000): import descriptor, ILT, name, dll name; export directory.
-        let mut rdata = vec![0_u8; 0x400];
-        let put32 = |buf: &mut Vec<u8>, at: usize, v: u32| {
-            buf[at..at + 4].copy_from_slice(&v.to_le_bytes());
-        };
-        put32(&mut rdata, 0x00, 0x2040); // OriginalFirstThunk
-        put32(&mut rdata, 0x0c, 0x2080); // Name
-        put32(&mut rdata, 0x10, 0x2040); // FirstThunk
-        rdata[0x40..0x48].copy_from_slice(&0x2060_u64.to_le_bytes());
-        rdata[0x62..0x62 + 15].copy_from_slice(b"GetTickCount64\0");
-        rdata[0x80..0x80 + 13].copy_from_slice(b"kernel32.dll\0");
-        // Export directory at RVA 0x2100.
-        put32(&mut rdata, 0x10c, 0x2180); // Name
-        put32(&mut rdata, 0x110, 1); // Base
-        put32(&mut rdata, 0x114, 1); // NumberOfFunctions
-        put32(&mut rdata, 0x118, 1); // NumberOfNames
-        put32(&mut rdata, 0x11c, 0x2140); // AddressOfFunctions
-        put32(&mut rdata, 0x120, 0x2150); // AddressOfNames
-        put32(&mut rdata, 0x124, 0x2160); // AddressOfNameOrdinals
-        put32(&mut rdata, 0x140, 0x1000);
-        put32(&mut rdata, 0x150, 0x2170);
-        rdata[0x170..0x174].copy_from_slice(b"Run\0");
-        rdata[0x180..0x188].copy_from_slice(b"one.dll\0");
-        file.extend_from_slice(&rdata);
-        // .rsrc at 0x800 (RVA 0x3000): type 16 → id 1 → lang 0 → data entry → VS_VERSIONINFO.
-        let mut rsrc = vec![0_u8; 0x200];
-        let dir = |buf: &mut Vec<u8>, at: usize, id: u32, target: u32| {
-            buf[at + 14..at + 16].copy_from_slice(&1_u16.to_le_bytes());
-            buf[at + 16..at + 20].copy_from_slice(&id.to_le_bytes());
-            buf[at + 20..at + 24].copy_from_slice(&target.to_le_bytes());
-        };
-        dir(&mut rsrc, 0x00, 16, 0x8000_0018);
-        dir(&mut rsrc, 0x18, 1, 0x8000_0030);
-        dir(&mut rsrc, 0x30, 0, 0x48);
-        let version = version_resource();
-        put32(&mut rsrc, 0x48, 0x3060);
-        put32(&mut rsrc, 0x4c, u32::try_from(version.len()).unwrap());
-        rsrc[0x60..0x60 + version.len()].copy_from_slice(&version);
-        file.extend_from_slice(&rsrc);
-        // .reloc at 0xa00 (RVA 0x4000): one block for page 0x1000 with two DIR64 entries.
-        let mut reloc = vec![0_u8; 0x200];
-        put32(&mut reloc, 0, 0x1000);
-        put32(&mut reloc, 4, 0x0c);
-        reloc[8..10].copy_from_slice(&((10_u16 << 12) | 0x010).to_le_bytes());
-        reloc[10..12].copy_from_slice(&((10_u16 << 12) | 0x018).to_le_bytes());
-        file.extend_from_slice(&reloc);
-        let checksum = pe_checksum(&file, oh + 64);
-        file[oh + 64..oh + 68].copy_from_slice(&checksum.to_le_bytes());
-        file
-    }
-
-    fn block(key: &str, value: &[u8], text: bool, children: &[u8]) -> Vec<u8> {
-        let mut out = vec![0_u8; 6];
-        for unit in key.encode_utf16().chain([0]) {
-            out.extend_from_slice(&unit.to_le_bytes());
-        }
-        while !out.len().is_multiple_of(4) {
-            out.push(0);
-        }
-        out.extend_from_slice(value);
-        while !out.len().is_multiple_of(4) {
-            out.push(0);
-        }
-        out.extend_from_slice(children);
-        let length = u16::try_from(out.len()).unwrap();
-        let value_length = if text { value.len() / 2 } else { value.len() };
-        out[0..2].copy_from_slice(&length.to_le_bytes());
-        out[2..4].copy_from_slice(&u16::try_from(value_length).unwrap().to_le_bytes());
-        out[4..6].copy_from_slice(&u16::from(text).to_le_bytes());
-        out
-    }
-
-    fn wide(text: &str) -> Vec<u8> {
-        text.encode_utf16()
-            .chain([0])
-            .flat_map(u16::to_le_bytes)
-            .collect()
-    }
-
-    fn version_resource() -> Vec<u8> {
-        let mut fixed = vec![0_u8; 52];
-        fixed[0..4].copy_from_slice(&0xfeef_04bd_u32.to_le_bytes());
-        fixed[8..12].copy_from_slice(&((1_u32 << 16) | 2).to_le_bytes());
-        fixed[12..16].copy_from_slice(&((3_u32 << 16) | 4).to_le_bytes());
-        let mut strings = block("CompanyName", &wide("Example Corp"), true, &[]);
-        while !strings.len().is_multiple_of(4) {
-            strings.push(0);
-        }
-        strings.extend(block("OriginalFilename", &wide("one.dll"), true, &[]));
-        let table = block("040904b0", &[], true, &strings);
-        let file_info = block("StringFileInfo", &[], true, &table);
-        block("VS_VERSION_INFO", &fixed, false, &file_info)
-    }
 
     #[test]
     fn a_built_dll_reads_back_whole() {
-        let bytes = sample_dll();
+        let bytes = synthetic_dll();
         assert!(is_pe(&bytes));
         let pe = parse(&bytes).unwrap();
         assert_eq!(pe.machine, Machine::X64);
@@ -1390,7 +1431,7 @@ pub(crate) mod tests {
 
     #[test]
     fn structural_anomalies_are_named() {
-        let mut bytes = sample_dll();
+        let mut bytes = synthetic_dll();
         // Make .text writable, append an overlay and leave the checksum stale.
         let st = 0x44 + 20 + 240;
         bytes[st + 36..st + 40].copy_from_slice(&0xe000_0020_u32.to_le_bytes());
@@ -1405,7 +1446,7 @@ pub(crate) mod tests {
 
     #[test]
     fn the_mapped_image_is_relocated_like_the_loader_does() {
-        let bytes = sample_dll();
+        let bytes = synthetic_dll();
         let pe = parse(&bytes).unwrap();
         let mut image = mapped_image(&pe, &bytes, 1 << 20).unwrap();
         assert_eq!(image.len(), 0x5000);
@@ -1426,7 +1467,7 @@ pub(crate) mod tests {
 
     #[test]
     fn garbage_is_an_error_or_a_partial_result_never_a_panic() {
-        let base = sample_dll();
+        let base = synthetic_dll();
         for cut in [
             0, 1, 2, 0x3c, 0x40, 0x84, 0x90, 0x100, 0x180, 0x200, 0x300, 0x500,
         ] {

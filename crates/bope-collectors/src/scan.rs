@@ -31,6 +31,9 @@ pub struct ScanContext {
     /// Which scan the player chose before it started (ADR 0052). A collector whose tier is above it
     /// is not called.
     pub tier: ScanTier,
+    /// The `FastFlag` reference to compare with, as the caller loaded it; `None` compares nothing
+    /// (B.O.P.E, ADR 0136).
+    pub flag_reference: Option<std::sync::Arc<crate::flag_reference::ReferenceSnapshot>>,
 }
 
 /// One step of a scan, as [`run_with_progress`] reports it after each collector (B.O.P.E, ADR 0115).
@@ -66,7 +69,7 @@ pub struct Cancelled;
 /// Runs every collector against `host` and evaluates `bundle`.
 pub fn run(host: &dyn Host, bundle: &Bundle, context: ScanContext) -> Report {
     let boot_time = boot_time(host, &context.generated_at);
-    let collectors = crate::all();
+    let collectors = crate::all_with(context.flag_reference.clone());
     let tier = context.tier;
     let mut runs: Vec<CollectorRun> = Vec::with_capacity(collectors.len());
     for collector in &collectors {
@@ -135,7 +138,7 @@ pub fn run_with_live(
     // the caller took just before this call: the `evtx` collector alone may run for 30 seconds, and
     // reading the count after it would move the start that much earlier (ADR 0039).
     let boot_time = boot_time(host, &context.generated_at);
-    let collectors = crate::all();
+    let collectors = crate::all_with(context.flag_reference.clone());
     let tier = context.tier;
     let total = collectors.len();
     let mut runs: Vec<CollectorRun> = Vec::with_capacity(total);
@@ -728,6 +731,7 @@ mod tests {
                 generated_at: "2026-01-01T00:00:00Z".to_owned(),
                 self_identity: SelfIdentity::default(),
                 tier: ScanTier::Standard,
+                flag_reference: None,
             },
         );
         for collector in crate::all() {
@@ -770,6 +774,7 @@ mod tests {
             generated_at: "2026-01-01T00:00:00Z".to_owned(),
             self_identity: SelfIdentity::default(),
             tier,
+            flag_reference: None,
         }
     }
 
@@ -1126,6 +1131,7 @@ mod progress_tests {
             generated_at: "2026-10-15T12:00:00Z".to_owned(),
             self_identity: SelfIdentity::default(),
             tier: ScanTier::Standard,
+            flag_reference: None,
         }
     }
 

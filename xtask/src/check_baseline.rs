@@ -334,6 +334,7 @@ fn baseline_context() -> ScanContext {
         self_identity: SelfIdentity::default(),
         // Every collector, so a `full` collector's rules are measured on a baseline too (ADR 0052).
         tier: ScanTier::Full,
+        flag_reference: None,
     }
 }
 

@@ -35,6 +35,7 @@ fn scan_fixture(name: &str) -> (Report, Bundle) {
             generated_at: "2026-10-15T12:00:00Z".to_owned(),
             self_identity: SelfIdentity::default(),
             tier: ScanTier::Full,
+            flag_reference: None,
         },
     );
     (report, bundle)

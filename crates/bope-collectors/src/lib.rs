@@ -22,6 +22,7 @@ pub mod file_inventory;
 pub mod fivem_dir;
 pub mod fivem_edition;
 pub mod fivem_servers;
+pub mod flag_reference;
 pub mod hijack;
 pub mod install_marker;
 pub mod installed_programs;
@@ -40,9 +41,12 @@ pub mod posture;
 pub mod powershell_text;
 pub mod prefetch;
 pub mod process;
+pub mod process_modules;
+pub mod procmem;
 pub mod recycle_bin;
 pub mod roblox;
 pub mod roblox_files;
+pub mod roblox_memory;
 pub mod roblox_process;
 pub mod roblox_trace;
 pub mod scan;
@@ -342,8 +346,15 @@ pub struct AgePlace {
     pub without: Option<&'static str>,
 }
 
-/// Every collector in this build.
+/// Every collector in this build, with no `FastFlag` reference to compare with.
 pub fn all() -> Vec<Box<dyn Collector>> {
+    all_with(None)
+}
+
+/// Every collector in this build; the ones that read flag values compare them with `reference`.
+pub fn all_with(
+    reference: Option<std::sync::Arc<flag_reference::ReferenceSnapshot>>,
+) -> Vec<Box<dyn Collector>> {
     vec![
         Box::new(amcache::Amcache),
         Box::new(autostart::Autostart::default()),
@@ -372,6 +383,7 @@ pub fn all() -> Vec<Box<dyn Collector>> {
         Box::new(powershell_text::PowershellText),
         Box::new(prefetch::Prefetch),
         Box::new(process::Process),
+        Box::new(process_modules::ProcessModules),
         Box::new(recycle_bin::RecycleBin),
         Box::new(roblox::Roblox),
         Box::new(roblox_files::RobloxFiles),
@@ -389,6 +401,7 @@ pub fn all() -> Vec<Box<dyn Collector>> {
         Box::new(windows_start::WindowsStart),
         Box::new(wmi_subscription::WmiSubscription),
         // The long reads run after the quick ones, so a stopped scan has had them (B.O.P.E, ADR 0133).
+        Box::new(roblox_memory::RobloxMemory::new(reference)),
         Box::new(file_inventory::FileInventory),
         // Last: it correlates the runs before it (ADR 0123).
         Box::new(roblox_trace::RobloxTrace),
