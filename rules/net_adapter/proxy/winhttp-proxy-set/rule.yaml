@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: 01293bed-96b3-4de6-b12c-a0ffb28a4603
+title: "A machine-wide WinHTTP proxy is set"
+description: >-
+  netsh winhttp stored a proxy, which Windows services and some programs use. The proxy address is
+  not read.
+status: experimental
+collector: net_adapter
+strength: context
+match:
+  place: "winhttp_proxy"
+  set: true
+retention: >-
+  The configuration at scan time.
+unmeasured_when: [not_windows]
+falsepositives:
+  - "Work and school VPNs, privacy VPNs, development proxies, virtual machines and LAN-gaming tools"
+author: B.O.P.E Scanner contributors
+date: 2026-10-15
+tags: [network]
+level: info
+category: network

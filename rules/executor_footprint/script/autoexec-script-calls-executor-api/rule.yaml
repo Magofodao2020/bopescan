@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: 865aa527-ba58-46bf-8c5e-305f15cecf99
+title: "An autoexec script calls functions that exist only in script executors"
+description: >-
+  A script in an executor-style autoexec folder calls two or more functions that exist only in
+  third-party Roblox script executors (getgenv, hookfunction, getrawmetatable, fireclickdetector,
+  game:HttpGet and the like). Ordinary Roblox game code cannot call them. Only which functions
+  appear is kept, never the script. It does not show the script ran.
+status: experimental
+collector: executor_footprint
+strength: presence
+match:
+  scope: "autoexec_script"
+  "distinct_markers|gte": 2
+retention: >-
+  The scripts as they are at scan time.
+unmeasured_when: [not_windows]
+falsepositives:
+  - "Scripts downloaded and kept without being used"
+  - "Anti-cheat developers and researchers who keep exploit scripts as samples"
+references:
+  - https://github.com/unified-naming-convention/NamingStandard
+author: B.O.P.E Scanner contributors
+date: 2026-10-15
+tags: [roblox, executor, script]
+level: flag

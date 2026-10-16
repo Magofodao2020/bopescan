@@ -1,0 +1,18 @@
+{
+  "description": "Synthetic negative case for user_files/program/unsigned-program-from-internet: local.",
+  "observations": [
+    {
+      "collector": "user_files",
+      "fields": {
+        "kind": "program",
+        "folder": "downloads",
+        "name": "x.exe",
+        "path": "C:\\Users\\fixtureuser\\Downloads\\x.exe",
+        "location_kind": "user_downloads",
+        "extension": "exe",
+        "signature": "no_embedded_signature",
+        "sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+      }
+    }
+  ]
+}

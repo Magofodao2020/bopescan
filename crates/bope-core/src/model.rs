@@ -1,0 +1,835 @@
+// SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+
+//! Data model shared by collectors, the engine, the CLI and the desktop app.
+//! Names follow the glossary in `CONVENTIONS.md`.
+
+use std::collections::BTreeMap;
+
+use serde::{Deserialize, Serialize};
+
+use crate::bundle::BundleInfo;
+use crate::provenance::Provenance;
+
+/// Version of the report JSON format. A breaking change is a major application release.
+pub const REPORT_SCHEMA_VERSION: u32 = 1;
+
+/// One typed fact a collector saw on the host, for example `{"secure_boot": "disabled"}`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Observation {
+    /// Id of the collector that produced this observation.
+    pub collector: String,
+    /// Field values. Rules match on these keys.
+    pub fields: BTreeMap<String, serde_json::Value>,
+}
+
+/// Why a collector, or one field of it, could not look.
+///
+/// Fourteen reasons, and the split between them is the whole of how this program distinguishes "we
+/// checked and there was nothing" from "we could not check". Four of them — [`Self::NotOnThisOs`],
+/// [`Self::ServiceDisabled`], [`Self::SourceAbsent`] and [`Self::SourceEmpty`] — describe a machine
+/// that is behaving exactly as Windows ships it, and a fifth, [`Self::OtherVolume`], one whose owner
+/// put a folder on another drive. ADR 0030 records, for each one, the ordinary condition that
+/// produces it and how common that condition is. A reason that fires on an ordinary machine is worse
+/// than no reason at all, so none of them may be read as a finding.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum UnmeasuredReason {
+    /// The scan is not running on Windows.
+    NotWindows,
+    /// This Windows version does not keep the artifact at all.
+    ///
+    /// A fact about the operating system rather than about the machine's history: PCA's files
+    /// arrived in Windows 11 22H2, so on anything older their absence carries no information
+    /// (ADR 0020, ADR 0030).
+    NotOnThisOs,
+    /// Reading the artifact needs administrator rights.
+    NotAdmin,
+    /// The collector did not look, so nothing was attempted.
+    ///
+    /// Distinct from every reason that describes a failed attempt: OVAL calls it `not collected`,
+    /// "no attempt was made to collect items on the system". A log after a budget has already been
+    /// spent was never opened, and reporting that as a failed read would name a failure that did not
+    /// happen (ADR 0030).
+    NotAttempted,
+    /// Windows denied access to the artifact.
+    AccessDenied,
+    /// The Windows service that writes the artifact is switched off.
+    ///
+    /// Not "somebody removed the record": a machine whose `EnablePrefetcher` is `0` or `2` is one
+    /// where Windows never wrote an application-launch record to remove (ADR 0030).
+    ServiceDisabled,
+    /// The place the artifact is kept is not on this machine.
+    ///
+    /// Split from [`Self::SourceEmpty`] because the two mean opposite things and one word for both
+    /// was the coarsest part of this vocabulary. OVAL's `does not exist` requires that "the
+    /// underlying structure is installed on the system" before an absence is a meaningful answer;
+    /// this is the case where it is not (ADR 0030).
+    SourceAbsent,
+    /// The place the artifact is kept is on this machine and holds nothing.
+    ///
+    /// The state an artifact reaches when it reads perfectly and says nothing, which is the hole no
+    /// error anywhere reveals. It is **not** evidence that anything was removed: Windows itself
+    /// empties BAM of entries older than seven days at every boot (ADR 0030).
+    SourceEmpty,
+    /// Part of the artifact was read and part of it was not.
+    ///
+    /// OVAL's `incomplete`: "only some of the matching items have been identified". Before ADR 0030
+    /// a partly-read Prefetch folder produced `not_found` — "the collector looked and nothing
+    /// matched" — for a folder whose missing half was never read.
+    Partial,
+    /// A wall-clock or record budget ended the read.
+    ///
+    /// This program's own limit, not the machine's, so the report names the limit rather than
+    /// blaming the artifact (ADR 0024, ADR 0030).
+    BudgetSpent,
+    /// The artifact exists but could not be read or understood.
+    ReadFailed,
+    /// No collector for this rule is available in this build.
+    CollectorUnavailable,
+    /// The player chose the standard scan, which does not read this source (ADR 0052).
+    ///
+    /// A fact about the scan, like [`Self::NotAdmin`]: the collector's tier is `full`, and the scan
+    /// was not. No machine produces it, so no rule may declare it in `unmeasured_when`.
+    NotConsented,
+    /// The place is on another drive than the one whose change journal this program reads.
+    ///
+    /// `usn` reads the system drive's journal alone (ADR 0047, amendment of 2026-09-30, owner
+    /// decision 2), so a watched folder moved to a game or data drive is never within it. Nothing
+    /// failed and nothing stopped early: the program never reached the source, and the reason is how
+    /// the machine is set up, so a rule may declare it, as it may `access_denied` and `source_absent`.
+    /// It is about one place on one machine, not about the scan, so it is not a scope statement.
+    OtherVolume,
+}
+
+impl UnmeasuredReason {
+    /// Stable identifier used in JSON and translation keys.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::NotWindows => "not_windows",
+            Self::NotOnThisOs => "not_on_this_os",
+            Self::NotAdmin => "not_admin",
+            Self::NotAttempted => "not_attempted",
+            Self::AccessDenied => "access_denied",
+            Self::ServiceDisabled => "service_disabled",
+            Self::SourceAbsent => "source_absent",
+            Self::SourceEmpty => "source_empty",
+            Self::Partial => "partial",
+            Self::BudgetSpent => "budget_spent",
+            Self::ReadFailed => "read_failed",
+            Self::CollectorUnavailable => "collector_unavailable",
+            Self::NotConsented => "not_consented",
+            Self::OtherVolume => "other_volume",
+        }
+    }
+
+    /// Whether this reason is one fact about the **scan** rather than one about the machine.
+    ///
+    /// Such a reason applies to every rule it stopped at once, so a view states it once above the
+    /// evidence instead of repeating it as a row per rule: N red-looking lines carrying one fact is
+    /// the shape that teaches a reviewer to stop reading (ADR 0027, ADR 0030).
+    pub fn is_scope_statement(self) -> bool {
+        matches!(
+            self,
+            Self::NotAdmin | Self::NotAttempted | Self::NotConsented
+        )
+    }
+
+    /// Whether a view must list this reason even when the rule declared it in `unmeasured_when`.
+    ///
+    /// All three say that the artifact was reachable and that the read of it did not finish:
+    /// [`Self::Partial`] because some of it did not yield a record, [`Self::BudgetSpent`] because a
+    /// limit **this program chose** ended the read, [`Self::ReadFailed`] because what was there could
+    /// not be read or understood. A rule author cannot declare any of them away, because none is a
+    /// fact about the machine for them to have anticipated: an ordinary Windows PC has a readable
+    /// `SecureBoot` key, so a rule saying it expects that key to be unreadable is not describing a
+    /// kind of machine, it is describing a fault — and a fault is what a reviewer needs as a row
+    /// (ADR 0030, ADR 0027).
+    ///
+    /// `check-rules` refuses to load a rule that names one of these in `unmeasured_when`, so the
+    /// declaration cannot rot back in. This is the answer for bundles that gate does not see.
+    pub fn is_always_listed(self) -> bool {
+        matches!(self, Self::Partial | Self::BudgetSpent | Self::ReadFailed)
+    }
+}
+
+/// Result of running one collector against a host.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "outcome", rename_all = "snake_case")]
+pub enum CollectorRun {
+    /// The collector looked. Fields it could not read are listed in `gaps`.
+    Measured {
+        /// Collector id.
+        collector: String,
+        /// What the collector saw.
+        observations: Vec<Observation>,
+        /// Fields the collector could not read, with the reason, for every observation of the run.
+        #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+        gaps: BTreeMap<String, UnmeasuredReason>,
+        /// Fields the collector could not read for **one value of its discriminator** only — one of
+        /// the several places it reads — while the others were read (ADR 0044). Empty for a
+        /// collector that declares no discriminator.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        discriminator_gaps: Vec<DiscriminatorGaps>,
+    },
+    /// The collector could not look at all.
+    Unmeasured {
+        /// Collector id.
+        collector: String,
+        /// Why it could not look.
+        reason: UnmeasuredReason,
+    },
+}
+
+/// Gaps confined to the observations whose **discriminator** carries one value (ADR 0044).
+///
+/// A discriminator is the field a collector uses to say which of the things it reads an observation is
+/// about: `fivem_dir`'s `location`. When one of those things could not be read and the others were,
+/// a run-wide gap would make every rule on the collector `unmeasured`, including rules that can only
+/// ever match an observation from a place that was read. These gaps reach a rule only when the rule's
+/// `match` could be satisfied by an observation carrying `value`, and they stop an observation carrying
+/// `value` from satisfying `<field>|exists: false` for a field listed here.
+///
+/// The collector promises that **every** observation it emits about that place carries
+/// `discriminator: value`. The engine cannot check that promise; `bope-collectors` binds it with a
+/// test over every fixture host.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct DiscriminatorGaps {
+    /// The observation field that says which place an observation is about.
+    pub discriminator: String,
+    /// The value that field carries on every observation about the place that could not be read.
+    pub value: serde_json::Value,
+    /// Fields that could not be read there, with the reason.
+    pub gaps: BTreeMap<String, UnmeasuredReason>,
+}
+
+impl DiscriminatorGaps {
+    /// Whether `observation` is about the place these gaps describe.
+    ///
+    /// Compared exactly, not with a rule's ASCII fold: both sides are written by the same collector,
+    /// and a value it spells two ways is a defect in the collector rather than something to hide.
+    pub fn describes(&self, observation: &Observation) -> bool {
+        observation.fields.get(&self.discriminator) == Some(&self.value)
+    }
+}
+
+impl CollectorRun {
+    /// Id of the collector this run belongs to.
+    pub fn collector(&self) -> &str {
+        match self {
+            Self::Measured { collector, .. } | Self::Unmeasured { collector, .. } => collector,
+        }
+    }
+}
+
+/// What a piece of evidence can show. There is deliberately no "level" or score.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Strength {
+    /// A program ran.
+    Execution,
+    /// A file or program existed; it does not show that it ran.
+    Presence,
+    /// Traces were removed or altered.
+    Tamper,
+    /// A machine setting that makes cheating easier.
+    Posture,
+    /// Background information for the reviewer.
+    Context,
+}
+
+impl Strength {
+    /// Stable identifier used in JSON and translation keys.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Execution => "execution",
+            Self::Presence => "presence",
+            Self::Tamper => "tamper",
+            Self::Posture => "posture",
+            Self::Context => "context",
+        }
+    }
+}
+
+/// Who is looking at the report.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Mode {
+    /// The player checking their own PC: everything is shown.
+    #[serde(rename = "self")]
+    SelfCheck,
+    /// Screenshare with staff: consent first, only matches, redacted paths.
+    Ss,
+}
+
+/// The result of one rule.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "state", rename_all = "snake_case")]
+pub enum EvidenceState {
+    /// The rule matched; the matching observations are attached.
+    Found {
+        /// Observations that matched the rule.
+        observations: Vec<Observation>,
+    },
+    /// The collector looked and nothing matched.
+    NotFound {
+        /// How far back the source can see, in words for the user.
+        retention: String,
+    },
+    /// The collector could not look.
+    Unmeasured {
+        /// Why it could not look.
+        reason: UnmeasuredReason,
+        /// Whether the rule named this reason in its `unmeasured_when`.
+        ///
+        /// A rule author who writes "PCA does not exist on Windows 10" into the rule has said that
+        /// this outcome carries no information on such a machine; a reason they did not name means
+        /// something they did not anticipate stopped the measurement, which is the only unmeasured
+        /// result worth listing to a reviewer (ADR 0027).
+        ///
+        /// Additive like `own_traces` and `unmatched`, and [`REPORT_SCHEMA_VERSION`] stays at 1: a
+        /// report written before the field existed reads back `false`, which lists it — the same
+        /// behaviour that report had.
+        #[serde(default)]
+        expected: bool,
+    },
+}
+
+/// Evidence for one rule.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Evidence {
+    /// Id of the rule (`UUIDv4`).
+    pub rule_id: String,
+    /// Collector the rule reads.
+    pub collector: String,
+    /// What this evidence can show.
+    pub strength: Strength,
+    /// Found, `NotFound` or Unmeasured.
+    #[serde(flatten)]
+    pub state: EvidenceState,
+}
+
+/// When the running Windows kernel started counting, for reading the times in a report against it
+/// (ADR 0039).
+///
+/// Context, never evidence: no rule reads it and nothing is concluded from it. It is not when a person
+/// last turned the PC on — a "Shut down" with Fast Startup, which is Windows' default, hibernates the
+/// kernel rather than ending it, and sleep and hibernation do not start the count again — so a start
+/// days before the scan is the ordinary state of a PC that is shut down every night.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "state", rename_all = "snake_case")]
+pub enum BootTime {
+    /// Windows answered.
+    Measured {
+        /// The scan's own clock minus the time since the start, UTC, RFC 3339, to the second.
+        ///
+        /// Expressed on the clock the scan read, so a clock that was changed after the start moves
+        /// this value and not [`BootTime::Measured::seconds_since_boot`]; a record written before such
+        /// a change carries a time on the old clock.
+        booted_at: String,
+        /// Whole seconds Windows counted between its start and the scan, sleep and hibernation
+        /// included. What was measured; `booted_at` is derived from it.
+        seconds_since_boot: u64,
+    },
+    /// Windows was not asked or did not answer. Never a guessed time.
+    Unmeasured {
+        /// Why there is no value.
+        reason: UnmeasuredReason,
+    },
+}
+
+impl Default for BootTime {
+    /// What a report written before this field existed reads back as: nothing was tried, which is
+    /// what that report did (ADR 0030, ADR 0039).
+    fn default() -> Self {
+        Self::Unmeasured {
+            reason: UnmeasuredReason::NotAttempted,
+        }
+    }
+}
+
+impl BootTime {
+    /// The start `since_boot` before `generated_at`, the scan's own RFC 3339 time.
+    ///
+    /// A `generated_at` that does not parse, or a count that reaches back before the clock can go, is
+    /// `read_failed` rather than a time this program made up.
+    pub fn from_elapsed(generated_at: &str, since_boot: std::time::Duration) -> Self {
+        let read_failed = Self::Unmeasured {
+            reason: UnmeasuredReason::ReadFailed,
+        };
+        let Ok(now) = generated_at.parse::<jiff::Timestamp>() else {
+            return read_failed;
+        };
+        let seconds = since_boot.as_secs();
+        let Ok(signed) = i64::try_from(seconds) else {
+            return read_failed;
+        };
+        // Truncated to the second on both sides: `GetTickCount64` moves in steps of 10 to 16 ms, and
+        // a fraction of a second here would claim a precision the reading does not have.
+        let Ok(now) = jiff::Timestamp::from_second(now.as_second()) else {
+            return read_failed;
+        };
+        let Ok(booted_at) = now.checked_sub(jiff::SignedDuration::from_secs(signed)) else {
+            return read_failed;
+        };
+        Self::Measured {
+            booted_at: booted_at.to_string(),
+            seconds_since_boot: seconds,
+        }
+    }
+}
+
+/// Facts about the scan itself.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReportHeader {
+    /// Report format version, see [`REPORT_SCHEMA_VERSION`].
+    pub schema_version: u32,
+    /// Who built this binary and from what.
+    pub provenance: Provenance,
+    /// The embedded rules bundle.
+    pub rules_bundle: BundleInfo,
+    /// `windows` or `other`.
+    pub platform: String,
+    /// Windows build number, when known.
+    pub os_build: Option<String>,
+    /// Whether the scan ran with administrator rights, when known.
+    pub elevated: Option<bool>,
+    /// When the scan ran, UTC, RFC 3339.
+    pub generated_at: String,
+    /// When the running Windows kernel started counting (ADR 0039). Additive, and
+    /// [`REPORT_SCHEMA_VERSION`] stays at 1: a report written before it existed reads back
+    /// `unmeasured` / `not_attempted`.
+    #[serde(default)]
+    pub boot_time: BootTime,
+    /// The machine's `ProfilesDirectory`, expanded, when the scan could read it (ADR 0049). It is
+    /// what SS-mode redaction treats as a profile root besides the fixed ones, and nothing else reads
+    /// it; the SS view drops it. Additive, and [`REPORT_SCHEMA_VERSION`] stays at 1.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub profiles_directory: Option<String>,
+    /// Which scan the player chose before it started (ADR 0052). Additive, and
+    /// [`REPORT_SCHEMA_VERSION`] stays at 1: a report written before it existed was a standard scan.
+    #[serde(default)]
+    pub scan_tier: ScanTier,
+    /// Dated facts about when parts of this PC were set up, each with what ordinarily resets it
+    /// (ADR 0061). In the header rather than in an observation so that no rule can read one: a rule on
+    /// "the PC is new" would be a verdict about an innocent fact. UTC dates, never times. Additive, and
+    /// [`REPORT_SCHEMA_VERSION`] stays at 1: a report written before it existed reads back with none.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub anchors: Vec<Anchor>,
+}
+
+/// One anchor: a dated fact about when part of this PC was set up (ADR 0061).
+///
+/// There is no single machine age and the report does not compute one: every anchor has an ordinary
+/// reset, and on the one PC measured they disagreed by seven years. Each is shown with what it is and
+/// what resets it, and a reviewer compares them.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Anchor {
+    /// Which fact this is.
+    pub anchor: AnchorKind,
+    /// Its date, or why there is none.
+    #[serde(flatten)]
+    pub state: AnchorState,
+}
+
+/// The anchors a scan reads (ADR 0061, owner decision 5), in the order a view shows them.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AnchorKind {
+    /// `InstallDate` under `HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion`: when this
+    /// installation was installed **or last upgraded to a new feature version**. Never "installed on".
+    InstallDate,
+    /// The earliest `InstallDate` among the `Source OS (Updated on …)` subkeys Windows Setup keeps
+    /// under `HKLM\SYSTEM\Setup`, and how many there are. Not documented by Microsoft.
+    SetupEarliestInstall,
+    /// The date the system drive's change journal identifier gives when read as a `FILETIME`: the
+    /// identifier read as a time, which is not documented (ADR 0047 amendment). Administrators only.
+    UsnJournalCreated,
+    /// The system drive root's own creation date.
+    SystemDriveRootCreated,
+    /// `$Recycle.Bin`'s creation date, at the root of the system drive.
+    RecycleBinCreated,
+    /// `FiveM` for GTA V Legacy's program folder, `%LOCALAPPDATA%\FiveM`, created on this account.
+    FivemLegacyProgramFolderCreated,
+    /// Legacy's `FiveM.app` folder inside it.
+    FivemLegacyAppFolderCreated,
+    /// `FiveM` for GTA V Enhanced's program folder, `%LOCALAPPDATA%\FiveM for GTAV Enhanced`.
+    FivemEnhancedProgramFolderCreated,
+}
+
+impl AnchorKind {
+    /// Stable identifier used in JSON and translation keys.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::InstallDate => "install_date",
+            Self::SetupEarliestInstall => "setup_earliest_install",
+            Self::UsnJournalCreated => "usn_journal_created",
+            Self::SystemDriveRootCreated => "system_drive_root_created",
+            Self::RecycleBinCreated => "recycle_bin_created",
+            Self::FivemLegacyProgramFolderCreated => "fivem_legacy_program_folder_created",
+            Self::FivemLegacyAppFolderCreated => "fivem_legacy_app_folder_created",
+            Self::FivemEnhancedProgramFolderCreated => "fivem_enhanced_program_folder_created",
+        }
+    }
+}
+
+/// An anchor's date, or why there is none.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "state", rename_all = "snake_case")]
+pub enum AnchorState {
+    /// Read.
+    Measured {
+        /// The UTC date, `YYYY-MM-DD`. A date and never a time: a value to the second is the same in
+        /// every report of one PC and would let two be matched (ADR 0061, owner decision 4).
+        on: String,
+        /// What was read, as a fixed spelling with no user name in it: a registry value, or a path
+        /// with its environment variable unexpanded.
+        source: String,
+        /// For [`AnchorKind::SetupEarliestInstall`], how many earlier installations Windows Setup kept.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        kept: Option<u32>,
+    },
+    /// Not read. Never a guessed date.
+    Unmeasured {
+        /// Why.
+        reason: UnmeasuredReason,
+    },
+}
+
+/// How much a scan reads, chosen before it starts (ADR 0052).
+#[derive(
+    Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum ScanTier {
+    /// The ordinary scan. Every collector whose tier is `full` is `not_consented`.
+    #[default]
+    Standard,
+    /// The standard scan and the sources the player agreed to at its start.
+    Full,
+}
+
+impl ScanTier {
+    /// Stable identifier used in JSON.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Standard => "standard",
+            Self::Full => "full",
+        }
+    }
+}
+
+/// A kind of value SS mode hides even after a full scan, each behind its own answer (ADR 0052).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SensitiveKind {
+    /// A value that identifies a game server: an endpoint, a server cache folder's name.
+    ServerIdentity,
+    /// A value that identifies an account.
+    AccountIdentifier,
+    /// The host a PowerShell command downloaded from (ADR 0064): one name the player may not want shown.
+    DownloadHost,
+}
+
+impl SensitiveKind {
+    /// Stable identifier used in JSON.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::ServerIdentity => "server_identity",
+            Self::AccountIdentifier => "account_identifier",
+            Self::DownloadHost => "download_host",
+        }
+    }
+}
+
+/// One observation that describes aeterna-rongroi itself rather than the machine it scanned.
+///
+/// The program's own process is running while it scans, so a collector that enumerates the machine
+/// sees it. Keeping it in its own bucket shows the reader what the tool did without presenting it as
+/// evidence about the PC; dropping it silently would hide that (ADR 0010).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct OwnTraceEntry {
+    /// Id of the collector that saw it.
+    pub collector: String,
+    /// The observation, as that collector reported it.
+    pub observation: Observation,
+}
+
+/// Observations of one collector that no rule matched.
+///
+/// A collector reads the machine whether or not a rule asks about what it finds, and an observation
+/// reaches [`Evidence`] only inside [`EvidenceState::Found`]. Without this bucket, everything a
+/// collector saw that no rule matched would be read and then discarded (ADR 0014).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct UnmatchedGroup {
+    /// Id of the collector that saw them.
+    pub collector: String,
+    /// The observations, as that collector reported them.
+    pub observations: Vec<Observation>,
+}
+
+/// Observations of one collector that one timeline selector matched (ADR 0051).
+///
+/// Not evidence: no state, no strength, no count. The same observations stay in
+/// [`Report::unmatched`] when no rule matched them, so what an SS view counts does not change.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TimelineSelection {
+    /// Id of the timeline selector (`UUIDv4`), for its text.
+    pub selector_id: String,
+    /// Id of the collector that saw them.
+    pub collector: String,
+    /// The observations, as that collector reported them.
+    pub observations: Vec<Observation>,
+}
+
+/// The two fields of a collector's observations that bound what the source could see (ADR 0051).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CoverageFields {
+    /// The field holding the oldest time the source still holds.
+    pub from: String,
+    /// The field holding the newest.
+    pub to: String,
+    /// The discriminator value of the one observation that describes the whole source, when the
+    /// collector's other observations carry the same two fields about something narrower: `usn`'s
+    /// `journal`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub place: Option<String>,
+}
+
+/// A collector, or one of the places it reads, whose times could not be read (ADR 0051).
+///
+/// The timeline shows the reason where a coverage band or the entries would be, so an absent entry
+/// is never read as "nothing happened". A scope reason — `not_admin` — is one of these too: it is
+/// the one place the `usn` collector's `not_admin` reaches a reviewer while no rule reads `usn`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct UnmeasuredSource {
+    /// Id of the collector.
+    pub collector: String,
+    /// The discriminator value of the place, when only that place could not be read.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub place: Option<String>,
+    /// Why.
+    pub reason: UnmeasuredReason,
+}
+
+/// How a collector's observations say how far back its source reaches (ADR 0061), as `scan::run`
+/// copies it from `Collector::age`. The core never guesses which field is a source's oldest time.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AgeFields {
+    /// The timestamp fields whose minimum over a row's observations is the oldest time it holds.
+    pub oldest: Vec<String>,
+    /// How much a row holds.
+    pub count: AgeCount,
+    /// What one row is.
+    pub rows: AgeRows,
+    /// For [`AgeRows::PerPlace`], the discriminator values that each get a row, in order; the other
+    /// places are not a source of their own. Empty: every place observed.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub places: Vec<String>,
+    /// Fields shown beside a row and never compared: a log's size and maximum, a journal's size.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub extra: Vec<String>,
+    /// For [`AgeRows::PerValue`], the values listed first, each a row; the rest are folded into one
+    /// line (ADR 0061, owner decision 3). Filled from the bundle: for `evtx`, the logs its rules and
+    /// timeline selectors read.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub first: Vec<String>,
+    /// A place whose row is read differently from the rest: `fivem_dir`'s Enhanced server cache,
+    /// counted in server folders.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub by_place: Vec<AgePlace>,
+}
+
+/// How much a trace-age row holds (ADR 0061).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum AgeCount {
+    /// The row's observations that carry one of its oldest fields.
+    Observations,
+    /// The sum of one number field over the row's observations.
+    Field {
+        /// The field.
+        field: String,
+    },
+}
+
+/// What one trace-age row is (ADR 0061).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum AgeRows {
+    /// One row for the collector.
+    One,
+    /// One row per value of the collector's discriminator.
+    PerPlace,
+    /// One row per value of a field: `evtx`'s `log`.
+    PerValue {
+        /// The field.
+        field: String,
+    },
+}
+
+/// One place whose trace-age row is read differently from its collector's other places (ADR 0061).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AgePlace {
+    /// The discriminator value.
+    pub place: String,
+    /// The oldest fields for this place.
+    pub oldest: Vec<String>,
+    /// How much it holds.
+    pub count: AgeCount,
+    /// Only the place's observations that do not carry this field count: a server folder rather
+    /// than the folder that holds it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub without: Option<String>,
+}
+
+/// A full scan result, before a view decides what to show.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Report {
+    /// Facts about the scan.
+    pub header: ReportHeader,
+    /// One entry per active rule.
+    pub evidence: Vec<Evidence>,
+    /// What this program itself left in what the collectors saw. Added to the format without a
+    /// [`REPORT_SCHEMA_VERSION`] change: a report written before it existed reads back with none.
+    #[serde(default)]
+    pub own_traces: Vec<OwnTraceEntry>,
+    /// Unmatched observations: what the collectors saw that no rule matched, grouped by collector.
+    /// Additive like `own_traces`, and for the same reason: a report written before it existed
+    /// reads back with none, which is what it meant (ADR 0014).
+    #[serde(default)]
+    pub unmatched: Vec<UnmatchedGroup>,
+    /// What each timeline selector matched (ADR 0051). Additive, and [`REPORT_SCHEMA_VERSION`] stays
+    /// at 1: a report written before it existed reads back with none.
+    #[serde(default)]
+    pub timeline_selections: Vec<TimelineSelection>,
+    /// For each collector, the fields its `fields()` declares as timestamps (ADR 0051). The core
+    /// never guesses a time from a value's shape, so a report written before this field existed
+    /// reads back with none and shows no timeline entries.
+    #[serde(default)]
+    pub timestamp_fields: BTreeMap<String, Vec<String>>,
+    /// For each collector that declares one, its discriminator (ADR 0044): which field names the
+    /// place an observation is about, for the timeline to show beside a time. Additive.
+    #[serde(default)]
+    pub discriminators: BTreeMap<String, String>,
+    /// For each collector that has them, the fields that bound what its source could see
+    /// (ADR 0051). Additive.
+    #[serde(default)]
+    pub coverage_fields: BTreeMap<String, CoverageFields>,
+    /// Collectors, or places, that declare timestamp fields and could not read them (ADR 0051).
+    /// Additive.
+    #[serde(default)]
+    pub unmeasured_sources: Vec<UnmeasuredSource>,
+    /// For each collector that declares one, the fields SS mode hides and the kind of each
+    /// (ADR 0052). Copied from the collectors' declarations, which the core cannot see. Additive.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub sensitive_fields: BTreeMap<String, BTreeMap<String, SensitiveKind>>,
+    /// For each collector that declares one, how its observations say how far back its source reaches
+    /// (ADR 0061). Additive, and [`REPORT_SCHEMA_VERSION`] stays at 1.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub age_fields: BTreeMap<String, AgeFields>,
+    /// The ids of every timeline selector the bundle held, by collector, whether or not it selected
+    /// anything (ADR 0061): "selected nothing" can be said only of a selector that was there. Additive.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub timeline_selectors: BTreeMap<String, Vec<String>>,
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use super::*;
+
+    /// One day, two hours, three minutes and four seconds before the scan, and the fraction of a
+    /// second on each side dropped rather than rounded into a precision the counter does not have.
+    #[test]
+    fn the_boot_time_is_the_scan_time_minus_the_count() {
+        assert_eq!(
+            BootTime::from_elapsed("2026-01-01T00:00:00Z", Duration::from_millis(93_784_999)),
+            BootTime::Measured {
+                booted_at: "2025-12-30T21:56:56Z".to_owned(),
+                seconds_since_boot: 93_784,
+            }
+        );
+        assert_eq!(
+            BootTime::from_elapsed("2026-09-13T10:27:03.3128928Z", Duration::from_secs(32_571)),
+            BootTime::Measured {
+                booted_at: "2026-09-13T01:24:12Z".to_owned(),
+                seconds_since_boot: 32_571,
+            }
+        );
+    }
+
+    /// A machine that has only just started is an answer, not a missing value.
+    #[test]
+    fn zero_seconds_since_boot_is_the_scan_time_itself() {
+        assert_eq!(
+            BootTime::from_elapsed("2026-01-01T00:00:00Z", Duration::ZERO),
+            BootTime::Measured {
+                booted_at: "2026-01-01T00:00:00Z".to_owned(),
+                seconds_since_boot: 0,
+            }
+        );
+    }
+
+    /// Neither case can come from a real scan; both would otherwise need a time to be invented.
+    #[test]
+    fn a_time_that_cannot_be_computed_is_read_failed_not_a_guess() {
+        let read_failed = BootTime::Unmeasured {
+            reason: UnmeasuredReason::ReadFailed,
+        };
+        assert_eq!(
+            BootTime::from_elapsed("not a time", Duration::from_secs(1)),
+            read_failed
+        );
+        assert_eq!(
+            BootTime::from_elapsed("2026-01-01T00:00:00Z", Duration::from_secs(u64::MAX)),
+            read_failed
+        );
+        assert_eq!(
+            BootTime::from_elapsed(
+                "2026-01-01T00:00:00Z",
+                Duration::from_hours(1_000_000 * 365 * 24)
+            ),
+            read_failed
+        );
+    }
+
+    /// The header shape both front ends read, and the shape a report from before ADR 0039 reads
+    /// back as.
+    #[test]
+    fn the_boot_time_serialises_as_a_tagged_state() {
+        let measured = BootTime::from_elapsed("2026-01-01T00:00:00Z", Duration::from_mins(1));
+        assert_eq!(
+            serde_json::to_value(&measured).unwrap(),
+            serde_json::json!({
+                "state": "measured",
+                "booted_at": "2025-12-31T23:59:00Z",
+                "seconds_since_boot": 60
+            })
+        );
+        let unmeasured = BootTime::Unmeasured {
+            reason: UnmeasuredReason::NotWindows,
+        };
+        assert_eq!(
+            serde_json::to_value(&unmeasured).unwrap(),
+            serde_json::json!({ "state": "unmeasured", "reason": "not_windows" })
+        );
+        assert_eq!(
+            BootTime::default(),
+            BootTime::Unmeasured {
+                reason: UnmeasuredReason::NotAttempted
+            }
+        );
+    }
+}

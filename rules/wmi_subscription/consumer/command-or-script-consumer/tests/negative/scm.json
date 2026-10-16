@@ -1,0 +1,14 @@
+{
+  "description": "Synthetic negative case for wmi_subscription/consumer/command-or-script-consumer: scm.",
+  "observations": [
+    {
+      "collector": "wmi_subscription",
+      "fields": {
+        "scope": "consumer",
+        "consumer_kind": "event_log",
+        "name": "SCM Event Log Consumer",
+        "known_default": true
+      }
+    }
+  ]
+}

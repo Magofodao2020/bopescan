@@ -1,0 +1,13 @@
+{
+  "description": "Synthetic negative case for roblox/client-settings/client-settings-present: empty.",
+  "observations": [
+    {
+      "collector": "roblox",
+      "fields": {
+        "location": "client_settings",
+        "path": "C:\\Users\\fixtureuser\\AppData\\Local\\Roblox\\Versions\\version-0123456789abcdef\\ClientSettings\\ClientAppSettings.json",
+        "flag_count": 0
+      }
+    }
+  ]
+}

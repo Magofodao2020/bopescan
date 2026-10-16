@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: 59259bcb-c00a-46fa-897d-40b4ef75ea99
+title: "NTFS times of Master File Table records named like Roblox tools"
+description: >-
+  Puts on the timeline the creation and last-write times NTFS keeps in Master File Table records whose
+  names match the Roblox tool catalog, in use or freed.
+status: experimental
+role: timeline
+collector: mft
+strength: context
+match:
+  scope: "entry"
+  "tool_id|exists": true
+retention: >-
+  A freed record lasts until NTFS reuses it.
+falsepositives:
+  - "These times can be set by programs that copy or extract files; a name does not identify a program"
+author: B.O.P.E Scanner contributors
+date: 2026-10-15
+tags: [timeline, roblox]
+category: files

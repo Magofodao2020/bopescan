@@ -1,0 +1,108 @@
+version = 1
+# B.O.P.E Scanner is a modified version of aeterna-rongroi (https://github.com/aeterna/aeterna-rongroi);
+# NOTICE section 7 asks that the upstream name not identify it.
+SPDX-PackageName = "bope-scanner"
+SPDX-PackageSupplier = "B.O.P.E Scanner contributors"
+SPDX-PackageDownloadLocation = "NOASSERTION"
+
+# Files that cannot carry a comment header, or where a header would be noise.
+# Source files (.rs, .ts, .tsx, rule .yaml, workflows) carry inline SPDX headers instead.
+
+[[annotations]]
+path = [
+  "**/*.md",
+  "NOTICE",
+  ".gitignore",
+  "**/*.json",
+  "**/*.snap",
+  "Cargo.lock",
+  "fuzz/Cargo.lock",
+  # Artifact bytes: a BAM registry value or a PCA text file is the artifact and nothing else, so it
+  # cannot carry a header. What they are and where they came from is in fixtures/parsers/PROVENANCE.md.
+  "fixtures/parsers/**",
+  "pnpm-lock.yaml",
+  "apps/desktop/pnpm-lock.yaml",
+  "apps/desktop/pnpm-workspace.yaml",
+  "apps/desktop/src-tauri/icons/**",
+  # B.O.P.E: the badge the project uses as its visual identity, provided by the project's owner.
+  "apps/desktop/src/assets/bope-logo.png",
+  # Screenshots of the interface over synthetic data only (docs/bope/capturas/LEIA-ME.md).
+  "docs/bope/capturas/*.png",
+]
+precedence = "closest"
+SPDX-FileCopyrightText = ["2026 aeterna-rongroi contributors", "2026 B.O.P.E Scanner contributors"]
+SPDX-License-Identifier = "GPL-3.0-or-later"
+
+# Vendored Prefetch test corpus: binary files that cannot carry a header, under their own licence.
+# Source, commit and per-file detail are in fixtures/prefetch/PROVENANCE.md.
+[[annotations]]
+path = ["fixtures/prefetch/*.pf"]
+precedence = "override"
+SPDX-FileCopyrightText = "2016 Eric Zimmerman"
+SPDX-License-Identifier = "MIT"
+
+# Vendored EVTX test corpus: the evtx crate's own samples, dual MIT/Apache-2.0 upstream, taken here
+# under Apache-2.0. Source, commit, per-file detail and what each file was scanned for are in
+# fixtures/evtx/PROVENANCE.md.
+[[annotations]]
+path = ["fixtures/evtx/*.evtx"]
+precedence = "override"
+SPDX-FileCopyrightText = "2019 Omer Ben-Amram"
+SPDX-License-Identifier = "Apache-2.0"
+
+# Vendored `evtx` crate source (ADR 0018): upstream's own files, carrying one patch of ours. They keep
+# upstream's licence and copyright rather than this project's — a file here is Omer Ben-Amram's work,
+# not ours, and relicensing it by annotation would be a false claim. What was removed and how to verify
+# the rest against the published crate is in third_party/evtx/PROVENANCE.md.
+[[annotations]]
+path = ["third_party/evtx/**"]
+precedence = "override"
+SPDX-FileCopyrightText = "2019 Omer Ben-Amram"
+SPDX-License-Identifier = "MIT OR Apache-2.0"
+
+# The rule reference pages are rule text rendered by `cargo xtask rules-reference`, so they carry the
+# rules' licence rather than the documentation's.
+[[annotations]]
+path = ["docs/rules-reference.md", "docs/rules-reference.th.md"]
+precedence = "override"
+SPDX-FileCopyrightText = "2026 aeterna-rongroi contributors"
+SPDX-License-Identifier = "CC-BY-SA-4.0"
+
+[[annotations]]
+path = ["rules/**/tests/**", "rules/**/*.md"]
+precedence = "override"
+SPDX-FileCopyrightText = "2026 aeterna-rongroi contributors"
+SPDX-License-Identifier = "CC-BY-SA-4.0"
+
+# LOLDrivers' vulnerable-driver hashes (ADR 0048): data taken from magicsword-io/LOLDrivers under its
+# licence, not this project's. The rule beside it stays CC-BY-SA-4.0. Source, commit, filter and how to
+# rebuild it are in the PROVENANCE.md beside it.
+[[annotations]]
+path = ["rules/driver_service/vulnerable-driver/loldrivers-listed/loldrivers-vulnerable-drivers.csv"]
+precedence = "override"
+SPDX-FileCopyrightText = "LOLDrivers contributors"
+SPDX-License-Identifier = "Apache-2.0"
+
+# Anuphan (Cadson Demak), the typeface of the desktop window and the landing page, converted to WOFF2
+# from the variable TTF of release 3.002 without changing its glyphs. It keeps its own licence.
+[[annotations]]
+path = ["apps/desktop/src/assets/fonts/Anuphan-Variable.woff2", "site/fonts/Anuphan-Variable.woff2"]
+precedence = "override"
+SPDX-FileCopyrightText = "2019 The Anuphan Project Authors (https://github.com/cadsondemak/Anuphan)"
+SPDX-License-Identifier = "OFL-1.1"
+
+# Mali (Cadson Demak), the rounded typeface of headings and buttons in the desktop window and on the
+# landing page: the WOFF2 files of github.com/cadsondemak/Mali at commit 7e11de1, unchanged.
+[[annotations]]
+path = ["apps/desktop/src/assets/fonts/Mali-*.woff2", "site/fonts/Mali-*.woff2"]
+precedence = "override"
+SPDX-FileCopyrightText = "2018 The Mali Project Authors (https://github.com/cadsondemak/Mali)"
+SPDX-License-Identifier = "OFL-1.1"
+
+# B.O.P.E 0.10.0 synthetic binary fixtures (an ESE database and an NTFS volume image), written by
+# `cargo run -p bope-parsers --example synthetic_fixtures`; see fixtures/hosts/PROVENANCE.md.
+[[annotations]]
+path = ["fixtures/hosts/*/SRUDB.dat", "fixtures/hosts/*/volume-c.img"]
+precedence = "override"
+SPDX-FileCopyrightText = "2026 B.O.P.E Scanner contributors"
+SPDX-License-Identifier = "GPL-3.0-or-later"

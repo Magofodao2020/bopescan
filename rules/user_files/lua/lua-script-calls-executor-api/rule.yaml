@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: 0c4c4fb6-5563-4bb7-89dc-42c73ca13347
+title: "A Lua script in Downloads, Desktop or Documents calls executor-only functions"
+description: >-
+  A .lua or .luau file in Downloads, Desktop or Documents calls two or more functions that exist
+  only in third-party Roblox script executors. Ordinary Roblox game code and Roblox Studio projects
+  cannot call them. Only which functions appear is kept. It does not show the script ran.
+status: experimental
+collector: user_files
+strength: presence
+match:
+  kind: "lua_script"
+  "distinct_markers|gte": 2
+retention: >-
+  The files as they are at scan time, one level below each folder.
+unmeasured_when: [not_windows]
+falsepositives:
+  - "Scripts downloaded and never used"
+  - "Anti-cheat researchers' samples"
+references:
+  - https://github.com/unified-naming-convention/NamingStandard
+author: B.O.P.E Scanner contributors
+date: 2026-10-15
+tags: [roblox, script]
+level: flag
+category: roblox

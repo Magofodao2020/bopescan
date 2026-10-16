@@ -1,0 +1,12 @@
+{
+  "description": "Synthetic negative case for net_adapter/proxy/proxy-variable-set: unset.",
+  "observations": [
+    {
+      "collector": "net_adapter",
+      "fields": {
+        "place": "winhttp_proxy",
+        "set": false
+      }
+    }
+  ]
+}

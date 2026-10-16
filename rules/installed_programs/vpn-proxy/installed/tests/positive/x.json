@@ -1,0 +1,15 @@
+{
+  "description": "Synthetic positive case for installed_programs/vpn-proxy/installed: x.",
+  "observations": [
+    {
+      "collector": "installed_programs",
+      "fields": {
+        "hive": "hklm",
+        "uninstall_key": "X",
+        "name": "X",
+        "category": "vpn_proxy"
+      }
+    }
+  ],
+  "expect_matches": 1
+}

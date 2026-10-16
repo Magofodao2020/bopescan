@@ -1,0 +1,14 @@
+{
+  "description": "Synthetic negative case for executor_footprint/layout/executor-folder-layout: named-only.",
+  "observations": [
+    {
+      "collector": "executor_footprint",
+      "fields": {
+        "scope": "named_folder",
+        "name": "Solara",
+        "path": "C:\\Users\\fixtureuser\\Downloads\\Solara",
+        "location_kind": "user_downloads"
+      }
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "description": "Synthetic positive case for feature_usage/timeline/executor-like-name: name.",
+  "observations": [
+    {
+      "collector": "feature_usage",
+      "fields": {
+        "path": "C:\\Users\\fixtureuser\\Downloads\\Solara\\SolaraBootstrapper.exe",
+        "name": "SolaraBootstrapper.exe",
+        "location_kind": "user_downloads"
+      }
+    }
+  ],
+  "expect_matches": 1
+}

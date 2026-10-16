@@ -1,0 +1,16 @@
+{
+  "description": "Synthetic negative case for user_files/automation/macro-script-present: py.",
+  "observations": [
+    {
+      "collector": "user_files",
+      "fields": {
+        "kind": "automation_script",
+        "folder": "documents",
+        "name": "hw.py",
+        "path": "C:\\Users\\fixtureuser\\Documents\\hw.py",
+        "location_kind": "user_documents",
+        "extension": "py"
+      }
+    }
+  ]
+}

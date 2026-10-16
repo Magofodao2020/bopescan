@@ -1,0 +1,17 @@
+{
+  "description": "Synthetic positive case for shellbags/shellbag/executor-named-folder-viewed: fluxus.",
+  "observations": [
+    {
+      "collector": "shellbags",
+      "fields": {
+        "list": "shellbag",
+        "path": "C:\\Users\\fixtureuser\\Downloads\\Fluxus",
+        "name": "Fluxus",
+        "tool_id": "fluxus",
+        "tool_kind": "executor",
+        "match_kind": "known_tool"
+      }
+    }
+  ],
+  "expect_matches": 1
+}

@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: 1569d65c-db37-4f1f-a668-e2e459315d98
+title: "A program in Temp or the Recycle Bin: Explorer counted a start"
+description: >-
+  For a file in a Temp folder or the Recycle Bin, Explorer counted a start. Programs rarely run from
+  the Recycle Bin, and loaders often unpack to Temp before running; installers and updaters also run
+  from Temp. Context for the timeline, never a finding on its own.
+status: experimental
+collector: userassist
+strength: execution
+match:
+  location_kind: ["temp", "recycle_bin"]
+retention: >-
+  Entries since the account was created or since a cleaner removed them; nothing is written when
+  "Track app launches" is off.
+unmeasured_when: [not_windows, source_absent]
+falsepositives:
+  - "Installers, updaters and self-extracting archives, which unpack to Temp and run from there"
+author: B.O.P.E Scanner contributors
+date: 2026-10-15
+tags: [execution]
+level: info

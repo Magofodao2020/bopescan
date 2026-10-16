@@ -1,0 +1,19 @@
+{
+  "description": "Synthetic positive case for wmi_subscription/consumer/roblox-tool-in-consumer: krnl.",
+  "observations": [
+    {
+      "collector": "wmi_subscription",
+      "fields": {
+        "scope": "consumer",
+        "consumer_kind": "active_script",
+        "name": "Js",
+        "known_default": false,
+        "mentioned": "krnl.exe",
+        "tool_id": "krnl",
+        "tool_kind": "executor",
+        "match_kind": "known_tool"
+      }
+    }
+  ],
+  "expect_matches": 1
+}

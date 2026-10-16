@@ -1,0 +1,15 @@
+{
+  "description": "Synthetic positive case for installed_programs/memory-tool/installed: x.",
+  "observations": [
+    {
+      "collector": "installed_programs",
+      "fields": {
+        "hive": "hklm",
+        "uninstall_key": "X",
+        "name": "X",
+        "category": "memory_tool"
+      }
+    }
+  ],
+  "expect_matches": 1
+}

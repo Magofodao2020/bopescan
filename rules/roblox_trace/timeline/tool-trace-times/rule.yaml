@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: 6bf3e51e-b16d-4d6e-a208-00be42ff698d
+title: "Times of Roblox tool traces"
+description: >-
+  Puts on the timeline every time a source recorded for a trace of a Roblox tool seen in a Roblox
+  context: when a program ran, an entry was written, a file was deleted or a shortcut saved.
+status: experimental
+role: timeline
+collector: roblox_trace
+strength: context
+match:
+  scope: "hit"
+  roblox_context: true
+  "time|exists": true
+retention: >-
+  Whatever each source still holds.
+falsepositives:
+  - "A time close to another does not show cause"
+author: B.O.P.E Scanner contributors
+date: 2026-10-15
+tags: [timeline, roblox]
+category: roblox_tools

@@ -1,0 +1,32 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: e3f5c638-81e3-410a-9f1d-fe762b9f8731
+title: "SRUM recorded CPU time for a program named like a Roblox executor or injector"
+description: >-
+  The System Resource Usage Monitor database (SRUDB.dat, read from an existing shadow copy) holds
+  rows saying that a program whose file name matches a Roblox executor or injector used CPU time, with
+  the first and last hour it was recorded. SRUM writes about once an hour, so the times are hours, not
+  starts. A name is not proof of what the program was, and the database misses whatever SRUM had not
+  written yet when the shadow copy was taken.
+status: experimental
+collector: srum
+strength: execution
+match:
+  scope: "app"
+  used_cpu: true
+  tool_kind: ["executor", "injector"]
+retention: >-
+  SRUM keeps about 30 to 60 days of hourly rows; a shadow copy is as old as the snapshot, and nothing
+  after it is in the copy.
+unmeasured_when: [not_admin, source_absent]
+falsepositives:
+  - "An unrelated program that happens to carry the same file name, such as a game or utility called Solara or Wave"
+  - "A file renamed to a tool's name by someone testing this scanner"
+references:
+  - "https://learn.microsoft.com/en-us/windows/win32/w8cookbook/system-resource-usage-monitor"
+author: B.O.P.E Scanner contributors
+date: 2026-10-15
+tags: [roblox, srum]
+level: warn
+category: execution

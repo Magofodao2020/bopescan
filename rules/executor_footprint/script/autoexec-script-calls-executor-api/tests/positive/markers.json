@@ -1,0 +1,18 @@
+{
+  "description": "Synthetic positive case for executor_footprint/script/autoexec-script-calls-executor-api: markers.",
+  "observations": [
+    {
+      "collector": "executor_footprint",
+      "fields": {
+        "scope": "autoexec_script",
+        "name": "esp.lua",
+        "path": "C:\\Users\\fixtureuser\\Downloads\\tool\\autoexec\\esp.lua",
+        "location_kind": "user_downloads",
+        "distinct_markers": 4,
+        "markers": "getgenv, getrawmetatable, hookfunction, setreadonly",
+        "remote_loadstring": false
+      }
+    }
+  ],
+  "expect_matches": 1
+}

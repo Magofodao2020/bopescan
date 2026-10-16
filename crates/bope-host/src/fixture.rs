@@ -1,0 +1,3360 @@
+// SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+
+//! A fake machine described in `fixtures/hosts/<name>/host.yaml`. See `fixtures/hosts/PROVENANCE.md`.
+
+use std::collections::{BTreeMap, BTreeSet};
+use std::path::Path;
+
+use serde::Deserialize;
+
+use crate::{
+    AccountSource, BootTimeSource, ChannelConfig, ChannelConfigReader, CodeIntegrityOptions,
+    DeviceBus, DeviceProperty, DeviceRecord, DeviceSource, DirEntryInfo, EntryTimes,
+    EnvironmentSource, EventLogConfigSource, FileId, FilesystemSource, FirmwareSecureBoot,
+    FirmwareSource, Host, IommuTable, Platform, ProcessRecord, ProcessSource, RandomReadSource,
+    RegistryData, RegistrySource, SignatureCheck, SignatureSource, SourceError,
+    SystemIntegritySource, TpmInfo, TpmSource, UsnJournalRead, UsnJournalSource, UsnJournalState,
+    UsnReadEnd, WmiObject, WmiSubscriptionClass, WmiSubscriptionSource,
+};
+
+/// Why a fixture host could not be loaded.
+#[derive(Debug, thiserror::Error)]
+pub enum FixtureError {
+    /// The file could not be read.
+    #[error("cannot read {path}: {source}")]
+    Io {
+        /// Path of the fixture file.
+        path: String,
+        /// Underlying error.
+        #[source]
+        source: std::io::Error,
+    },
+    /// The file is not a valid fixture host.
+    #[error("invalid fixture host {path}: {message}")]
+    Parse {
+        /// Path of the fixture file.
+        path: String,
+        /// Parser message.
+        message: String,
+    },
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct HostFile {
+    platform: Platform,
+    #[serde(default)]
+    os_build: Option<String>,
+    #[serde(default)]
+    elevated: Option<bool>,
+    #[serde(default)]
+    registry: BTreeMap<String, BTreeMap<String, RegistryValue>>,
+    #[serde(default)]
+    env: BTreeMap<String, String>,
+    #[serde(default)]
+    filesystem: BTreeMap<String, Vec<FixtureFile>>,
+    #[serde(default)]
+    access_denied: Vec<String>,
+    #[serde(default)]
+    code_integrity: Option<FixtureCodeIntegrity>,
+    #[serde(default)]
+    tpm: Option<FixtureTpm>,
+    #[serde(default)]
+    firmware: Option<FixtureFirmware>,
+    /// What the firmware's ACPI tables say about an IOMMU (ADR 0038, amendment of 2026-10-15). Absent
+    /// means the fixture never modelled it, which the accessor reports as `Unsupported`.
+    #[serde(default)]
+    iommu_table: Option<FixtureIommuTable>,
+    #[serde(default)]
+    processes: Option<Vec<FixtureProcess>>,
+    /// What `GetTickCount64` would answer. Absent means the fixture never modelled it, which the
+    /// accessor reports as `Unsupported` rather than inventing a value (ADR 0039).
+    #[serde(default)]
+    milliseconds_since_boot: Option<u64>,
+    #[serde(default)]
+    event_log_channels: Option<BTreeMap<String, FixtureChannel>>,
+    /// The system volume's change journal (ADR 0047). Absent means the fixture never modelled it,
+    /// which the accessors report as `Unsupported`.
+    #[serde(default)]
+    usn_journal: Option<FixtureUsnJournal>,
+    /// The SID of the account the scan runs as (ADR 0060). Absent means the fixture never modelled
+    /// it, which the accessor reports as `Unsupported`. A fixture's SID is invented, never a real one.
+    #[serde(default)]
+    account_sid: Option<String>,
+    /// The devices Windows remembers (ADR 0069). Absent means the fixture never modelled them, which
+    /// the accessor reports as `Unsupported`; an empty list is a machine with no such device.
+    #[serde(default)]
+    devices: Option<Vec<FixtureDevice>>,
+    /// The creation and last-write times of drive roots, keyed `C:` (ADR 0061). A drive root has no
+    /// parent listing to carry them, so they are written here; a drive not named here is not there.
+    #[serde(default)]
+    drive_roots: BTreeMap<String, FixtureTimes>,
+    /// Raw volume images keyed by drive letter, `C` (B.O.P.E, ADR 0124). A drive not named here is
+    /// `Unsupported`, never an empty volume.
+    #[serde(default)]
+    volumes: BTreeMap<String, FixtureVolume>,
+    /// Permanent WMI event subscription objects by namespace (B.O.P.E, ADR 0127). Absent means the
+    /// fixture never modelled WMI, which the accessor reports as `Unsupported`.
+    #[serde(default)]
+    wmi: Option<FixtureWmi>,
+    /// What the Service Control Manager reports (B.O.P.E, ADR 0130). Absent means the fixture never
+    /// modelled it, which the accessor reports as `Unsupported`.
+    #[serde(default)]
+    services: Option<FixtureServices>,
+}
+
+/// The Service Control Manager, for the fixture host (B.O.P.E, ADR 0130).
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FixtureServices {
+    /// The time every query answers with; invented, so that a snapshot does not change with the clock.
+    queried_at: String,
+    /// The manager itself refuses the account.
+    #[serde(default)]
+    access_denied: bool,
+    /// Installed services by internal name. A name not here is not installed.
+    #[serde(default)]
+    installed: BTreeMap<String, FixtureService>,
+}
+
+/// One installed service. `config` absent with `config_access_denied: false` is a configuration
+/// query that failed.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FixtureService {
+    #[serde(default)]
+    state: Option<crate::ServiceRunState>,
+    #[serde(default)]
+    pid: Option<u32>,
+    #[serde(default)]
+    config: Option<crate::ServiceConfig>,
+    /// The service itself refuses a status query.
+    #[serde(default)]
+    access_denied: bool,
+    /// The status is readable but the configuration is refused.
+    #[serde(default)]
+    config_access_denied: bool,
+}
+
+/// One raw volume image (B.O.P.E, ADR 0124): its bytes as `hex:` or `from:`, or `access_denied: true`
+/// for a volume a host without administrator rights cannot open.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FixtureVolume {
+    #[serde(default)]
+    hex: Option<String>,
+    #[serde(default)]
+    from: Option<String>,
+    #[serde(default)]
+    access_denied: bool,
+}
+
+/// What WMI holds, for the fixture host (B.O.P.E, ADR 0127).
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FixtureWmi {
+    /// Objects by namespace, as `ROOT\subscription`. A namespace not named here does not exist.
+    #[serde(default)]
+    namespaces: BTreeMap<String, Vec<WmiObject>>,
+    /// Namespaces WMI refuses to the account.
+    #[serde(default)]
+    access_denied: Vec<String>,
+}
+
+/// One device a fixture describes (ADR 0069). `id` is a device **instance** id, as `CfgMgr32` lists it,
+/// so that the fixture exercises the same reduction to a model a live host makes; a fixture's ids are
+/// invented, never read from a real PC.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FixtureDevice {
+    id: String,
+    present: bool,
+    #[serde(default)]
+    compatible_ids: Vec<String>,
+    #[serde(default)]
+    service: Option<String>,
+    #[serde(default)]
+    problem_code: Option<u32>,
+    #[serde(default)]
+    first_install: Option<String>,
+    #[serde(default)]
+    last_arrival: Option<String>,
+    #[serde(default)]
+    last_removal: Option<String>,
+    /// Properties a live host could not read for this device.
+    #[serde(default)]
+    unreadable: Vec<FixtureDeviceProperty>,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum FixtureDeviceProperty {
+    CompatibleIds,
+    Service,
+    ProblemCode,
+    FirstInstall,
+    LastArrival,
+    LastRemoval,
+}
+
+/// Turns one described device into the record a live host returns. A device whose id belongs to
+/// neither enumerator, or a problem code on an absent device, is a mistake in the fixture: a live
+/// host lists by enumerator and reads a problem code only for a present device.
+fn device_record(device: FixtureDevice, origin: &str) -> Result<DeviceRecord, FixtureError> {
+    let fail = |message: String| FixtureError::Parse {
+        path: origin.to_owned(),
+        message,
+    };
+    let id = &device.id;
+    let (bus, model_id) = [DeviceBus::Pci, DeviceBus::Hid, DeviceBus::Usb]
+        .into_iter()
+        .find_map(|bus| crate::device_model_id(bus, id).map(|model| (bus, model)))
+        .ok_or_else(|| {
+            fail(format!(
+                "device `{id}` is neither a PCI nor a HID instance id"
+            ))
+        })?;
+    if !device.present && device.problem_code.is_some() {
+        return Err(fail(format!(
+            "device `{id}` is absent but has a problem code; a live host reads one only for a present device"
+        )));
+    }
+    let class_code = match bus {
+        DeviceBus::Pci => crate::pci_class_code(&device.compatible_ids),
+        DeviceBus::Hid | DeviceBus::Usb => None,
+    };
+    Ok(DeviceRecord {
+        bus,
+        model_id,
+        class_code,
+        service: device.service,
+        problem_code: device.problem_code,
+        present: device.present,
+        first_install: listed_time_of(device.first_install.as_deref(), id, origin)?,
+        last_arrival: listed_time_of(device.last_arrival.as_deref(), id, origin)?,
+        last_removal: listed_time_of(device.last_removal.as_deref(), id, origin)?,
+        unreadable: device
+            .unreadable
+            .into_iter()
+            .map(|property| match property {
+                FixtureDeviceProperty::CompatibleIds => DeviceProperty::CompatibleIds,
+                FixtureDeviceProperty::Service => DeviceProperty::Service,
+                FixtureDeviceProperty::ProblemCode => DeviceProperty::ProblemCode,
+                FixtureDeviceProperty::FirstInstall => DeviceProperty::FirstInstall,
+                FixtureDeviceProperty::LastArrival => DeviceProperty::LastArrival,
+                FixtureDeviceProperty::LastRemoval => DeviceProperty::LastRemoval,
+            })
+            .collect(),
+    })
+}
+
+/// One entry's own times, written as a listing writes them: RFC 3339 in whole seconds (ADR 0061).
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FixtureTimes {
+    #[serde(default)]
+    created: Option<String>,
+    #[serde(default)]
+    modified: Option<String>,
+}
+
+/// What a fixture says the Event Log service states about one channel (ADR 0042). A fixture with no
+/// `event_log_channels:` block never modelled the service, which the accessor reports as
+/// `Unsupported`; a block that does not name a channel describes a service with no such channel.
+///
+/// `never_answers: true`, and nothing else, describes a service that accepts the question about this
+/// channel and never replies — the case a collector has to survive, and one no real machine can be
+/// made to produce on demand. A reader asked about it blocks for as long as the process lives.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FixtureChannel {
+    #[serde(default)]
+    log_file_path: Option<String>,
+    #[serde(default)]
+    max_size_bytes: Option<u64>,
+    #[serde(default)]
+    never_answers: bool,
+}
+
+/// One channel as the fixture's reader answers it.
+#[derive(Debug, Clone)]
+enum StoredChannel {
+    Answers(ChannelConfig),
+    NeverAnswers,
+}
+
+/// Turns what a fixture wrote for one channel into what its reader answers, refusing a channel that
+/// both answers and does not.
+fn resolve_channel(
+    name: &str,
+    described: FixtureChannel,
+    origin: &str,
+) -> Result<StoredChannel, FixtureError> {
+    match (
+        described.never_answers,
+        described.log_file_path,
+        described.max_size_bytes,
+    ) {
+        (true, None, None) => Ok(StoredChannel::NeverAnswers),
+        (false, Some(log_file_path), Some(max_size_bytes)) => {
+            Ok(StoredChannel::Answers(ChannelConfig {
+                log_file_path,
+                max_size_bytes,
+            }))
+        }
+        _ => Err(FixtureError::Parse {
+            path: origin.to_owned(),
+            message: format!(
+                "channel `{name}`: write `log_file_path` and `max_size_bytes`, or `never_answers: true` alone"
+            ),
+        }),
+    }
+}
+
+/// The reader a fixture host hands out: its channels and its denials, owned, so it can move to
+/// another thread.
+#[derive(Debug, Clone)]
+struct FixtureChannelReader {
+    channels: BTreeMap<String, StoredChannel>,
+    access_denied: Vec<String>,
+}
+
+impl ChannelConfigReader for FixtureChannelReader {
+    fn channel_config(&self, channel: &str) -> Result<Option<ChannelConfig>, SourceError> {
+        let key = channel.to_ascii_lowercase();
+        if self.access_denied.contains(&key) {
+            return Err(SourceError::AccessDenied);
+        }
+        match self.channels.get(&key) {
+            None => Ok(None),
+            Some(StoredChannel::Answers(config)) => Ok(Some(config.clone())),
+            // Blocks without spinning. `park` may return spuriously, so it is asked again; nothing
+            // ever unparks this thread on purpose.
+            Some(StoredChannel::NeverAnswers) => loop {
+                std::thread::park();
+            },
+        }
+    }
+}
+
+/// Code-integrity settings a fixture describes. Absent means the fixture never modelled them, which
+/// the accessor reports as `Unsupported` rather than inventing a value (ADR 0011).
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FixtureCodeIntegrity {
+    enabled: bool,
+    test_signing: bool,
+}
+
+/// The TPM a fixture describes. Absent means the fixture never modelled one.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FixtureTpm {
+    present: bool,
+    #[serde(default)]
+    spec_version: Option<String>,
+}
+
+/// The firmware a fixture describes (ADR 0038). Absent means the fixture never modelled it, which the
+/// accessor reports as `Unsupported` rather than inventing a Secure Boot state.
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FixtureFirmware {
+    secure_boot: FixtureFirmwareSecureBoot,
+}
+
+/// Every answer a live host gives about the firmware's `SecureBoot` variable, including the two that
+/// are not answers: a process without the privilege to read it, and a read that failed.
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum FixtureFirmwareSecureBoot {
+    Enabled,
+    Disabled,
+    VariableAbsent,
+    NotUefi,
+    AccessDenied,
+    ReadFailed,
+}
+
+/// Every answer a live host gives about the IOMMU's ACPI table, and the two that are not answers.
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum FixtureIommuTable {
+    Dmar,
+    Ivrs,
+    Neither,
+    NotX86,
+    AccessDenied,
+    ReadFailed,
+}
+
+/// One process a fixture describes. An absent `path` describes a process whose image path cannot be
+/// resolved, and an absent `started_at` one whose creation time cannot be read (ADR 0062); a collector
+/// reports either by omitting that one field — never by dropping the process.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FixtureProcess {
+    pid: u32,
+    name: String,
+    #[serde(default)]
+    path: Option<String>,
+    #[serde(default)]
+    started_at: Option<String>,
+    #[serde(default)]
+    parent_pid: Option<u32>,
+    /// The modules a module read returns; absent describes a process whose modules were not modelled.
+    #[serde(default)]
+    modules: Option<Vec<String>>,
+    /// The module and memory reads are refused, as a protected process refuses them.
+    #[serde(default)]
+    denied: bool,
+    /// What a walk of the address space returns; absent describes one that was not modelled.
+    #[serde(default)]
+    memory: Option<FixtureMemory>,
+}
+
+/// What a fixture says one walk of a process's address space found executable (B.O.P.E, ADR 0102).
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FixtureMemory {
+    #[serde(default)]
+    private_regions: u32,
+    #[serde(default)]
+    private_bytes: u64,
+    #[serde(default)]
+    mapped_regions: u32,
+    #[serde(default)]
+    mapped_bytes: u64,
+    #[serde(default)]
+    image_regions: u32,
+    #[serde(default)]
+    regions_walked: u32,
+    #[serde(default = "complete_by_default")]
+    complete: bool,
+}
+
+fn complete_by_default() -> bool {
+    true
+}
+
+/// What the module and memory reads of one fixture process answer.
+#[derive(Debug, Clone)]
+struct ProcessInternals {
+    modules: Option<Vec<String>>,
+    denied: bool,
+    memory: Option<crate::ExecutableMemory>,
+}
+
+/// Turns one described process into the record a live host returns, parsing `started_at` now so that
+/// a fixture with a time no machine reports fails to load rather than failing a collector later.
+/// The live host reports a creation time in whole seconds ([`crate::process_started_at`]), so a time
+/// with a fraction of a second describes something no machine returns.
+fn process_record(process: FixtureProcess, origin: &str) -> Result<ProcessRecord, FixtureError> {
+    let started_at = match process.started_at.as_deref() {
+        None => None,
+        Some(text) => {
+            let fail = |message: String| FixtureError::Parse {
+                path: origin.to_owned(),
+                message,
+            };
+            let name = &process.name;
+            let instant: jiff::Timestamp = text.parse().map_err(|error: jiff::Error| {
+                fail(format!("process `{name}` started_at `{text}`: {error}"))
+            })?;
+            if instant.subsec_nanosecond() != 0 {
+                return Err(fail(format!(
+                    "process `{name}` started_at `{text}` has a fraction of a second; a live host reports whole seconds"
+                )));
+            }
+            Some(instant)
+        }
+    };
+    Ok(ProcessRecord {
+        pid: process.pid,
+        name: process.name,
+        path: process.path,
+        started_at,
+        parent_pid: process.parent_pid,
+    })
+}
+
+/// One registry value as the YAML writes it. A number is a `REG_DWORD`, a string is a `REG_SZ`, a map
+/// with the one key `qword:` is a `REG_QWORD` (ADR 0038), and any other map is a `REG_BINARY` whose
+/// bytes are written the two ways a file's bytes are (ADR 0019): `content:` inline, or `from:` a file
+/// under `fixtures/`. None can be confused for another — both maps refuse each other's keys — which
+/// is what makes the untagged enum safe to extend.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(untagged)]
+enum RegistryValue {
+    Dword(u32),
+    Text(String),
+    Qword(FixtureQword),
+    Binary(FixtureBinary),
+}
+
+/// A `REG_QWORD`, written `{ qword: 0 }`.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FixtureQword {
+    qword: u64,
+}
+
+/// The bytes of one `REG_BINARY` value. Neither `content:` nor `from:` describes a value that is
+/// there and whose bytes cannot be read, as a file entry with neither does (ADR 0019).
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FixtureBinary {
+    #[serde(default)]
+    content: Option<String>,
+    #[serde(default)]
+    from: Option<String>,
+    /// The bytes as hexadecimal text, spaces allowed (B.O.P.E: binary artifacts such as `UserAssist`
+    /// and `AppCompatCache` values are written inline in tests this way).
+    #[serde(default)]
+    hex: Option<String>,
+}
+
+/// Decodes `hex:` text into bytes, ignoring ASCII whitespace.
+fn decode_hex(text: &str, what: &str, origin: &str) -> Result<Vec<u8>, FixtureError> {
+    let digits: Vec<u8> = text.bytes().filter(|b| !b.is_ascii_whitespace()).collect();
+    let fail = || FixtureError::Parse {
+        path: origin.to_owned(),
+        message: format!("{what}: `hex:` must be an even number of hexadecimal digits"),
+    };
+    if !digits.len().is_multiple_of(2) {
+        return Err(fail());
+    }
+    digits
+        .chunks(2)
+        .map(|pair| {
+            std::str::from_utf8(pair)
+                .ok()
+                .and_then(|s| u8::from_str_radix(s, 16).ok())
+                .ok_or_else(fail)
+        })
+        .collect()
+}
+
+/// One registry value with its `from:` already read from disk and the spelling the fixture used for
+/// its name, so that enumeration can hand back what a real registry would.
+#[derive(Debug, Clone)]
+struct StoredValue {
+    /// The name as the fixture wrote it; the map key is its lower-cased form.
+    name: String,
+    data: StoredData,
+}
+
+#[derive(Debug, Clone)]
+enum StoredData {
+    Dword(u32),
+    Qword(u64),
+    Text(String),
+    /// `None` describes a value that is there and cannot be read.
+    Binary(Option<Vec<u8>>),
+}
+
+/// One registry key a fixture describes, with the spelling it used for the key's own path.
+#[derive(Debug, Clone)]
+struct StoredKey {
+    /// The full key path as the fixture wrote it; the map key is its lower-cased form.
+    path: String,
+    values: BTreeMap<String, StoredValue>,
+}
+
+/// One entry in a fixture directory, as the YAML writes it. A file unless `directory: true`; an
+/// absent `sha256` describes a file whose hash cannot be read, which a collector must report by
+/// omitting the field.
+///
+/// Its bytes are written one of two ways, and never both: `content:` holds them inline as text, and
+/// `from:` names a file under `fixtures/`, relative to the directory holding this `host.yaml`. An
+/// entry with neither describes a file that is listed and whose bytes cannot be read (ADR 0019).
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FixtureFile {
+    name: String,
+    #[serde(default)]
+    sha256: Option<String>,
+    #[serde(default)]
+    signature: Option<FixtureSignature>,
+    #[serde(default)]
+    directory: bool,
+    #[serde(default)]
+    content: Option<String>,
+    /// The bytes as lowercase hex, for binary artifacts written inline (B.O.P.E: shortcuts, hives,
+    /// archives). Exclusive with `content:` and `from:`.
+    #[serde(default)]
+    hex: Option<String>,
+    #[serde(default)]
+    from: Option<String>,
+    #[serde(default)]
+    read_only: Option<bool>,
+    /// What the listing reports as the entry's size (ADR 0050). A directory has none.
+    #[serde(default)]
+    size: Option<u64>,
+    /// The listing's creation time, RFC 3339 in whole seconds (ADR 0050).
+    #[serde(default)]
+    created: Option<String>,
+    /// The listing's last-write time, RFC 3339 in whole seconds (ADR 0050).
+    #[serde(default)]
+    modified: Option<String>,
+}
+
+/// What a fixture says Windows would report about a file's embedded signature (ADR 0035). An absent
+/// `signature:` describes a file whose signature cannot be checked, which a collector reports by
+/// omitting the fields — the same shape an absent `sha256` has.
+///
+/// `signer` and `signer_cert_sha256` belong to `state: valid` and to nothing else, and a fixture that
+/// writes them anywhere else fails to load: a live host never reports a signer it did not trust.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FixtureSignature {
+    state: FixtureSignatureState,
+    #[serde(default)]
+    signer: Option<String>,
+    #[serde(default)]
+    signer_cert_sha256: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum FixtureSignatureState {
+    Valid,
+    NoEmbeddedSignature,
+    Invalid,
+    UnverifiableOffline,
+}
+
+/// Turns what a fixture wrote into what a host reports, refusing a combination no host produces.
+fn resolve_signature(
+    described: FixtureSignature,
+    file: &str,
+    origin: &str,
+) -> Result<SignatureCheck, FixtureError> {
+    let invalid = |message: String| FixtureError::Parse {
+        path: origin.to_owned(),
+        message: format!("file `{file}`: {message}"),
+    };
+    let names_signer = described.signer.is_some() || described.signer_cert_sha256.is_some();
+    let quiet = |check: SignatureCheck| {
+        if names_signer {
+            Err(invalid(
+                "only a valid signature names a `signer` or a `signer_cert_sha256`".to_owned(),
+            ))
+        } else {
+            Ok(check)
+        }
+    };
+    match described.state {
+        FixtureSignatureState::NoEmbeddedSignature => quiet(SignatureCheck::NoEmbeddedSignature),
+        FixtureSignatureState::Invalid => quiet(SignatureCheck::Invalid),
+        FixtureSignatureState::UnverifiableOffline => quiet(SignatureCheck::UnverifiableOffline),
+        FixtureSignatureState::Valid => {
+            let (Some(signer), Some(cert)) = (described.signer, described.signer_cert_sha256)
+            else {
+                return Err(invalid(
+                    "a valid signature needs both `signer` and `signer_cert_sha256`".to_owned(),
+                ));
+            };
+            if signer.trim().is_empty() {
+                return Err(invalid(
+                    "a valid signature needs a non-empty `signer`".to_owned(),
+                ));
+            }
+            if cert.len() != 64 || !cert.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+                return Err(invalid(format!(
+                    "`signer_cert_sha256` `{cert}` must be 64 hex characters"
+                )));
+            }
+            Ok(SignatureCheck::Valid {
+                signer,
+                signer_cert_sha256: cert.to_ascii_lowercase(),
+            })
+        }
+    }
+}
+
+/// One entry in a fixture directory with its `from:` already read from disk, so that a fixture with a
+/// path that does not resolve fails when it is loaded rather than looking like an unreadable file.
+#[derive(Debug, Clone)]
+struct FixtureEntry {
+    name: String,
+    sha256: Option<String>,
+    /// `None` describes a file whose signature cannot be checked.
+    signature: Option<SignatureCheck>,
+    directory: bool,
+    /// The file's bytes. `None` describes a file that exists and cannot be read.
+    content: Option<Vec<u8>>,
+    /// Whether the file carries the read-only attribute. `None` describes a fixture that never said,
+    /// which is not the same as saying it does not (ADR 0037).
+    read_only: Option<bool>,
+    /// What a listing reports beside the name (ADR 0050). `None` is a value the fixture never wrote,
+    /// which a listing returns as "not provided", never as a zero or an epoch.
+    size: Option<u64>,
+    created: Option<jiff::Timestamp>,
+    modified: Option<jiff::Timestamp>,
+}
+
+/// Paths and registry keys are compared case-insensitively and without a trailing separator, like Windows.
+fn normalise_path(path: &str) -> String {
+    path.trim_end_matches(['\\', '/']).to_ascii_lowercase()
+}
+
+/// Whether a normalised path is a drive root, `c:`.
+fn is_drive_root(path: &str) -> bool {
+    let bytes = path.as_bytes();
+    bytes.len() == 2 && bytes[0].is_ascii_alphabetic() && bytes[1] == b':'
+}
+
+/// Splits a normalised path into its parent directory and the last segment.
+fn split_parent(path: &str) -> (&str, &str) {
+    path.rfind(['\\', '/'])
+        .map_or(("", path), |index| (&path[..index], &path[index + 1..]))
+}
+
+/// Reads the bytes a fixture described, resolving a `from:` now rather than later.
+///
+/// `content:` and `from:` are two ways of writing the same thing, so an entry that uses both is
+/// rejected instead of one of them being picked: a fixture that says two things about one entry is a
+/// fixture whose reader has to guess. `what` names the entry in an error message.
+fn resolve_content(
+    content: Option<String>,
+    from: Option<String>,
+    what: &str,
+    origin: &str,
+    base: Option<&Path>,
+) -> Result<Option<Vec<u8>>, FixtureError> {
+    match (content, from) {
+        (Some(_), Some(_)) => Err(FixtureError::Parse {
+            path: origin.to_owned(),
+            message: format!("{what} uses both `content:` and `from:`; it must use one"),
+        }),
+        (Some(inline), None) => Ok(Some(inline.into_bytes())),
+        (None, Some(relative)) => {
+            let Some(base) = base else {
+                return Err(FixtureError::Parse {
+                    path: origin.to_owned(),
+                    message: format!(
+                        "{what} uses `from:`, which needs a fixture directory to start from; \
+                         an inline fixture writes its bytes with `content:`"
+                    ),
+                });
+            };
+            let path = base.join(&relative);
+            Ok(Some(std::fs::read(&path).map_err(|source| {
+                FixtureError::Io {
+                    path: path.display().to_string(),
+                    source,
+                }
+            })?))
+        }
+        (None, None) => Ok(None),
+    }
+}
+
+/// Turns one described file into a stored entry, reading a `from:` file now rather than later.
+fn resolve_file(
+    described: FixtureFile,
+    origin: &str,
+    base: Option<&Path>,
+) -> Result<FixtureEntry, FixtureError> {
+    let what = format!("file `{}`", described.name);
+    let content = match described.hex {
+        Some(hex) if described.content.is_none() && described.from.is_none() => {
+            Some(decode_hex(&hex, &what, origin)?)
+        }
+        Some(_) => {
+            return Err(FixtureError::Parse {
+                path: origin.to_owned(),
+                message: format!("{what} uses `hex:` with `content:` or `from:`; it must use one"),
+            });
+        }
+        None => resolve_content(described.content, described.from, &what, origin, base)?,
+    };
+    let signature = described
+        .signature
+        .map(|signature| resolve_signature(signature, &described.name, origin))
+        .transpose()?;
+    if described.directory && described.size.is_some() {
+        return Err(FixtureError::Parse {
+            path: origin.to_owned(),
+            message: format!(
+                "directory `{}` has a `size:`; a listing reports a size for files only",
+                described.name
+            ),
+        });
+    }
+    let created = listed_time_of(described.created.as_deref(), &described.name, origin)?;
+    let modified = listed_time_of(described.modified.as_deref(), &described.name, origin)?;
+    Ok(FixtureEntry {
+        name: described.name,
+        sha256: described.sha256,
+        signature,
+        directory: described.directory,
+        content,
+        read_only: described.read_only,
+        size: described.size,
+        created,
+        modified,
+    })
+}
+
+/// Parses a `created:` or `modified:` value. A live listing never reports a fraction of a second
+/// (ADR 0050), so a fixture that writes one describes something no machine returns, and fails to load.
+/// The times a fixture gives each drive's root, keyed as a live host would look the drive up.
+fn resolve_drive_roots(
+    described: BTreeMap<String, FixtureTimes>,
+    origin: &str,
+) -> Result<BTreeMap<String, EntryTimes>, FixtureError> {
+    let mut drive_roots = BTreeMap::new();
+    for (drive, times) in described {
+        let key = normalise_path(&drive);
+        if !is_drive_root(&key) {
+            return Err(FixtureError::Parse {
+                path: origin.to_owned(),
+                message: format!("drive_roots: `{drive}` is not a drive such as `C:`"),
+            });
+        }
+        let times = EntryTimes {
+            created: listed_time_of(times.created.as_deref(), &drive, origin)?,
+            modified: listed_time_of(times.modified.as_deref(), &drive, origin)?,
+        };
+        drive_roots.insert(key, times);
+    }
+    Ok(drive_roots)
+}
+
+fn listed_time_of(
+    text: Option<&str>,
+    name: &str,
+    origin: &str,
+) -> Result<Option<jiff::Timestamp>, FixtureError> {
+    let Some(text) = text else {
+        return Ok(None);
+    };
+    let fail = |message: String| FixtureError::Parse {
+        path: origin.to_owned(),
+        message,
+    };
+    let instant: jiff::Timestamp = text
+        .parse()
+        .map_err(|error: jiff::Error| fail(format!("entry `{name}` time `{text}`: {error}")))?;
+    if instant.subsec_nanosecond() != 0 {
+        return Err(fail(format!(
+            "entry `{name}` time `{text}` has a fraction of a second; a listing reports whole seconds"
+        )));
+    }
+    Ok(Some(instant))
+}
+
+/// Turns one described registry value into a stored one, reading a `from:` file now rather than
+/// later, and keeping the name as the fixture spelled it.
+fn resolve_value(
+    name: String,
+    described: RegistryValue,
+    origin: &str,
+    base: Option<&Path>,
+) -> Result<StoredValue, FixtureError> {
+    let data = match described {
+        RegistryValue::Dword(number) => StoredData::Dword(number),
+        RegistryValue::Text(text) => StoredData::Text(text),
+        RegistryValue::Qword(qword) => StoredData::Qword(qword.qword),
+        RegistryValue::Binary(binary) => {
+            let what = format!("registry value `{name}`");
+            match binary.hex {
+                Some(hex) if binary.content.is_none() && binary.from.is_none() => {
+                    StoredData::Binary(Some(decode_hex(&hex, &what, origin)?))
+                }
+                Some(_) => {
+                    return Err(FixtureError::Parse {
+                        path: origin.to_owned(),
+                        message: format!(
+                            "{what} uses `hex:` with `content:` or `from:`; it must use one"
+                        ),
+                    });
+                }
+                None => StoredData::Binary(resolve_content(
+                    binary.content,
+                    binary.from,
+                    &what,
+                    origin,
+                    base,
+                )?),
+            }
+        }
+    };
+    Ok(StoredValue { name, data })
+}
+
+/// A fixture's change journal (ADR 0047). Records are written as groups, because a baseline describes
+/// hundreds of them; the host encodes each group into that many records with the documented
+/// `USN_RECORD_V2` or `USN_RECORD_V3` layout and a name of two characters, so the collector reads the
+/// same bytes it reads on a real machine.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FixtureUsnJournal {
+    /// The drive letter whose journal this is.
+    #[serde(default = "default_usn_volume")]
+    volume: char,
+    #[serde(default)]
+    state: FixtureUsnState,
+    #[serde(default = "default_usn_maximum_size")]
+    maximum_size: u64,
+    /// Records have been trimmed since the journal was made: `FirstUsn` above `LowestValidUsn`.
+    #[serde(default)]
+    trimmed: bool,
+    #[serde(default)]
+    ends: FixtureUsnEnd,
+    /// Folder path → a small number the host turns into both identifiers.
+    #[serde(default)]
+    folders: BTreeMap<String, u64>,
+    /// Paths under `folders:` whose identifier carries a different volume serial than the journal's —
+    /// the shape a folder reached through a junction to another volume has, so attributing a record to
+    /// it by identifier alone would be wrong (ADR 0047 amendment: junctions).
+    #[serde(default)]
+    other_volume_folders: Vec<String>,
+    #[serde(default)]
+    records: Vec<FixtureUsnRecords>,
+    /// The journal's `UsnJournalID`, which the host turns into the date it gives when read as a
+    /// `FILETIME` and never hands over itself (ADR 0061). Absent: an identifier that gives no date.
+    #[serde(default)]
+    journal_id: Option<u64>,
+}
+
+fn default_usn_volume() -> char {
+    'C'
+}
+
+/// 32 MiB, the `MaximumSize` measured on a GitHub-hosted runner (ADR 0047).
+fn default_usn_maximum_size() -> u64 {
+    33_554_432
+}
+
+#[derive(Debug, Clone, Copy, Default, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+enum FixtureUsnState {
+    #[default]
+    Active,
+    /// `ERROR_JOURNAL_NOT_ACTIVE`: the volume has no journal.
+    NotActive,
+    /// The volume handle was refused.
+    AccessDenied,
+}
+
+#[derive(Debug, Clone, Copy, Default, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+enum FixtureUsnEnd {
+    #[default]
+    Complete,
+    JournalChanged,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FixtureUsnRecords {
+    /// A folder under `folders:`, or absent for a folder nobody watches.
+    #[serde(default)]
+    parent: Option<String>,
+    #[serde(default = "default_usn_major")]
+    major: u16,
+    reasons: Vec<FixtureUsnReason>,
+    #[serde(default = "default_usn_count")]
+    count: u32,
+    /// When the first record of the group was written; the rest are spread evenly up to `last`.
+    #[serde(default)]
+    first: Option<String>,
+    #[serde(default)]
+    last: Option<String>,
+    /// The file name every record of the group carries (B.O.P.E, ADR 0121). Absent: `fx`.
+    #[serde(default)]
+    name: Option<String>,
+}
+
+fn default_usn_major() -> u16 {
+    3
+}
+
+fn default_usn_count() -> u32 {
+    1
+}
+
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum FixtureUsnReason {
+    DataOverwrite,
+    DataExtend,
+    DataTruncation,
+    FileCreate,
+    FileDelete,
+    RenameOldName,
+    RenameNewName,
+    BasicInfoChange,
+    Close,
+}
+
+impl FixtureUsnReason {
+    fn flag(self) -> u32 {
+        match self {
+            Self::DataOverwrite => 0x0000_0001,
+            Self::DataExtend => 0x0000_0002,
+            Self::DataTruncation => 0x0000_0004,
+            Self::FileCreate => 0x0000_0100,
+            Self::FileDelete => 0x0000_0200,
+            Self::RenameOldName => 0x0000_1000,
+            Self::RenameNewName => 0x0000_2000,
+            Self::BasicInfoChange => 0x0000_8000,
+            Self::Close => 0x8000_0000,
+        }
+    }
+}
+
+/// A journal as the host hands it over: its state, how a read ends, the encoded buffers and the folder
+/// identifiers.
+#[derive(Debug, Clone)]
+struct StoredUsnJournal {
+    volume: char,
+    state: FixtureUsnState,
+    journal: UsnJournalState,
+    end: UsnReadEnd,
+    buffers: Vec<Vec<u8>>,
+    /// Lower-cased, normalised path → identifier.
+    folders: BTreeMap<String, FileId>,
+}
+
+/// Records per encoded buffer: a real buffer is 1 MiB, and several small ones exercise the
+/// collector's loop over more than one.
+const USN_RECORDS_PER_BUFFER: usize = 500;
+/// The parent of a record whose group names no folder: an identifier no `folders:` entry produces.
+const UNWATCHED_PARENT: u64 = u64::MAX;
+/// FILETIME of 1970-01-01T00:00:00Z.
+const UNIX_EPOCH_AS_FILETIME: i128 = 116_444_736_000_000_000;
+/// NTFS's root directory record number, for the `FileId` a fixture answers a drive root with.
+const NTFS_ROOT_DIRECTORY_RECORD: u64 = 5;
+/// `volume_serial` of the journal's own volume — every folder under `folders:` gets this, unless it is
+/// also listed in `other_volume_folders`.
+const JOURNAL_VOLUME_SERIAL: u64 = 0xAAAA_AAAA;
+/// `volume_serial` of a folder reached through a junction to a different volume than the journal's.
+const OTHER_VOLUME_SERIAL: u64 = 0xBBBB_BBBB;
+
+fn file_id_for(number: u64, volume_serial: u64) -> FileId {
+    let mut id_128 = [0u8; 16];
+    id_128[..8].copy_from_slice(&number.to_le_bytes());
+    FileId {
+        id_128,
+        index_64: number,
+        volume_serial,
+    }
+}
+
+fn filetime_of(text: &str, origin: &str) -> Result<u64, FixtureError> {
+    let instant: jiff::Timestamp =
+        text.parse()
+            .map_err(|error: jiff::Error| FixtureError::Parse {
+                path: origin.to_owned(),
+                message: format!("usn_journal time `{text}`: {error}"),
+            })?;
+    u64::try_from(instant.as_nanosecond() / 100 + UNIX_EPOCH_AS_FILETIME).map_err(|_| {
+        FixtureError::Parse {
+            path: origin.to_owned(),
+            message: format!("usn_journal time `{text}` is before 1601"),
+        }
+    })
+}
+
+fn encode_record(major: u16, parent: FileId, written: u64, reason: u32, name: &str) -> Vec<u8> {
+    let name: Vec<u8> = name.encode_utf16().flat_map(u16::to_le_bytes).collect();
+    let name_len = u16::try_from(name.len()).unwrap_or(0);
+    let (fixed, len_at) = if major == 2 { (60, 56) } else { (76, 72) };
+    let length = (fixed + name.len()).next_multiple_of(8);
+    let mut record = vec![0u8; length];
+    record[0..4].copy_from_slice(&u32::try_from(length).unwrap_or(0).to_le_bytes());
+    record[4..6].copy_from_slice(&major.to_le_bytes());
+    if major == 2 {
+        record[16..24].copy_from_slice(&parent.index_64.to_le_bytes());
+        record[32..40].copy_from_slice(&written.to_le_bytes());
+        record[40..44].copy_from_slice(&reason.to_le_bytes());
+    } else {
+        record[24..40].copy_from_slice(&parent.id_128);
+        record[48..56].copy_from_slice(&written.to_le_bytes());
+        record[56..60].copy_from_slice(&reason.to_le_bytes());
+    }
+    record[len_at..len_at + 2].copy_from_slice(&name_len.to_le_bytes());
+    record[len_at + 2..len_at + 4]
+        .copy_from_slice(&u16::try_from(fixed).unwrap_or(0).to_le_bytes());
+    record[fixed..fixed + name.len()].copy_from_slice(&name);
+    record
+}
+
+/// Turns `folders:` and `other_volume_folders:` into identifiers, rejecting an
+/// `other_volume_folders` entry that names no `folders:` entry: a fixture that claims a junction over
+/// a folder nobody said existed (ADR 0047 amendment: junctions).
+fn resolve_usn_folders(
+    described: &FixtureUsnJournal,
+    origin: &str,
+) -> Result<BTreeMap<String, FileId>, FixtureError> {
+    let folder_keys: BTreeSet<String> = described
+        .folders
+        .keys()
+        .map(|path| normalise_path(path))
+        .collect();
+    for path in &described.other_volume_folders {
+        if !folder_keys.contains(&normalise_path(path)) {
+            return Err(FixtureError::Parse {
+                path: origin.to_owned(),
+                message: format!(
+                    "usn_journal other_volume_folders `{path}` is not under `folders:`"
+                ),
+            });
+        }
+    }
+    let other_volume: BTreeSet<String> = described
+        .other_volume_folders
+        .iter()
+        .map(|path| normalise_path(path))
+        .collect();
+    Ok(described
+        .folders
+        .iter()
+        .map(|(path, number)| {
+            let key = normalise_path(path);
+            let serial = if other_volume.contains(&key) {
+                OTHER_VOLUME_SERIAL
+            } else {
+                JOURNAL_VOLUME_SERIAL
+            };
+            (key, file_id_for(*number, serial))
+        })
+        .collect())
+}
+
+fn resolve_usn_journal(
+    described: FixtureUsnJournal,
+    origin: &str,
+) -> Result<StoredUsnJournal, FixtureError> {
+    let folders = resolve_usn_folders(&described, origin)?;
+    let mut records = Vec::new();
+    for group in described.records {
+        let parent = match &group.parent {
+            None => file_id_for(UNWATCHED_PARENT, JOURNAL_VOLUME_SERIAL),
+            Some(path) => {
+                *folders
+                    .get(&normalise_path(path))
+                    .ok_or_else(|| FixtureError::Parse {
+                        path: origin.to_owned(),
+                        message: format!(
+                            "usn_journal record parent `{path}` is not under `folders:`"
+                        ),
+                    })?
+            }
+        };
+        if group.major != 2 && group.major != 3 {
+            return Err(FixtureError::Parse {
+                path: origin.to_owned(),
+                message: format!("usn_journal major version {} is not 2 or 3", group.major),
+            });
+        }
+        let reason = group
+            .reasons
+            .iter()
+            .fold(0u32, |flags, reason| flags | reason.flag());
+        let first = group
+            .first
+            .as_deref()
+            .map(|text| filetime_of(text, origin))
+            .transpose()?
+            .unwrap_or(133_000_000_000_000_000);
+        let last = group
+            .last
+            .as_deref()
+            .map(|text| filetime_of(text, origin))
+            .transpose()?
+            .unwrap_or(first);
+        if last < first {
+            let first_text = group.first.as_deref().unwrap_or("<default>");
+            let last_text = group.last.as_deref().unwrap_or("<default>");
+            return Err(FixtureError::Parse {
+                path: origin.to_owned(),
+                message: format!(
+                    "usn_journal record group `last` `{last_text}` is before its `first` `{first_text}`"
+                ),
+            });
+        }
+        let span = last.saturating_sub(first);
+        let steps = u64::from(group.count.saturating_sub(1)).max(1);
+        for index in 0..group.count {
+            let written = first + span / steps * u64::from(index);
+            let written = if index + 1 == group.count {
+                last
+            } else {
+                written
+            };
+            records.push(encode_record(
+                group.major,
+                parent,
+                written,
+                reason,
+                group.name.as_deref().unwrap_or("fx"),
+            ));
+        }
+    }
+    let first_usn: i64 = if described.trimmed { 4096 } else { 0 };
+    let mut buffers = Vec::new();
+    let mut usn = first_usn;
+    for chunk in records.chunks(USN_RECORDS_PER_BUFFER) {
+        let bytes: usize = chunk.iter().map(Vec::len).sum();
+        usn += i64::try_from(bytes).unwrap_or(i64::MAX);
+        let mut buffer = usn.to_le_bytes().to_vec();
+        for record in chunk {
+            buffer.extend_from_slice(record);
+        }
+        buffers.push(buffer);
+    }
+    Ok(StoredUsnJournal {
+        volume: described.volume.to_ascii_uppercase(),
+        state: described.state,
+        journal: UsnJournalState {
+            first_usn,
+            next_usn: usn,
+            lowest_valid_usn: 0,
+            maximum_size: described.maximum_size,
+            created_on: described.journal_id.and_then(crate::journal_created_on),
+        },
+        end: match described.ends {
+            FixtureUsnEnd::Complete => UsnReadEnd::Complete,
+            FixtureUsnEnd::JournalChanged => UsnReadEnd::JournalChanged,
+        },
+        buffers,
+        folders,
+    })
+}
+
+/// A fake machine for tests. Registry keys, value names, directory paths and environment variable names
+/// are case-insensitive, like Windows.
+#[derive(Debug, Clone)]
+pub struct FixtureHost {
+    platform: Platform,
+    os_build: Option<String>,
+    elevated: Option<bool>,
+    registry: BTreeMap<String, StoredKey>,
+    env: BTreeMap<String, String>,
+    filesystem: BTreeMap<String, Vec<FixtureEntry>>,
+    access_denied: Vec<String>,
+    code_integrity: Option<FixtureCodeIntegrity>,
+    tpm: Option<FixtureTpm>,
+    firmware: Option<FixtureFirmware>,
+    iommu_table: Option<FixtureIommuTable>,
+    processes: Option<Vec<ProcessRecord>>,
+    /// Module and memory answers by process id (B.O.P.E, ADR 0102).
+    internals: BTreeMap<u32, ProcessInternals>,
+    milliseconds_since_boot: Option<u64>,
+    /// Keyed by the lower-cased channel name, like every other name this host compares.
+    event_log_channels: Option<BTreeMap<String, StoredChannel>>,
+    usn_journal: Option<StoredUsnJournal>,
+    account_sid: Option<String>,
+    devices: Option<Vec<DeviceRecord>>,
+    /// Keyed by the lower-cased drive, `c:`.
+    drive_roots: BTreeMap<String, EntryTimes>,
+    /// Keyed by the upper-cased drive letter; `None` is a volume the account may not open.
+    volumes: BTreeMap<char, Option<Vec<u8>>>,
+    wmi: Option<FixtureWmi>,
+    services: Option<FixtureServices>,
+}
+
+impl FixtureHost {
+    /// Loads `<dir>/host.yaml`. A `from:` in it is read relative to `dir`.
+    pub fn load(dir: &Path) -> Result<Self, FixtureError> {
+        let path = dir.join("host.yaml");
+        let text = std::fs::read_to_string(&path).map_err(|source| FixtureError::Io {
+            path: path.display().to_string(),
+            source,
+        })?;
+        Self::parse(&text, &path.display().to_string(), Some(dir))
+    }
+
+    /// Parses a fixture host from YAML; `origin` is used in error messages.
+    ///
+    /// An inline fixture has no directory for a relative path to start from, so a file entry that
+    /// uses `from:` is rejected here and must use `content:` instead.
+    pub fn from_yaml_str(yaml: &str, origin: &str) -> Result<Self, FixtureError> {
+        Self::parse(yaml, origin, None)
+    }
+
+    /// `base` is the directory a `from:` resolves against, or `None` for an inline fixture.
+    #[allow(clippy::too_many_lines)]
+    fn parse(yaml: &str, origin: &str, base: Option<&Path>) -> Result<Self, FixtureError> {
+        let file: HostFile = serde_saphyr::from_str(yaml).map_err(|e| FixtureError::Parse {
+            path: origin.to_owned(),
+            message: e.to_string(),
+        })?;
+        let mut registry = BTreeMap::new();
+        for (key, values) in file.registry {
+            let mut stored = BTreeMap::new();
+            for (name, value) in values {
+                let lowercased = name.to_ascii_lowercase();
+                stored.insert(lowercased, resolve_value(name, value, origin, base)?);
+            }
+            registry.insert(
+                key.to_ascii_lowercase(),
+                StoredKey {
+                    path: key,
+                    values: stored,
+                },
+            );
+        }
+        let env = file
+            .env
+            .into_iter()
+            .map(|(name, value)| (name.to_ascii_lowercase(), value))
+            .collect();
+        let drive_roots = resolve_drive_roots(file.drive_roots, origin)?;
+        let mut volumes = BTreeMap::new();
+        for (drive, volume) in file.volumes {
+            let what = format!("volume `{drive}`");
+            let letter = drive
+                .chars()
+                .next()
+                .filter(|c| c.is_ascii_alphabetic() && drive.len() == 1)
+                .ok_or_else(|| FixtureError::Parse {
+                    path: origin.to_owned(),
+                    message: format!("{what}: a volume is named by one drive letter"),
+                })?;
+            let bytes = if volume.access_denied {
+                None
+            } else if let Some(hex) = volume.hex {
+                Some(decode_hex(&hex, &what, origin)?)
+            } else {
+                resolve_content(None, volume.from, &what, origin, base)?
+            };
+            volumes.insert(letter.to_ascii_uppercase(), bytes);
+        }
+        let mut filesystem = BTreeMap::new();
+        for (dir, files) in file.filesystem {
+            let mut entries = Vec::with_capacity(files.len());
+            for described in files {
+                entries.push(resolve_file(described, origin, base)?);
+            }
+            filesystem.insert(normalise_path(&dir), entries);
+        }
+        Ok(Self {
+            platform: file.platform,
+            os_build: file.os_build,
+            elevated: file.elevated,
+            registry,
+            env,
+            filesystem,
+            access_denied: file
+                .access_denied
+                .iter()
+                .map(|key| normalise_path(key))
+                .collect(),
+            code_integrity: file.code_integrity,
+            tpm: file.tpm,
+            firmware: file.firmware,
+            iommu_table: file.iommu_table,
+            internals: file
+                .processes
+                .iter()
+                .flatten()
+                .map(|process| {
+                    (
+                        process.pid,
+                        ProcessInternals {
+                            modules: process.modules.clone(),
+                            denied: process.denied,
+                            memory: process.memory.map(|m| crate::ExecutableMemory {
+                                private_regions: m.private_regions,
+                                private_bytes: m.private_bytes,
+                                mapped_regions: m.mapped_regions,
+                                mapped_bytes: m.mapped_bytes,
+                                image_regions: m.image_regions,
+                                regions_walked: m.regions_walked,
+                                complete: m.complete,
+                            }),
+                        },
+                    )
+                })
+                .collect(),
+            processes: file
+                .processes
+                .map(|described| {
+                    described
+                        .into_iter()
+                        .map(|process| process_record(process, origin))
+                        .collect::<Result<Vec<_>, _>>()
+                })
+                .transpose()?,
+            milliseconds_since_boot: file.milliseconds_since_boot,
+            account_sid: file.account_sid,
+            devices: file
+                .devices
+                .map(|described| {
+                    described
+                        .into_iter()
+                        .map(|device| device_record(device, origin))
+                        .collect::<Result<Vec<_>, _>>()
+                })
+                .transpose()?,
+            drive_roots,
+            volumes,
+            wmi: file.wmi,
+            services: file.services,
+            event_log_channels: file
+                .event_log_channels
+                .map(|channels| {
+                    channels
+                        .into_iter()
+                        .map(|(name, channel)| {
+                            let stored = resolve_channel(&name, channel, origin)?;
+                            Ok((name.to_ascii_lowercase(), stored))
+                        })
+                        .collect::<Result<BTreeMap<_, _>, FixtureError>>()
+                })
+                .transpose()?,
+            usn_journal: file
+                .usn_journal
+                .map(|journal| resolve_usn_journal(journal, origin))
+                .transpose()?,
+        })
+    }
+
+    /// The bytes the fixture wrote for one file, after `read_file`'s checks, with no size limit.
+    fn stored_content(&self, path: &str) -> Result<Option<&[u8]>, SourceError> {
+        self.windows_filesystem()?;
+        let normalised = normalise_path(path);
+        let (dir, name) = split_parent(&normalised);
+        if self.is_denied(&normalised) || self.is_denied(dir) {
+            return Err(SourceError::AccessDenied);
+        }
+        let Some(file) = self.filesystem.get(dir).and_then(|files| {
+            files
+                .iter()
+                .find(|file| file.name.eq_ignore_ascii_case(name))
+        }) else {
+            return Ok(None);
+        };
+        if file.directory {
+            return Err(SourceError::Failed(format!("not a file: {path}")));
+        }
+        file.content
+            .as_deref()
+            .map(Some)
+            .ok_or_else(|| SourceError::Failed(format!("no content recorded for {path}")))
+    }
+
+    /// The entry the fixture wrote for one file, after the access checks every per-file read makes.
+    /// A file it never listed is a failure here, which is what hashing or checking one means.
+    fn described_file(&self, path: &str) -> Result<&FixtureEntry, SourceError> {
+        let normalised = normalise_path(path);
+        let (dir, name) = split_parent(&normalised);
+        if self.is_denied(&normalised) || self.is_denied(dir) {
+            return Err(SourceError::AccessDenied);
+        }
+        self.filesystem
+            .get(dir)
+            .and_then(|files| {
+                files
+                    .iter()
+                    .find(|file| file.name.eq_ignore_ascii_case(name))
+            })
+            .ok_or_else(|| SourceError::Failed(format!("no such file: {path}")))
+    }
+
+    /// The file system is only described for Windows fixtures.
+    fn windows_filesystem(&self) -> Result<(), SourceError> {
+        if self.platform == Platform::Windows {
+            Ok(())
+        } else {
+            Err(SourceError::Unsupported(
+                "no Windows file system on this platform".to_owned(),
+            ))
+        }
+    }
+
+    fn is_denied(&self, path: &str) -> bool {
+        self.access_denied.iter().any(|denied| denied == path)
+    }
+
+    /// The lower-cased key a fixture would have stored, once this host is known to have a registry
+    /// and the key is known not to be one the fixture denies.
+    fn registry_key(&self, key: &str) -> Result<String, SourceError> {
+        if self.platform != Platform::Windows {
+            return Err(SourceError::Unsupported(
+                "no registry on this platform".to_owned(),
+            ));
+        }
+        let key = key.to_ascii_lowercase();
+        if self.access_denied.contains(&key) {
+            return Err(SourceError::AccessDenied);
+        }
+        Ok(key)
+    }
+
+    fn lookup(&self, key: &str, value: &str) -> Result<Option<&StoredValue>, SourceError> {
+        let key = self.registry_key(key)?;
+        Ok(self
+            .registry
+            .get(&key)
+            .and_then(|stored| stored.values.get(&value.to_ascii_lowercase())))
+    }
+
+    /// Whether a fixture described this key at all — either by writing it, or by writing a key
+    /// underneath it. A key with subkeys and no values of its own is still a key that is there.
+    fn registry_key_exists(&self, key: &str) -> bool {
+        let prefix = format!(r"{key}\");
+        self.registry.contains_key(key)
+            || self
+                .registry
+                .keys()
+                .any(|stored| stored.starts_with(&prefix))
+    }
+}
+
+impl RegistrySource for FixtureHost {
+    fn read_u32(&self, key: &str, value: &str) -> Result<Option<u32>, SourceError> {
+        match self.lookup(key, value)?.map(|stored| &stored.data) {
+            Some(StoredData::Dword(number)) => Ok(Some(*number)),
+            // A live host's reader accepts a `REG_QWORD` that fits, so this one does too.
+            Some(StoredData::Qword(number)) => u32::try_from(*number)
+                .map(Some)
+                .map_err(|_| SourceError::Failed("a QWORD too large for a DWORD".to_owned())),
+            Some(StoredData::Text(_)) => Err(SourceError::Failed(
+                "expected a DWORD, found a string".to_owned(),
+            )),
+            Some(StoredData::Binary(_)) => Err(SourceError::Failed(
+                "expected a DWORD, found a binary value".to_owned(),
+            )),
+            None => Ok(None),
+        }
+    }
+
+    fn read_string(&self, key: &str, value: &str) -> Result<Option<String>, SourceError> {
+        match self.lookup(key, value)?.map(|stored| &stored.data) {
+            Some(StoredData::Text(text)) => Ok(Some(text.clone())),
+            Some(StoredData::Dword(_) | StoredData::Qword(_)) => Err(SourceError::Failed(
+                "expected a string, found a number".to_owned(),
+            )),
+            Some(StoredData::Binary(_)) => Err(SourceError::Failed(
+                "expected a string, found a binary value".to_owned(),
+            )),
+            None => Ok(None),
+        }
+    }
+
+    /// The keys the fixture wrote directly underneath this one, in a stable order and spelled as it
+    /// wrote them.
+    ///
+    /// A fixture describes a key by writing its values, so the subkeys of a key are found by
+    /// scanning for the keys whose path starts with it — which is also why a key nobody wrote and
+    /// nothing sits under is `Ok(None)`, the same answer `read_u32` gives for a key that is not
+    /// there.
+    fn subkeys(&self, key: &str) -> Result<Option<Vec<String>>, SourceError> {
+        let key = self.registry_key(key)?;
+        if !self.registry_key_exists(&key) {
+            return Ok(None);
+        }
+        let prefix = format!(r"{key}\");
+        let mut children: BTreeMap<String, String> = BTreeMap::new();
+        for stored in self.registry.values() {
+            // Lower-casing is length-preserving, so the prefix that matched the lower-cased path
+            // covers the same bytes of the path as the fixture spelled it.
+            let lowercased = stored.path.to_ascii_lowercase();
+            let Some(rest) = lowercased.strip_prefix(&prefix) else {
+                continue;
+            };
+            let length = rest.find('\\').unwrap_or(rest.len());
+            let child = &stored.path[prefix.len()..prefix.len() + length];
+            children.insert(child.to_ascii_lowercase(), child.to_owned());
+        }
+        Ok(Some(children.into_values().collect()))
+    }
+
+    /// The names of this key's values, in a stable order and spelled as the fixture wrote them.
+    fn value_names(&self, key: &str) -> Result<Option<Vec<String>>, SourceError> {
+        let key = self.registry_key(key)?;
+        if !self.registry_key_exists(&key) {
+            return Ok(None);
+        }
+        Ok(Some(
+            self.registry
+                .get(&key)
+                .map(|stored| {
+                    stored
+                        .values
+                        .values()
+                        .map(|value| value.name.clone())
+                        .collect()
+                })
+                .unwrap_or_default(),
+        ))
+    }
+
+    /// The bytes the fixture wrote for that value, through the same limit a live host applies.
+    ///
+    /// A value written with neither `content:` nor `from:` is there and cannot be read, which is the
+    /// per-value failure a file entry without bytes already models the same way (ADR 0019).
+    fn read_bytes(&self, key: &str, value: &str) -> Result<Option<Vec<u8>>, SourceError> {
+        match self.lookup(key, value)?.map(|stored| &stored.data) {
+            Some(StoredData::Binary(Some(bytes))) => {
+                crate::bound_registry_value(bytes.clone(), crate::MAX_REGISTRY_VALUE_BYTES)
+                    .map(Some)
+            }
+            Some(StoredData::Binary(None)) => Err(SourceError::Failed(format!(
+                "no bytes recorded for {key}\\{value}"
+            ))),
+            Some(StoredData::Dword(_) | StoredData::Qword(_) | StoredData::Text(_)) => {
+                Err(SourceError::Failed(
+                    "expected a binary value, found a number or a string".to_owned(),
+                ))
+            }
+            None => Ok(None),
+        }
+    }
+
+    /// The type and data the fixture wrote, through the same limit a live host applies to a string.
+    /// A binary value is a type whose data this method does not read.
+    fn read_value(&self, key: &str, value: &str) -> Result<Option<RegistryData>, SourceError> {
+        let data = match self.lookup(key, value)?.map(|stored| &stored.data) {
+            Some(StoredData::Dword(number)) => RegistryData::Dword(*number),
+            Some(StoredData::Qword(number)) => RegistryData::Qword(*number),
+            Some(StoredData::Text(text)) => RegistryData::Text(text.clone()),
+            Some(StoredData::Binary(_)) => RegistryData::OtherType,
+            None => return Ok(None),
+        };
+        crate::bound_registry_data(data, crate::MAX_REGISTRY_VALUE_BYTES).map(Some)
+    }
+}
+
+impl FilesystemSource for FixtureHost {
+    fn list_dir(&self, dir: &str) -> Result<Option<Vec<DirEntryInfo>>, SourceError> {
+        self.windows_filesystem()?;
+        let dir = normalise_path(dir);
+        if self.is_denied(&dir) {
+            return Err(SourceError::AccessDenied);
+        }
+        Ok(self.filesystem.get(&dir).map(|files| {
+            files
+                .iter()
+                .map(|file| DirEntryInfo {
+                    name: file.name.clone(),
+                    is_file: !file.directory,
+                    size: file.size,
+                    created: file.created,
+                    modified: file.modified,
+                })
+                .collect()
+        }))
+    }
+
+    fn file_sha256(&self, path: &str) -> Result<String, SourceError> {
+        self.windows_filesystem()?;
+        let file = self.described_file(path)?;
+        file.sha256
+            .clone()
+            .ok_or_else(|| SourceError::Failed(format!("no sha256 recorded for {path}")))
+    }
+
+    /// The bytes the fixture wrote for that file, through the same limit a live host applies.
+    ///
+    /// A file the fixture never listed does not exist, which is `Ok(None)`. A file it listed without
+    /// `content:` or `from:` exists and cannot be read, which is the per-file failure `sha256` already
+    /// models the same way — not `Unsupported`, which is reserved for a whole block the fixture never
+    /// described.
+    fn read_file(&self, path: &str) -> Result<Option<Vec<u8>>, SourceError> {
+        self.windows_filesystem()?;
+        let normalised = normalise_path(path);
+        let (dir, name) = split_parent(&normalised);
+        if self.is_denied(&normalised) || self.is_denied(dir) {
+            return Err(SourceError::AccessDenied);
+        }
+        let Some(file) = self.filesystem.get(dir).and_then(|files| {
+            files
+                .iter()
+                .find(|file| file.name.eq_ignore_ascii_case(name))
+        }) else {
+            return Ok(None);
+        };
+        if file.directory {
+            return Err(SourceError::Failed(format!("not a file: {path}")));
+        }
+        let content = file
+            .content
+            .as_ref()
+            .ok_or_else(|| SourceError::Failed(format!("no content recorded for {path}")))?;
+        crate::read_bounded(content.as_slice(), crate::MAX_FILE_BYTES).map(Some)
+    }
+
+    /// What the fixture wrote under `read_only:` for that file, behind the same access checks
+    /// `read_file` makes.
+    ///
+    /// A file the fixture never listed does not exist, which is `Ok(None)`. A file it listed without
+    /// `read_only:` is `Unsupported`: silence in a fixture is "never modelled", and answering `false`
+    /// for it would put a value in the report nobody wrote (ADR 0037).
+    fn is_read_only(&self, path: &str) -> Result<Option<bool>, SourceError> {
+        self.windows_filesystem()?;
+        let normalised = normalise_path(path);
+        let (dir, name) = split_parent(&normalised);
+        if self.is_denied(&normalised) || self.is_denied(dir) {
+            return Err(SourceError::AccessDenied);
+        }
+        let Some(file) = self.filesystem.get(dir).and_then(|files| {
+            files
+                .iter()
+                .find(|file| file.name.eq_ignore_ascii_case(name))
+        }) else {
+            return Ok(None);
+        };
+        file.read_only.map(Some).ok_or_else(|| {
+            SourceError::Unsupported(format!(
+                "this fixture host does not describe the attributes of {path}"
+            ))
+        })
+    }
+
+    /// A drive root's times from `drive_roots:`; any other entry's from its parent's listing, as
+    /// `list_dir` reports them. A path the fixture denies is refused; its parent being denied is not
+    /// a refusal, because a live host does not list the parent to answer (ADR 0061).
+    fn times(&self, path: &str) -> Result<Option<EntryTimes>, SourceError> {
+        self.windows_filesystem()?;
+        let normalised = normalise_path(path);
+        if self.is_denied(&normalised) {
+            return Err(SourceError::AccessDenied);
+        }
+        if is_drive_root(&normalised) {
+            return Ok(self.drive_roots.get(&normalised).copied());
+        }
+        let (dir, name) = split_parent(&normalised);
+        Ok(self.filesystem.get(dir).and_then(|files| {
+            files
+                .iter()
+                .find(|file| file.name.eq_ignore_ascii_case(name))
+                .map(|file| EntryTimes {
+                    created: file.created,
+                    modified: file.modified,
+                })
+        }))
+    }
+}
+
+impl EventLogConfigSource for FixtureHost {
+    /// A reader over what the fixture wrote under `event_log_channels:`.
+    ///
+    /// No block at all is `Unsupported`, never a reader that knows no channel: a fixture written
+    /// before this source existed must not claim that the service knows none. A channel named in
+    /// `access_denied` is refused, as a key or a folder named there is.
+    fn channel_config_reader(&self) -> Result<Box<dyn ChannelConfigReader>, SourceError> {
+        if self.platform != Platform::Windows {
+            return Err(SourceError::Unsupported(
+                "no Windows Event Log on this platform".to_owned(),
+            ));
+        }
+        let channels = self.event_log_channels.clone().ok_or_else(|| {
+            SourceError::Unsupported(
+                "this fixture host does not describe the Event Log service".to_owned(),
+            )
+        })?;
+        Ok(Box::new(FixtureChannelReader {
+            channels,
+            access_denied: self.access_denied.clone(),
+        }))
+    }
+}
+
+impl EnvironmentSource for FixtureHost {
+    fn env_var(&self, name: &str) -> Option<String> {
+        self.env.get(&name.to_ascii_lowercase()).cloned()
+    }
+}
+
+impl AccountSource for FixtureHost {
+    fn account_sid(&self) -> Result<String, SourceError> {
+        self.account_sid.clone().ok_or_else(|| {
+            SourceError::Unsupported("this fixture host does not describe its account".to_owned())
+        })
+    }
+}
+
+impl SystemIntegritySource for FixtureHost {
+    fn code_integrity_options(&self) -> Result<CodeIntegrityOptions, SourceError> {
+        let described = self.code_integrity.ok_or_else(|| {
+            SourceError::Unsupported(
+                "this fixture host does not describe code integrity".to_owned(),
+            )
+        })?;
+        Ok(CodeIntegrityOptions {
+            enabled: described.enabled,
+            test_signing: described.test_signing,
+        })
+    }
+}
+
+impl TpmSource for FixtureHost {
+    fn tpm_info(&self) -> Result<TpmInfo, SourceError> {
+        let described = self.tpm.as_ref().ok_or_else(|| {
+            SourceError::Unsupported("this fixture host does not describe a TPM".to_owned())
+        })?;
+        Ok(TpmInfo {
+            present: described.present,
+            spec_version: described.spec_version.clone(),
+        })
+    }
+}
+
+impl DeviceSource for FixtureHost {
+    fn devices(&self, bus: DeviceBus) -> Result<Vec<DeviceRecord>, SourceError> {
+        let described = self.devices.as_ref().ok_or_else(|| {
+            SourceError::Unsupported("this fixture host does not describe devices".to_owned())
+        })?;
+        Ok(described
+            .iter()
+            .filter(|device| device.bus == bus)
+            .cloned()
+            .collect())
+    }
+}
+
+impl BootTimeSource for FixtureHost {
+    fn since_boot(&self) -> Result<std::time::Duration, SourceError> {
+        self.milliseconds_since_boot
+            .map(std::time::Duration::from_millis)
+            .ok_or_else(|| {
+                SourceError::Unsupported(
+                    "this fixture host does not describe a boot time".to_owned(),
+                )
+            })
+    }
+}
+
+impl UsnJournalSource for FixtureHost {
+    /// The buffers the fixture's `usn_journal:` block encodes, for its one volume. No block, or another
+    /// volume, is `Unsupported`: a fixture written before this source existed must not claim a machine
+    /// with no journal.
+    fn read_usn_journal(
+        &self,
+        volume: char,
+        visit: &mut dyn FnMut(&[u8]) -> std::ops::ControlFlow<()>,
+    ) -> Result<Option<UsnJournalRead>, SourceError> {
+        let journal = self
+            .usn_journal
+            .as_ref()
+            .filter(|journal| journal.volume == volume.to_ascii_uppercase())
+            .ok_or_else(|| {
+                SourceError::Unsupported(format!(
+                    "this fixture host does not describe the change journal of {volume}:"
+                ))
+            })?;
+        match journal.state {
+            FixtureUsnState::NotActive => return Ok(None),
+            FixtureUsnState::AccessDenied => return Err(SourceError::AccessDenied),
+            FixtureUsnState::Active => {}
+        }
+        for buffer in &journal.buffers {
+            if visit(buffer).is_break() {
+                return Ok(Some(UsnJournalRead {
+                    state: journal.journal,
+                    end: UsnReadEnd::Stopped,
+                }));
+            }
+        }
+        Ok(Some(UsnJournalRead {
+            state: journal.journal,
+            end: journal.end,
+        }))
+    }
+
+    /// The identifier of a folder under `usn_journal: folders:`, or of the journal volume's own root
+    /// (`X:\`), answered with the journal's own `volume_serial` and NTFS's root directory record
+    /// number (ADR 0047 amendment: junctions). A path named in `access_denied` is refused, as a key or
+    /// folder named there is.
+    fn file_id(&self, path: &str) -> Result<Option<FileId>, SourceError> {
+        let journal = self.usn_journal.as_ref().ok_or_else(|| {
+            SourceError::Unsupported(
+                "this fixture host does not describe file identifiers".to_owned(),
+            )
+        })?;
+        let key = normalise_path(path);
+        if self.access_denied.contains(&key) {
+            return Err(SourceError::AccessDenied);
+        }
+        let root = format!("{}:", journal.volume.to_ascii_lowercase());
+        if key == root {
+            return Ok(Some(file_id_for(
+                NTFS_ROOT_DIRECTORY_RECORD,
+                JOURNAL_VOLUME_SERIAL,
+            )));
+        }
+        Ok(journal.folders.get(&key).copied())
+    }
+}
+
+impl RandomReadSource for FixtureHost {
+    /// The length of the bytes the fixture wrote for that file, behind `read_file`'s checks.
+    fn file_size(&self, path: &str) -> Result<Option<u64>, SourceError> {
+        Ok(self
+            .stored_content(path)?
+            .map(|content| u64::try_from(content.len()).unwrap_or(u64::MAX)))
+    }
+
+    /// A slice of the bytes the fixture wrote for that file. Unlike `read_file`, no whole-file limit
+    /// applies: only the slice is returned.
+    fn read_file_at(
+        &self,
+        path: &str,
+        offset: u64,
+        len: usize,
+    ) -> Result<Option<Vec<u8>>, SourceError> {
+        match self.stored_content(path)? {
+            Some(content) => crate::slice_at(content, offset, len).map(Some),
+            None => Ok(None),
+        }
+    }
+
+    fn read_volume_at(
+        &self,
+        volume: char,
+        offset: u64,
+        len: usize,
+    ) -> Result<Vec<u8>, SourceError> {
+        self.windows_filesystem()?;
+        match self.volumes.get(&volume.to_ascii_uppercase()) {
+            None => Err(SourceError::Unsupported(format!(
+                "this fixture host does not describe volume {volume}:"
+            ))),
+            Some(None) => Err(SourceError::AccessDenied),
+            Some(Some(bytes)) => crate::slice_at(bytes, offset, len),
+        }
+    }
+}
+
+impl WmiSubscriptionSource for FixtureHost {
+    fn wmi_objects(
+        &self,
+        namespace: &str,
+        class: WmiSubscriptionClass,
+        properties: &[&str],
+    ) -> Result<Option<Vec<WmiObject>>, SourceError> {
+        let wmi = self.wmi.as_ref().ok_or_else(|| {
+            SourceError::Unsupported("this fixture host does not describe WMI".to_owned())
+        })?;
+        if wmi
+            .access_denied
+            .iter()
+            .any(|n| n.eq_ignore_ascii_case(namespace))
+        {
+            return Err(SourceError::AccessDenied);
+        }
+        let Some(objects) = wmi
+            .namespaces
+            .iter()
+            .find(|(n, _)| n.eq_ignore_ascii_case(namespace))
+            .map(|(_, o)| o)
+        else {
+            return Ok(None);
+        };
+        let kind_of = |object: &WmiObject| match object.class.as_str() {
+            "__EventFilter" => WmiSubscriptionClass::Filter,
+            "__FilterToConsumerBinding" => WmiSubscriptionClass::Binding,
+            _ => WmiSubscriptionClass::Consumer,
+        };
+        Ok(Some(
+            objects
+                .iter()
+                .filter(|object| kind_of(object) == class)
+                .map(|object| WmiObject {
+                    class: object.class.clone(),
+                    properties: object
+                        .properties
+                        .iter()
+                        .filter(|(name, _)| properties.iter().any(|p| p.eq_ignore_ascii_case(name)))
+                        .map(|(name, value)| {
+                            (
+                                name.clone(),
+                                crate::bound_text(value.clone(), crate::MAX_WMI_PROPERTY_BYTES).0,
+                            )
+                        })
+                        .collect(),
+                })
+                .collect(),
+        ))
+    }
+}
+
+impl FirmwareSource for FixtureHost {
+    fn firmware_secure_boot(&self) -> Result<FirmwareSecureBoot, SourceError> {
+        let described = self.firmware.ok_or_else(|| {
+            SourceError::Unsupported("this fixture host does not describe its firmware".to_owned())
+        })?;
+        match described.secure_boot {
+            FixtureFirmwareSecureBoot::Enabled => Ok(FirmwareSecureBoot::Enabled),
+            FixtureFirmwareSecureBoot::Disabled => Ok(FirmwareSecureBoot::Disabled),
+            FixtureFirmwareSecureBoot::VariableAbsent => Ok(FirmwareSecureBoot::VariableAbsent),
+            FixtureFirmwareSecureBoot::NotUefi => Ok(FirmwareSecureBoot::NotUefi),
+            FixtureFirmwareSecureBoot::AccessDenied => Err(SourceError::AccessDenied),
+            FixtureFirmwareSecureBoot::ReadFailed => Err(SourceError::Failed(
+                "this fixture host describes a firmware read that failed".to_owned(),
+            )),
+        }
+    }
+
+    fn iommu_table(&self) -> Result<IommuTable, SourceError> {
+        let described = self.iommu_table.ok_or_else(|| {
+            SourceError::Unsupported(
+                "this fixture host does not describe its ACPI tables".to_owned(),
+            )
+        })?;
+        match described {
+            FixtureIommuTable::Dmar => Ok(IommuTable::Dmar),
+            FixtureIommuTable::Ivrs => Ok(IommuTable::Ivrs),
+            FixtureIommuTable::Neither => Ok(IommuTable::Neither),
+            FixtureIommuTable::NotX86 => Ok(IommuTable::NotX86),
+            FixtureIommuTable::AccessDenied => Err(SourceError::AccessDenied),
+            FixtureIommuTable::ReadFailed => Err(SourceError::Failed(
+                "this fixture host describes an ACPI table read that failed".to_owned(),
+            )),
+        }
+    }
+}
+
+impl SignatureSource for FixtureHost {
+    /// What the fixture wrote under `signature:` for that file, behind the same access checks
+    /// `file_sha256` makes.
+    fn file_signature(&self, path: &str) -> Result<SignatureCheck, SourceError> {
+        self.windows_filesystem()?;
+        let file = self.described_file(path)?;
+        file.signature
+            .clone()
+            .ok_or_else(|| SourceError::Failed(format!("no signature recorded for {path}")))
+    }
+}
+
+impl ProcessSource for FixtureHost {
+    /// The processes the fixture lists, in file order.
+    ///
+    /// A fixture with no `processes:` block never modelled a process list, so it is `Unsupported`
+    /// rather than an empty list: an empty list is the claim that nothing was running (ADR 0010).
+    /// A fixture that writes `processes: []` makes that claim deliberately.
+    fn running_processes(&self) -> Result<Vec<ProcessRecord>, SourceError> {
+        let described = self.processes.as_ref().ok_or_else(|| {
+            SourceError::Unsupported(
+                "this fixture host does not describe running processes".to_owned(),
+            )
+        })?;
+        Ok(described.clone())
+    }
+}
+
+impl crate::ModuleSource for FixtureHost {
+    fn process_modules(&self, pid: u32) -> Result<Vec<String>, SourceError> {
+        let internals = self.internals.get(&pid).ok_or_else(|| {
+            SourceError::Failed(format!("no process {pid} is running on this fixture host"))
+        })?;
+        if internals.denied {
+            return Err(SourceError::AccessDenied);
+        }
+        internals.modules.clone().ok_or_else(|| {
+            SourceError::Unsupported(format!(
+                "this fixture does not describe process {pid}'s modules"
+            ))
+        })
+    }
+
+    fn executable_memory(&self, pid: u32) -> Result<crate::ExecutableMemory, SourceError> {
+        let internals = self.internals.get(&pid).ok_or_else(|| {
+            SourceError::Failed(format!("no process {pid} is running on this fixture host"))
+        })?;
+        if internals.denied {
+            return Err(SourceError::AccessDenied);
+        }
+        internals.memory.ok_or_else(|| {
+            SourceError::Unsupported(format!(
+                "this fixture does not describe process {pid}'s memory"
+            ))
+        })
+    }
+}
+
+impl crate::ServiceSource for FixtureHost {
+    fn service_status(&self, name: &str) -> Result<Option<crate::ServiceStatus>, SourceError> {
+        let services = self.services.as_ref().ok_or_else(|| {
+            SourceError::Unsupported(
+                "this fixture host does not describe the Service Control Manager".to_owned(),
+            )
+        })?;
+        if services.access_denied {
+            return Err(SourceError::AccessDenied);
+        }
+        let queried_at = services
+            .queried_at
+            .parse::<jiff::Timestamp>()
+            .map_err(|e| SourceError::Failed(format!("fixture queried_at: {e}")))?;
+        let Some(service) = services
+            .installed
+            .iter()
+            .find(|(n, _)| n.eq_ignore_ascii_case(name))
+            .map(|(_, s)| s)
+        else {
+            return Ok(None);
+        };
+        if service.access_denied {
+            return Err(SourceError::AccessDenied);
+        }
+        let config = match (&service.config, service.config_access_denied) {
+            (_, true) => Err(SourceError::AccessDenied),
+            (Some(config), false) => Ok(config.clone()),
+            (None, false) => Err(SourceError::Failed("configuration query failed".to_owned())),
+        };
+        Ok(Some(crate::ServiceStatus {
+            state: service.state.unwrap_or(crate::ServiceRunState::Other),
+            pid: service.pid.filter(|p| *p != 0),
+            config,
+            queried_at,
+        }))
+    }
+}
+
+impl Host for FixtureHost {
+    fn platform(&self) -> Platform {
+        self.platform
+    }
+
+    fn os_build(&self) -> Option<String> {
+        self.os_build.clone()
+    }
+
+    fn is_elevated(&self) -> Option<bool> {
+        self.elevated
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const CERT: &str = "ABCDEF0123456789abcdef0123456789ABCDEF0123456789abcdef0123456789";
+
+    fn signed(signature: &str) -> Result<FixtureHost, FixtureError> {
+        FixtureHost::from_yaml_str(
+            &format!(
+                "platform: windows\nfilesystem:\n  'C:\\p':\n    - name: a.dll\n      signature: {signature}\n    - name: b.dll\n"
+            ),
+            "inline",
+        )
+    }
+
+    const DEVICES: &str = r"platform: windows
+devices:
+  - id: 'PCI\VEN_1234&DEV_11E8&SUBSYS_11001AF4&REV_10\4&c580b9d&0&0020'
+    present: true
+    compatible_ids: ['PCI\CC_00FF00', 'PCI\CC_00FF']
+    problem_code: 28
+    first_install: '2026-10-15T11:32:36Z'
+    last_arrival: '2026-10-15T11:32:36Z'
+  - id: 'PCI\VEN_1B36&DEV_0008&SUBSYS_11001AF4&REV_00\3&11583659&0&00'
+    present: false
+    last_arrival: '2026-10-15T11:51:35Z'
+    last_removal: '2026-10-15T11:53:25Z'
+    unreadable: [service]
+  - id: 'HID\VID_0627&PID_0001\6&43b7243&0&0000'
+    present: true
+    service: kbdhid
+";
+
+    #[test]
+    fn devices_are_listed_per_bus_as_models_with_their_times() {
+        let host = FixtureHost::from_yaml_str(DEVICES, "inline").unwrap();
+        let pci = host.devices(DeviceBus::Pci).unwrap();
+        assert_eq!(pci.len(), 2);
+        assert_eq!(
+            pci[0].model_id,
+            r"PCI\VEN_1234&DEV_11E8&SUBSYS_11001AF4&REV_10"
+        );
+        assert_eq!(pci[0].class_code.as_deref(), Some("00FF"));
+        assert_eq!(pci[0].problem_code, Some(28));
+        assert!(pci[0].present);
+        assert_eq!(
+            pci[1].last_removal,
+            Some("2026-10-15T11:53:25Z".parse().unwrap())
+        );
+        assert_eq!(pci[1].unreadable, vec![DeviceProperty::Service]);
+        let hid = host.devices(DeviceBus::Hid).unwrap();
+        assert_eq!(hid.len(), 1);
+        assert_eq!(hid[0].class_code, None);
+        assert_eq!(hid[0].service.as_deref(), Some("kbdhid"));
+    }
+
+    #[test]
+    fn a_host_that_describes_no_devices_is_unsupported_and_an_empty_list_is_none() {
+        let silent = FixtureHost::from_yaml_str("platform: windows\n", "inline").unwrap();
+        assert!(matches!(
+            silent.devices(DeviceBus::Pci),
+            Err(SourceError::Unsupported(_))
+        ));
+        let empty =
+            FixtureHost::from_yaml_str("platform: windows\ndevices: []\n", "inline").unwrap();
+        assert_eq!(empty.devices(DeviceBus::Pci), Ok(Vec::new()));
+    }
+
+    #[test]
+    fn a_fixture_device_a_live_host_could_not_report_fails_to_load() {
+        for yaml in [
+            "platform: windows\ndevices:\n  - { id: 'USBSTOR\\DISK&VEN_X\\1', present: true }\n",
+            "platform: windows\ndevices:\n  - { id: 'PCI\\VEN_1234&DEV_11E8\\1', present: false, problem_code: 28 }\n",
+            "platform: windows\ndevices:\n  - { id: 'PCI\\VEN_1234&DEV_11E8\\1', present: true, first_install: '2026-10-15T11:32:36.5Z' }\n",
+        ] {
+            assert!(
+                FixtureHost::from_yaml_str(yaml, "inline").is_err(),
+                "{yaml}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_valid_signature_reports_its_signer_and_a_lowercased_certificate_hash() {
+        let host = signed(&format!(
+            "{{ state: valid, signer: Example Corp, signer_cert_sha256: {CERT} }}"
+        ))
+        .unwrap();
+        assert_eq!(
+            host.file_signature(r"C:\P\A.DLL"),
+            Ok(SignatureCheck::Valid {
+                signer: "Example Corp".to_owned(),
+                signer_cert_sha256: CERT.to_ascii_lowercase(),
+            })
+        );
+    }
+
+    #[test]
+    fn the_three_other_states_carry_no_signer() {
+        for (written, expected) in [
+            ("no_embedded_signature", SignatureCheck::NoEmbeddedSignature),
+            ("invalid", SignatureCheck::Invalid),
+            ("unverifiable_offline", SignatureCheck::UnverifiableOffline),
+        ] {
+            let host = signed(&format!("{{ state: {written} }}")).unwrap();
+            assert_eq!(host.file_signature(r"C:\p\a.dll"), Ok(expected));
+        }
+    }
+
+    /// A live host never reports a signer it did not trust, so a fixture cannot describe one.
+    #[test]
+    fn a_fixture_cannot_describe_a_signature_no_host_would_report() {
+        for signature in [
+            "{ state: valid, signer: Example Corp }".to_owned(),
+            format!("{{ state: valid, signer_cert_sha256: {CERT} }}"),
+            format!("{{ state: valid, signer: '  ', signer_cert_sha256: {CERT} }}"),
+            "{ state: valid, signer: Example Corp, signer_cert_sha256: abc }".to_owned(),
+            "{ state: invalid, signer: Example Corp }".to_owned(),
+            format!("{{ state: unverifiable_offline, signer_cert_sha256: {CERT} }}"),
+            "{ state: unsigned }".to_owned(),
+        ] {
+            assert!(signed(&signature).is_err(), "{signature} loaded");
+        }
+    }
+
+    #[test]
+    fn a_file_with_no_signature_written_could_not_be_checked() {
+        let host = signed("{ state: invalid }").unwrap();
+        assert!(matches!(
+            host.file_signature(r"C:\p\b.dll"),
+            Err(SourceError::Failed(_))
+        ));
+        assert!(matches!(
+            host.file_signature(r"C:\p\absent.dll"),
+            Err(SourceError::Failed(_))
+        ));
+    }
+
+    #[test]
+    fn a_denied_folder_denies_its_signatures_too() {
+        let host = FixtureHost::from_yaml_str(
+            "platform: windows\naccess_denied: ['C:\\p']\nfilesystem:\n  'C:\\p':\n    - name: a.dll\n      signature: { state: invalid }\n",
+            "inline",
+        )
+        .unwrap();
+        assert_eq!(
+            host.file_signature(r"C:\p\a.dll"),
+            Err(SourceError::AccessDenied)
+        );
+    }
+
+    const HOST: &str = r#"
+platform: windows
+os_build: "26100"
+elevated: false
+registry:
+  'HKLM\SYSTEM\Example':
+    Enabled: 1
+    Name: "hello"
+    Blob:
+      content: "eight or more bytes"
+    Unwritten: {}
+  'HKLM\SYSTEM\Example\Inner':
+    Enabled: 0
+  'HKLM\SYSTEM\Example\Inner\Deeper':
+    Enabled: 0
+env:
+  LOCALAPPDATA: 'C:\Users\fixtureuser\AppData\Local'
+filesystem:
+  'C:\Users\fixtureuser\AppData\Local\Example':
+    - name: readable.dll
+      sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+      content: "the bytes of readable.dll"
+    - name: unreadable.dll
+    - name: cache
+      directory: true
+access_denied:
+  - 'HKLM\SYSTEM\Locked'
+  - 'C:\Users\fixtureuser\AppData\Local\Locked'
+code_integrity:
+  enabled: true
+  test_signing: true
+tpm:
+  present: true
+  spec_version: "2.0"
+processes:
+  - pid: 4
+    name: System
+  - pid: 1200
+    name: FiveM.exe
+    path: 'C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.exe'
+    started_at: '2026-09-10T18:04:12Z'
+"#;
+
+    const EMPTY_HASH: &str = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+
+    /// `read_value` hands back each type the fixture can write, and a `{ qword: }` map is neither a
+    /// binary value nor a number `read_u32` refuses: a live host's reader accepts a QWORD that fits.
+    #[test]
+    fn read_value_names_the_type_the_fixture_wrote() {
+        let host = FixtureHost::from_yaml_str(
+            "platform: windows\nregistry:\n  'HKCU\\Software\\Example':\n    Dword: 0\n    Text: '0'\n    Qword: { qword: 1 }\n    Large: { qword: 4294967296 }\n    Blob: { content: 'x' }\n",
+            "inline",
+        )
+        .unwrap();
+        let key = r"HKCU\Software\Example";
+        assert_eq!(
+            host.read_value(key, "Dword"),
+            Ok(Some(RegistryData::Dword(0)))
+        );
+        assert_eq!(
+            host.read_value(key, "Text"),
+            Ok(Some(RegistryData::Text("0".to_owned())))
+        );
+        assert_eq!(
+            host.read_value(key, "Qword"),
+            Ok(Some(RegistryData::Qword(1)))
+        );
+        assert_eq!(
+            host.read_value(key, "Blob"),
+            Ok(Some(RegistryData::OtherType))
+        );
+        assert_eq!(host.read_value(key, "Absent"), Ok(None));
+        assert_eq!(host.read_value(r"HKCU\Software\Absent", "Dword"), Ok(None));
+        assert_eq!(host.read_u32(key, "Qword"), Ok(Some(1)));
+        assert!(matches!(
+            host.read_u32(key, "Large"),
+            Err(SourceError::Failed(_))
+        ));
+        assert!(matches!(
+            host.read_bytes(key, "Qword"),
+            Err(SourceError::Failed(_))
+        ));
+        assert!(matches!(
+            host.read_string(key, "Qword"),
+            Err(SourceError::Failed(_))
+        ));
+    }
+
+    #[test]
+    fn a_denied_key_denies_read_value_too() {
+        let host = FixtureHost::from_yaml_str(
+            "platform: windows\naccess_denied: ['HKCU\\Software\\Locked']\n",
+            "inline",
+        )
+        .unwrap();
+        assert_eq!(
+            host.read_value(r"HKCU\Software\Locked", "Anything"),
+            Err(SourceError::AccessDenied)
+        );
+    }
+
+    #[test]
+    fn reads_values_case_insensitively() {
+        let host = FixtureHost::from_yaml_str(HOST, "inline").unwrap();
+        assert_eq!(
+            host.read_u32(r"hklm\system\EXAMPLE", "enabled"),
+            Ok(Some(1))
+        );
+        assert_eq!(
+            host.read_string(r"HKLM\SYSTEM\Example", "Name"),
+            Ok(Some("hello".to_owned()))
+        );
+        assert_eq!(host.read_u32(r"HKLM\SYSTEM\Example", "Missing"), Ok(None));
+        assert_eq!(host.os_build().as_deref(), Some("26100"));
+    }
+
+    #[test]
+    fn access_denied_and_type_mismatch() {
+        let host = FixtureHost::from_yaml_str(HOST, "inline").unwrap();
+        assert_eq!(
+            host.read_u32(r"HKLM\SYSTEM\Locked", "Anything"),
+            Err(SourceError::AccessDenied)
+        );
+        assert!(matches!(
+            host.read_u32(r"HKLM\SYSTEM\Example", "Name"),
+            Err(SourceError::Failed(_))
+        ));
+    }
+
+    /// Enumeration answers with the spelling the fixture used, not the lower-cased form the lookup
+    /// map is keyed by: a collector that emits a value name would otherwise report a path the
+    /// machine does not have.
+    #[test]
+    fn subkeys_and_value_names_are_listed_as_the_fixture_spelled_them() {
+        let host = FixtureHost::from_yaml_str(HOST, "inline").unwrap();
+        assert_eq!(
+            host.subkeys(r"hklm\system\EXAMPLE"),
+            Ok(Some(vec!["Inner".to_owned()]))
+        );
+        assert_eq!(
+            host.value_names(r"HKLM\SYSTEM\Example"),
+            Ok(Some(vec![
+                "Blob".to_owned(),
+                "Enabled".to_owned(),
+                "Name".to_owned(),
+                "Unwritten".to_owned(),
+            ]))
+        );
+    }
+
+    /// Only the keys directly inside, as `list_dir` lists only what is directly inside a directory.
+    #[test]
+    fn subkeys_never_recurse() {
+        let host = FixtureHost::from_yaml_str(HOST, "inline").unwrap();
+        assert_eq!(
+            host.subkeys(r"HKLM\SYSTEM\Example\Inner"),
+            Ok(Some(vec!["Deeper".to_owned()]))
+        );
+        assert_eq!(
+            host.subkeys(r"HKLM\SYSTEM\Example\Inner\Deeper"),
+            Ok(Some(vec![]))
+        );
+    }
+
+    /// The three answers a key can give, and they are three different statements: the key is not
+    /// there, the key is there and holds nothing, the key cannot be read.
+    #[test]
+    fn an_absent_key_is_none_and_an_empty_one_is_an_empty_list() {
+        let host = FixtureHost::from_yaml_str(HOST, "inline").unwrap();
+        assert_eq!(host.subkeys(r"HKLM\SYSTEM\Absent"), Ok(None));
+        assert_eq!(host.value_names(r"HKLM\SYSTEM\Absent"), Ok(None));
+        assert_eq!(host.read_bytes(r"HKLM\SYSTEM\Absent", "Anything"), Ok(None));
+        assert_eq!(host.read_bytes(r"HKLM\SYSTEM\Example", "Absent"), Ok(None));
+        assert_eq!(
+            host.subkeys(r"HKLM\SYSTEM\Locked"),
+            Err(SourceError::AccessDenied)
+        );
+        assert_eq!(
+            host.value_names(r"HKLM\SYSTEM\Locked"),
+            Err(SourceError::AccessDenied)
+        );
+        assert_eq!(
+            host.read_bytes(r"HKLM\SYSTEM\Locked", "Anything"),
+            Err(SourceError::AccessDenied)
+        );
+    }
+
+    /// A key that only has subkeys was never written as a key of its own, and it is there all the
+    /// same: a fixture describes a key by writing its values, and this one has none.
+    #[test]
+    fn a_key_that_only_holds_subkeys_is_there_and_holds_no_value() {
+        let host = FixtureHost::from_yaml_str(
+            "platform: windows\nregistry:\n  'HKLM\\SYSTEM\\Parent\\Child':\n    Enabled: 1\n",
+            "inline",
+        )
+        .unwrap();
+        assert_eq!(
+            host.subkeys(r"HKLM\SYSTEM\Parent"),
+            Ok(Some(vec!["Child".to_owned()]))
+        );
+        assert_eq!(host.value_names(r"HKLM\SYSTEM\Parent"), Ok(Some(vec![])));
+    }
+
+    #[test]
+    fn binary_value_bytes_are_read_and_a_value_without_them_fails() {
+        let host = FixtureHost::from_yaml_str(HOST, "inline").unwrap();
+        assert_eq!(
+            host.read_bytes(r"HKLM\SYSTEM\Example", "blob"),
+            Ok(Some(b"eight or more bytes".to_vec()))
+        );
+        assert!(matches!(
+            host.read_bytes(r"HKLM\SYSTEM\Example", "Unwritten"),
+            Err(SourceError::Failed(_))
+        ));
+    }
+
+    /// Asking for the wrong type is a caller's mistake and is reported as one, in both directions,
+    /// rather than being converted into something the caller did not ask for.
+    #[test]
+    fn a_value_of_another_type_is_not_converted() {
+        let host = FixtureHost::from_yaml_str(HOST, "inline").unwrap();
+        assert!(matches!(
+            host.read_bytes(r"HKLM\SYSTEM\Example", "Enabled"),
+            Err(SourceError::Failed(_))
+        ));
+        assert!(matches!(
+            host.read_u32(r"HKLM\SYSTEM\Example", "Blob"),
+            Err(SourceError::Failed(_))
+        ));
+        assert!(matches!(
+            host.read_string(r"HKLM\SYSTEM\Example", "Blob"),
+            Err(SourceError::Failed(_))
+        ));
+    }
+
+    /// The limit is the host's, so it is applied by the fixture host as well as the live one; a
+    /// value of exactly the limit is still read.
+    #[test]
+    fn a_registry_value_over_the_limit_is_refused() {
+        let over = "a".repeat(crate::MAX_REGISTRY_VALUE_BYTES + 1);
+        let host = FixtureHost::from_yaml_str(
+            &format!(
+                "platform: windows\nregistry:\n  'HKLM\\SYSTEM\\Example':\n    Blob:\n      content: \"{over}\"\n"
+            ),
+            "inline",
+        )
+        .unwrap();
+        assert_eq!(
+            host.read_bytes(r"HKLM\SYSTEM\Example", "Blob"),
+            Err(SourceError::TooLarge {
+                limit: crate::MAX_REGISTRY_VALUE_BYTES
+            })
+        );
+    }
+
+    /// `from:` reaches the artifact corpora for a registry value exactly as it does for a file, and
+    /// it is tested against a real one: these bytes are a fuzz seed and a parser fixture.
+    #[test]
+    fn a_loaded_fixture_resolves_a_registry_from_against_its_own_directory() {
+        let fixtures = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures");
+        let host = FixtureHost::load(&fixtures.join("hosts/registry-bytes-present")).unwrap();
+        let key = r"HKLM\SYSTEM\CurrentControlSet\Services\fixture\State";
+
+        let on_disk =
+            std::fs::read(fixtures.join("parsers/bam/documented-24-byte-value.bin")).unwrap();
+        assert_eq!(host.read_bytes(key, "from-disk"), Ok(Some(on_disk)));
+        assert_eq!(
+            host.read_bytes(key, "inline"),
+            Ok(Some(b"hello\n".to_vec()))
+        );
+        assert!(matches!(
+            host.read_bytes(key, "unreadable"),
+            Err(SourceError::Failed(_))
+        ));
+    }
+
+    #[test]
+    fn a_registry_value_describing_its_bytes_twice_is_rejected() {
+        let error = FixtureHost::from_yaml_str(
+            "platform: windows\nregistry:\n  'HKLM\\SYSTEM\\Example':\n    Blob:\n      content: \"a\"\n      from: 'b.bin'\n",
+            "inline",
+        )
+        .unwrap_err();
+        assert!(error.to_string().contains("content"), "{error}");
+    }
+
+    #[test]
+    fn unknown_fields_are_rejected() {
+        assert!(FixtureHost::from_yaml_str("platform: windows\nbogus: 1\n", "inline").is_err());
+        assert!(
+            FixtureHost::from_yaml_str(
+                "platform: windows\nfilesystem:\n  'C:\\x':\n    - name: a.dll\n      bogus: 1\n",
+                "inline"
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn the_four_existing_fields_still_load_without_the_new_ones() {
+        let host = FixtureHost::from_yaml_str("platform: windows\nos_build: \"26100\"\n", "inline")
+            .unwrap();
+        assert_eq!(host.env_var("LOCALAPPDATA"), None);
+        assert_eq!(host.list_dir(r"C:\anything"), Ok(None));
+    }
+
+    #[test]
+    fn environment_variables_are_case_insensitive() {
+        let host = FixtureHost::from_yaml_str(HOST, "inline").unwrap();
+        assert_eq!(
+            host.env_var("localappdata").as_deref(),
+            Some(r"C:\Users\fixtureuser\AppData\Local")
+        );
+        assert_eq!(host.env_var("NOT_SET"), None);
+    }
+
+    #[test]
+    fn directories_are_listed_case_insensitively_and_mark_subdirectories() {
+        let host = FixtureHost::from_yaml_str(HOST, "inline").unwrap();
+        assert_eq!(
+            host.list_dir(r"c:\users\FIXTUREUSER\appdata\local\example"),
+            Ok(Some(vec![
+                DirEntryInfo::named("readable.dll", true),
+                DirEntryInfo::named("unreadable.dll", true),
+                DirEntryInfo::named("cache", false),
+            ]))
+        );
+    }
+
+    #[test]
+    fn a_directory_that_is_not_described_is_none() {
+        let host = FixtureHost::from_yaml_str(HOST, "inline").unwrap();
+        assert_eq!(
+            host.list_dir(r"C:\Users\fixtureuser\AppData\Local\Absent"),
+            Ok(None)
+        );
+    }
+
+    #[test]
+    fn a_file_hash_is_read_and_an_absent_one_fails() {
+        let host = FixtureHost::from_yaml_str(HOST, "inline").unwrap();
+        let dir = r"C:\Users\fixtureuser\AppData\Local\Example";
+        assert_eq!(
+            host.file_sha256(&format!(r"{dir}\READABLE.dll")),
+            Ok(EMPTY_HASH.to_owned())
+        );
+        assert!(matches!(
+            host.file_sha256(&format!(r"{dir}\unreadable.dll")),
+            Err(SourceError::Failed(_))
+        ));
+        assert!(matches!(
+            host.file_sha256(&format!(r"{dir}\absent.dll")),
+            Err(SourceError::Failed(_))
+        ));
+    }
+
+    #[test]
+    fn access_denied_covers_directories_too() {
+        let host = FixtureHost::from_yaml_str(HOST, "inline").unwrap();
+        let dir = r"C:\Users\fixtureuser\AppData\Local\Locked";
+        assert_eq!(host.list_dir(dir), Err(SourceError::AccessDenied));
+        assert_eq!(
+            host.file_sha256(&format!(r"{dir}\x.dll")),
+            Err(SourceError::AccessDenied)
+        );
+        assert_eq!(
+            host.read_file(&format!(r"{dir}\x.dll")),
+            Err(SourceError::AccessDenied)
+        );
+    }
+
+    #[test]
+    fn file_content_is_read_case_insensitively() {
+        let host = FixtureHost::from_yaml_str(HOST, "inline").unwrap();
+        let dir = r"C:\Users\fixtureuser\AppData\Local\Example";
+        assert_eq!(
+            host.read_file(&format!(r"{dir}\READABLE.dll")),
+            Ok(Some(b"the bytes of readable.dll".to_vec()))
+        );
+    }
+
+    /// The two shapes a fixture can describe without writing bytes, and they are different answers:
+    /// a file nobody listed is not on this machine, while one listed without bytes is there and
+    /// cannot be read.
+    #[test]
+    fn an_absent_file_is_none_and_a_listed_one_without_bytes_fails() {
+        let host = FixtureHost::from_yaml_str(HOST, "inline").unwrap();
+        let dir = r"C:\Users\fixtureuser\AppData\Local\Example";
+        assert_eq!(host.read_file(&format!(r"{dir}\absent.dll")), Ok(None));
+        assert_eq!(host.read_file(r"C:\Nowhere\at\all.dll"), Ok(None));
+        assert!(matches!(
+            host.read_file(&format!(r"{dir}\unreadable.dll")),
+            Err(SourceError::Failed(_))
+        ));
+    }
+
+    /// `list_dir` says which entries are files; asking for a directory's bytes is a caller's mistake
+    /// and is reported as one rather than as an empty file.
+    #[test]
+    fn a_directory_has_no_bytes() {
+        let host = FixtureHost::from_yaml_str(HOST, "inline").unwrap();
+        assert!(matches!(
+            host.read_file(r"C:\Users\fixtureuser\AppData\Local\Example\cache"),
+            Err(SourceError::Failed(_))
+        ));
+    }
+
+    #[test]
+    fn a_file_describing_its_bytes_twice_is_rejected() {
+        let error = FixtureHost::from_yaml_str(
+            "platform: windows\nfilesystem:\n  'C:\\x':\n    - name: a.txt\n      content: \"a\"\n      from: 'b.txt'\n",
+            "inline",
+        )
+        .unwrap_err();
+        assert!(error.to_string().contains("content"), "{error}");
+    }
+
+    /// `from:` is how a fixture reaches the artifact corpora in `fixtures/`, so it is tested against
+    /// a real one: the file is CRLF-terminated, which a read that went through text would change.
+    #[test]
+    fn a_loaded_fixture_resolves_from_against_its_own_directory() {
+        let fixtures = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures");
+        let host = FixtureHost::load(&fixtures.join("hosts/file-content-present")).unwrap();
+        let dir = r"C:\ProgramData\fixture";
+
+        let on_disk = std::fs::read(fixtures.join("parsers/pca-app-launch/normal.txt")).unwrap();
+        assert_eq!(
+            host.read_file(&format!(r"{dir}\from-disk.txt")),
+            Ok(Some(on_disk))
+        );
+        assert_eq!(
+            host.read_file(&format!(r"{dir}\inline.txt")),
+            Ok(Some(b"hello\n".to_vec()))
+        );
+        assert!(matches!(
+            host.read_file(&format!(r"{dir}\unreadable.bin")),
+            Err(SourceError::Failed(_))
+        ));
+    }
+
+    /// A `from:` that does not resolve is a broken fixture, and it says so when it is loaded rather
+    /// than looking like a file whose bytes cannot be read.
+    #[test]
+    fn a_from_path_that_does_not_exist_fails_at_load() {
+        let error = FixtureHost::parse(
+            "platform: windows\nfilesystem:\n  'C:\\x':\n    - name: a.txt\n      from: 'no-such-file'\n",
+            "inline",
+            Some(Path::new(env!("CARGO_MANIFEST_DIR"))),
+        )
+        .unwrap_err();
+        assert!(matches!(error, FixtureError::Io { .. }), "{error}");
+    }
+
+    /// An inline fixture has no directory for a relative path to start from, so `from:` is refused
+    /// there instead of being resolved against whatever the test's working directory happens to be.
+    #[test]
+    fn from_needs_a_fixture_directory() {
+        let error = FixtureHost::from_yaml_str(
+            "platform: windows\nfilesystem:\n  'C:\\x':\n    - name: a.txt\n      from: 'b.txt'\n",
+            "inline",
+        )
+        .unwrap_err();
+        assert!(error.to_string().contains("from"), "{error}");
+    }
+
+    #[test]
+    fn code_integrity_and_tpm_are_read_from_the_fixture() {
+        let host = FixtureHost::from_yaml_str(HOST, "inline").unwrap();
+        assert_eq!(
+            host.code_integrity_options(),
+            Ok(CodeIntegrityOptions {
+                enabled: true,
+                test_signing: true,
+            })
+        );
+        assert_eq!(
+            host.tpm_info(),
+            Ok(TpmInfo {
+                present: true,
+                spec_version: Some("2.0".to_owned()),
+            })
+        );
+    }
+
+    /// A fixture written before these settings existed must not silently claim one: silence is
+    /// "never modelled", which is `Unsupported`, and never a made-up "disabled" or "absent".
+    #[test]
+    fn a_fixture_without_the_new_blocks_is_unsupported_not_a_default() {
+        let host = FixtureHost::from_yaml_str("platform: windows\n", "inline").unwrap();
+        assert!(matches!(
+            host.code_integrity_options(),
+            Err(SourceError::Unsupported(_))
+        ));
+        assert!(matches!(host.tpm_info(), Err(SourceError::Unsupported(_))));
+        assert!(matches!(
+            host.firmware_secure_boot(),
+            Err(SourceError::Unsupported(_))
+        ));
+        assert!(matches!(
+            host.running_processes(),
+            Err(SourceError::Unsupported(_))
+        ));
+        assert!(matches!(
+            host.since_boot(),
+            Err(SourceError::Unsupported(_))
+        ));
+    }
+
+    /// A fixture writes what `GetTickCount64` would answer, in its unit, and the host hands it back
+    /// unchanged. Zero is an answer — a machine that has only just started — not a missing value.
+    #[test]
+    fn the_time_since_boot_is_read_from_the_fixture() {
+        let host = FixtureHost::from_yaml_str(
+            "platform: windows\nmilliseconds_since_boot: 93784005\n",
+            "inline",
+        )
+        .unwrap();
+        assert_eq!(
+            host.since_boot(),
+            Ok(std::time::Duration::from_millis(93_784_005))
+        );
+        let host =
+            FixtureHost::from_yaml_str("platform: windows\nmilliseconds_since_boot: 0\n", "inline")
+                .unwrap();
+        assert_eq!(host.since_boot(), Ok(std::time::Duration::ZERO));
+    }
+
+    /// Three answers, and they are three statements: the attribute is set, it is not, and the
+    /// fixture never said. The third must not read as the second (ADR 0037).
+    #[test]
+    fn the_read_only_attribute_is_what_the_fixture_wrote_and_silence_is_unsupported() {
+        let host = FixtureHost::from_yaml_str(
+            "platform: windows\nfilesystem:\n  'C:\\p':\n    - name: set.pf\n      read_only: true\n    - name: clear.pf\n      read_only: false\n    - name: silent.pf\n",
+            "inline",
+        )
+        .unwrap();
+        assert_eq!(host.is_read_only(r"C:\P\SET.PF"), Ok(Some(true)));
+        assert_eq!(host.is_read_only(r"C:\p\clear.pf"), Ok(Some(false)));
+        assert!(matches!(
+            host.is_read_only(r"C:\p\silent.pf"),
+            Err(SourceError::Unsupported(_))
+        ));
+        assert_eq!(host.is_read_only(r"C:\p\absent.pf"), Ok(None));
+    }
+
+    #[test]
+    fn a_listing_reports_the_size_and_times_the_fixture_wrote_and_nothing_else() {
+        let host = FixtureHost::from_yaml_str(
+            "platform: windows\nfilesystem:\n  'C:\\p':\n    - name: a.log\n      size: 42\n      created: 2026-09-01T10:00:00Z\n      modified: 2025-01-02T03:04:05Z\n    - name: sub\n      directory: true\n      created: 2026-09-02T00:00:00Z\n    - name: silent.log\n",
+            "inline",
+        )
+        .unwrap();
+        let at = |text: &str| Some(text.parse::<jiff::Timestamp>().unwrap());
+        assert_eq!(
+            host.list_dir(r"C:\p"),
+            Ok(Some(vec![
+                DirEntryInfo {
+                    name: "a.log".to_owned(),
+                    is_file: true,
+                    size: Some(42),
+                    created: at("2026-09-01T10:00:00Z"),
+                    modified: at("2025-01-02T03:04:05Z"),
+                },
+                DirEntryInfo {
+                    created: at("2026-09-02T00:00:00Z"),
+                    ..DirEntryInfo::named("sub", false)
+                },
+                DirEntryInfo::named("silent.log", true),
+            ]))
+        );
+    }
+
+    /// A path's own times are what its parent's listing says, a drive root's are what `drive_roots:`
+    /// says, and a denied path is refused while a denied parent is not (ADR 0061).
+    #[test]
+    fn times_come_from_the_parents_listing_or_the_drive_roots() {
+        let host = FixtureHost::from_yaml_str(
+            "platform: windows\ndrive_roots:\n  'C:':\n    created: 2019-01-02T03:04:05Z\naccess_denied:\n  - 'C:\\Locked'\n  - 'C:\\Hidden'\nfilesystem:\n  'C:\\':\n    - name: $Recycle.Bin\n      directory: true\n      created: 2019-01-03T00:00:00Z\n      modified: 2020-01-01T00:00:00Z\n    - name: Locked\n      directory: true\n  'C:\\Hidden':\n    - name: inner\n      directory: true\n      created: 2021-01-01T00:00:00Z\n",
+            "inline",
+        )
+        .unwrap();
+        let at = |text: &str| Some(text.parse::<jiff::Timestamp>().unwrap());
+        assert_eq!(
+            host.times(r"C:\"),
+            Ok(Some(EntryTimes {
+                created: at("2019-01-02T03:04:05Z"),
+                modified: None,
+            }))
+        );
+        assert_eq!(
+            host.times(r"c:\$RECYCLE.BIN"),
+            Ok(Some(EntryTimes {
+                created: at("2019-01-03T00:00:00Z"),
+                modified: at("2020-01-01T00:00:00Z"),
+            }))
+        );
+        assert_eq!(host.times(r"C:\Locked"), Err(SourceError::AccessDenied));
+        assert_eq!(
+            host.times(r"C:\Hidden\inner"),
+            Ok(Some(EntryTimes {
+                created: at("2021-01-01T00:00:00Z"),
+                modified: None,
+            }))
+        );
+        assert_eq!(host.times(r"C:\absent"), Ok(None));
+        assert_eq!(host.times(r"D:\"), Ok(None));
+        assert!(
+            FixtureHost::from_yaml_str(
+                "platform: windows\ndrive_roots:\n  'C:\\Windows': {}\n",
+                "inline"
+            )
+            .unwrap_err()
+            .to_string()
+            .contains("is not a drive")
+        );
+    }
+
+    /// The journal identifier becomes a date inside the host and nothing else does (ADR 0061).
+    #[test]
+    fn a_journal_identifier_is_handed_over_as_its_date_only() {
+        let read = |yaml: &str| {
+            let host = FixtureHost::from_yaml_str(yaml, "inline").unwrap();
+            host.read_usn_journal('C', &mut |_| std::ops::ControlFlow::Continue(()))
+                .unwrap()
+                .unwrap()
+                .state
+                .created_on
+        };
+        assert_eq!(
+            read("platform: windows\nusn_journal:\n  journal_id: 132223104000000000\n"),
+            Some(jiff::civil::date(2020, 1, 1))
+        );
+        assert_eq!(
+            read("platform: windows\nusn_journal:\n  journal_id: 7\n"),
+            None
+        );
+        assert_eq!(read("platform: windows\nusn_journal: {}\n"), None);
+    }
+
+    #[test]
+    fn a_fixture_listing_refuses_what_no_listing_reports() {
+        for (yaml, needle) in [
+            (
+                "platform: windows\nfilesystem:\n  'C:\\p':\n    - name: sub\n      directory: true\n      size: 1\n",
+                "files only",
+            ),
+            (
+                "platform: windows\nfilesystem:\n  'C:\\p':\n    - name: a.log\n      created: 2026-09-01T10:00:00.5Z\n",
+                "fraction of a second",
+            ),
+            (
+                "platform: windows\nfilesystem:\n  'C:\\p':\n    - name: a.log\n      modified: yesterday\n",
+                "`yesterday`",
+            ),
+        ] {
+            let error = FixtureHost::from_yaml_str(yaml, "inline")
+                .unwrap_err()
+                .to_string();
+            assert!(error.contains(needle), "{error}");
+        }
+    }
+
+    #[test]
+    fn a_denied_folder_denies_the_read_only_attribute_too() {
+        let host = FixtureHost::from_yaml_str(
+            "platform: windows\naccess_denied: ['C:\\p']\nfilesystem:\n  'C:\\p':\n    - name: a.pf\n      read_only: false\n",
+            "inline",
+        )
+        .unwrap();
+        assert_eq!(
+            host.is_read_only(r"C:\p\a.pf"),
+            Err(SourceError::AccessDenied)
+        );
+    }
+
+    /// A block that does not name a channel describes a service that has none of that name; no
+    /// block at all describes nothing, and must not be read as "no such channel" (ADR 0042).
+    #[test]
+    fn a_channel_is_what_the_fixture_wrote_and_no_block_is_unsupported() {
+        let host = FixtureHost::from_yaml_str(
+            "platform: windows\naccess_denied: ['Locked/Operational']\nevent_log_channels:\n  Security:\n    log_file_path: '%SystemRoot%\\System32\\Winevt\\Logs\\Security.evtx'\n    max_size_bytes: 20971520\n",
+            "inline",
+        )
+        .unwrap();
+        let reader = host.channel_config_reader().unwrap();
+        assert_eq!(
+            reader.channel_config("security"),
+            Ok(Some(ChannelConfig {
+                log_file_path: r"%SystemRoot%\System32\Winevt\Logs\Security.evtx".to_owned(),
+                max_size_bytes: 20_971_520,
+            }))
+        );
+        assert_eq!(reader.channel_config("No-Such/Channel"), Ok(None));
+        assert_eq!(
+            reader.channel_config("locked/operational"),
+            Err(SourceError::AccessDenied)
+        );
+
+        let silent = FixtureHost::from_yaml_str("platform: windows\n", "inline").unwrap();
+        assert!(matches!(
+            silent.channel_config_reader(),
+            Err(SourceError::Unsupported(_))
+        ));
+        let other = FixtureHost::from_yaml_str("platform: other\n", "inline").unwrap();
+        assert!(matches!(
+            other.channel_config_reader(),
+            Err(SourceError::Unsupported(_))
+        ));
+    }
+
+    /// A channel either answers or never does, and a fixture that says both, or neither, fails to load.
+    #[test]
+    fn a_channel_that_never_answers_is_written_alone() {
+        let with = |channel: &str| {
+            FixtureHost::from_yaml_str(
+                &format!("platform: windows\nevent_log_channels:\n  A/B:\n    {channel}\n"),
+                "inline",
+            )
+        };
+        assert!(with("never_answers: true").is_ok());
+        for refused in [
+            "{ never_answers: true, max_size_bytes: 1 }",
+            "{ never_answers: false }",
+            "{ log_file_path: 'C:\\x.evtx' }",
+        ] {
+            let yaml = format!("platform: windows\nevent_log_channels:\n  A/B: {refused}\n");
+            assert!(
+                FixtureHost::from_yaml_str(&yaml, "inline").is_err(),
+                "{refused} loaded"
+            );
+        }
+    }
+
+    #[test]
+    fn processes_are_returned_in_file_order() {
+        let host = FixtureHost::from_yaml_str(HOST, "inline").unwrap();
+        assert_eq!(
+            host.running_processes(),
+            Ok(vec![
+                ProcessRecord {
+                    pid: 4,
+                    name: "System".to_owned(),
+                    path: None,
+                    started_at: None,
+                    parent_pid: None,
+                },
+                ProcessRecord {
+                    pid: 1200,
+                    name: "FiveM.exe".to_owned(),
+                    path: Some(r"C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.exe".to_owned()),
+                    started_at: Some("2026-09-10T18:04:12Z".parse().unwrap()),
+                    parent_pid: None,
+                },
+            ])
+        );
+    }
+
+    /// A live host reports a creation time in whole seconds, and a time that is not one at all is a
+    /// mistake in the fixture: both fail to load rather than reaching a collector (ADR 0062).
+    #[test]
+    fn a_process_start_time_no_live_host_reports_does_not_load() {
+        for refused in ["'2026-09-10T18:04:12.5Z'", "'yesterday'", "'2026-09-10'"] {
+            let yaml = format!(
+                "platform: windows\nprocesses:\n  - pid: 1200\n    name: FiveM.exe\n    started_at: {refused}\n"
+            );
+            assert!(
+                FixtureHost::from_yaml_str(&yaml, "inline").is_err(),
+                "{refused} loaded"
+            );
+        }
+    }
+
+    /// Writing the block with nothing in it is a deliberate statement, unlike leaving it out.
+    #[test]
+    fn an_explicitly_empty_process_list_is_an_answer() {
+        let host =
+            FixtureHost::from_yaml_str("platform: windows\nprocesses: []\n", "inline").unwrap();
+        assert_eq!(host.running_processes(), Ok(vec![]));
+    }
+
+    #[test]
+    fn an_absent_tpm_has_no_spec_version() {
+        let host =
+            FixtureHost::from_yaml_str("platform: windows\ntpm:\n  present: false\n", "inline")
+                .unwrap();
+        assert_eq!(
+            host.tpm_info(),
+            Ok(TpmInfo {
+                present: false,
+                spec_version: None,
+            })
+        );
+    }
+
+    #[test]
+    fn unknown_fields_in_the_new_blocks_are_rejected() {
+        assert!(
+            FixtureHost::from_yaml_str(
+                "platform: windows\ncode_integrity:\n  enabled: true\n  bogus: 1\n",
+                "inline"
+            )
+            .is_err()
+        );
+        assert!(
+            FixtureHost::from_yaml_str(
+                "platform: windows\ntpm:\n  present: true\n  bogus: 1\n",
+                "inline"
+            )
+            .is_err()
+        );
+        assert!(
+            FixtureHost::from_yaml_str(
+                "platform: windows\nprocesses:\n  - pid: 4\n    name: System\n    bogus: 1\n",
+                "inline"
+            )
+            .is_err()
+        );
+    }
+
+    /// Every state a fixture can write reaches the collector as the host reports it: four answers,
+    /// and the two ways of not getting one.
+    #[test]
+    fn firmware_secure_boot_is_read_from_the_fixture() {
+        let read = |state: &str| {
+            FixtureHost::from_yaml_str(
+                &format!("platform: windows\nfirmware:\n  secure_boot: {state}\n"),
+                "inline",
+            )
+            .unwrap()
+            .firmware_secure_boot()
+        };
+        assert_eq!(read("enabled"), Ok(FirmwareSecureBoot::Enabled));
+        assert_eq!(read("disabled"), Ok(FirmwareSecureBoot::Disabled));
+        assert_eq!(
+            read("variable_absent"),
+            Ok(FirmwareSecureBoot::VariableAbsent)
+        );
+        assert_eq!(read("not_uefi"), Ok(FirmwareSecureBoot::NotUefi));
+        assert_eq!(read("access_denied"), Err(SourceError::AccessDenied));
+        assert!(matches!(read("read_failed"), Err(SourceError::Failed(_))));
+    }
+
+    #[test]
+    fn unknown_fields_and_states_in_the_firmware_block_are_rejected() {
+        for yaml in [
+            "platform: windows\nfirmware:\n  secure_boot: enabled\n  bogus: 1\n",
+            "platform: windows\nfirmware:\n  secure_boot: on\n",
+            "platform: windows\nfirmware: {}\n",
+        ] {
+            assert!(
+                FixtureHost::from_yaml_str(yaml, "inline").is_err(),
+                "{yaml}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_non_windows_fixture_has_no_file_system() {
+        let host = FixtureHost::from_yaml_str("platform: other\n", "inline").unwrap();
+        assert!(matches!(
+            host.list_dir(r"C:\x"),
+            Err(SourceError::Unsupported(_))
+        ));
+        assert!(matches!(
+            host.file_sha256(r"C:\x\y.dll"),
+            Err(SourceError::Unsupported(_))
+        ));
+        assert!(matches!(
+            host.read_file(r"C:\x\y.dll"),
+            Err(SourceError::Unsupported(_))
+        ));
+    }
+
+    fn read_all(
+        host: &FixtureHost,
+        volume: char,
+    ) -> (Result<Option<UsnJournalRead>, SourceError>, Vec<Vec<u8>>) {
+        let mut buffers = Vec::new();
+        let read = host.read_usn_journal(volume, &mut |bytes| {
+            buffers.push(bytes.to_vec());
+            std::ops::ControlFlow::Continue(())
+        });
+        (read, buffers)
+    }
+
+    #[test]
+    fn a_usn_journal_block_encodes_version_3_records_under_their_folders() {
+        let host = FixtureHost::from_yaml_str(
+            r"
+platform: windows
+usn_journal:
+  maximum_size: 33554432
+  folders:
+    'C:\Windows\Prefetch': 7
+  records:
+    - parent: 'C:\Windows\Prefetch'
+      reasons: [file_create, close]
+      count: 3
+      first: '2026-09-08T01:11:56Z'
+      last: '2026-09-14T16:22:50Z'
+    - reasons: [data_extend]
+",
+            "inline",
+        )
+        .unwrap();
+
+        let (read, buffers) = read_all(&host, 'C');
+        let read = read.unwrap().unwrap();
+        assert_eq!(read.end, UsnReadEnd::Complete);
+        assert_eq!(read.state.maximum_size, 33_554_432);
+        assert_eq!(read.state.first_usn, read.state.lowest_valid_usn);
+        assert_eq!(buffers.len(), 1);
+        let bytes = &buffers[0];
+        // Next USN, then four 80-byte version 3 records.
+        assert_eq!(bytes.len(), 8 + 4 * 80);
+        let parent = |record: usize| &bytes[8 + record * 80 + 24..8 + record * 80 + 40];
+        let mut prefetch = [0u8; 16];
+        prefetch[..8].copy_from_slice(&7u64.to_le_bytes());
+        assert_eq!(parent(0), prefetch);
+        assert_eq!(parent(2), prefetch);
+        assert_ne!(parent(3), prefetch);
+        let reason = |record: usize| {
+            u32::from_le_bytes(
+                bytes[8 + record * 80 + 56..8 + record * 80 + 60]
+                    .try_into()
+                    .unwrap(),
+            )
+        };
+        assert_eq!(reason(0), 0x8000_0100);
+        assert_eq!(reason(3), 0x0000_0002);
+
+        assert_eq!(
+            host.file_id(r"c:\windows\prefetch").unwrap(),
+            Some(FileId {
+                id_128: prefetch,
+                index_64: 7,
+                volume_serial: JOURNAL_VOLUME_SERIAL,
+            })
+        );
+        assert_eq!(
+            host.file_id(r"C:\Windows\System32\winevt\Logs").unwrap(),
+            None
+        );
+    }
+
+    #[test]
+    fn a_usn_journal_block_can_describe_every_way_a_read_ends() {
+        let not_active = FixtureHost::from_yaml_str(
+            "platform: windows\nusn_journal:\n  state: not_active\n",
+            "inline",
+        )
+        .unwrap();
+        assert_eq!(read_all(&not_active, 'C').0, Ok(None));
+
+        let denied = FixtureHost::from_yaml_str(
+            "platform: windows\nusn_journal:\n  state: access_denied\n",
+            "inline",
+        )
+        .unwrap();
+        assert_eq!(read_all(&denied, 'C').0, Err(SourceError::AccessDenied));
+
+        let changed = FixtureHost::from_yaml_str(
+            "platform: windows\nusn_journal:\n  ends: journal_changed\n  trimmed: true\n  records:\n    - reasons: [close]\n",
+            "inline",
+        )
+        .unwrap();
+        let read = read_all(&changed, 'C').0.unwrap().unwrap();
+        assert_eq!(read.end, UsnReadEnd::JournalChanged);
+        assert_ne!(read.state.first_usn, read.state.lowest_valid_usn);
+
+        let other_volume =
+            FixtureHost::from_yaml_str("platform: windows\nusn_journal: {}\n", "inline").unwrap();
+        assert!(matches!(
+            read_all(&other_volume, 'D').0,
+            Err(SourceError::Unsupported(_))
+        ));
+
+        let undescribed = FixtureHost::from_yaml_str("platform: windows\n", "inline").unwrap();
+        assert!(matches!(
+            read_all(&undescribed, 'C').0,
+            Err(SourceError::Unsupported(_))
+        ));
+        assert!(matches!(
+            undescribed.file_id(r"C:\Windows\Prefetch"),
+            Err(SourceError::Unsupported(_))
+        ));
+    }
+
+    #[test]
+    fn a_visitor_that_breaks_stops_the_read_and_version_2_records_are_64_bytes() {
+        let host = FixtureHost::from_yaml_str(
+            "platform: windows\nusn_journal:\n  records:\n    - reasons: [close]\n      major: 2\n      count: 2000\n",
+            "inline",
+        )
+        .unwrap();
+        let mut seen = 0usize;
+        let read = host
+            .read_usn_journal('C', &mut |bytes| {
+                seen += 1;
+                assert_eq!((bytes.len() - 8) % 64, 0);
+                std::ops::ControlFlow::Break(())
+            })
+            .unwrap()
+            .unwrap();
+        assert_eq!(read.end, UsnReadEnd::Stopped);
+        assert_eq!(seen, 1);
+    }
+
+    #[test]
+    fn a_folder_named_in_access_denied_has_no_identifier_to_give() {
+        let host = FixtureHost::from_yaml_str(
+            "platform: windows\naccess_denied:\n  - 'C:\\Windows\\Prefetch'\nusn_journal:\n  folders:\n    'C:\\Windows\\Prefetch': 1\n",
+            "inline",
+        )
+        .unwrap();
+        assert_eq!(
+            host.file_id(r"C:\Windows\Prefetch"),
+            Err(SourceError::AccessDenied)
+        );
+    }
+
+    /// A record group whose `last` is before its `first` is a transposed fixture, not a group with a
+    /// negative span: it is rejected like every other invalid `usn_journal` group, rather than
+    /// silently clamped to a span of zero with a final record that jumps backward.
+    #[test]
+    fn a_record_group_with_last_before_first_is_rejected() {
+        let error = FixtureHost::from_yaml_str(
+            "platform: windows\nusn_journal:\n  records:\n    - reasons: [close]\n      first: '2026-09-14T00:00:00Z'\n      last: '2026-09-13T00:00:00Z'\n",
+            "inline",
+        )
+        .unwrap_err();
+        assert!(matches!(error, FixtureError::Parse { .. }), "{error}");
+        assert!(error.to_string().contains("last"), "{error}");
+    }
+
+    /// A caller compares a folder's identifier against the journal volume's own, so the drive root has
+    /// to answer with the journal's `volume_serial` too — this is what lets `usn` tell a folder reached
+    /// through a junction to another volume apart from one really on the system volume.
+    #[test]
+    fn a_drive_root_answers_with_the_journal_volume_serial() {
+        let host =
+            FixtureHost::from_yaml_str("platform: windows\nusn_journal: {}\n", "inline").unwrap();
+        let root = host.file_id(r"C:\").unwrap().unwrap();
+        assert_eq!(root.volume_serial, JOURNAL_VOLUME_SERIAL);
+        assert_eq!(root.index_64, NTFS_ROOT_DIRECTORY_RECORD);
+        // Spelled without the trailing backslash, or in another case: the same answer.
+        assert_eq!(host.file_id("c:").unwrap().unwrap(), root);
+    }
+
+    /// `other_volume_folders` is how a fixture describes a folder reached through a junction: same
+    /// drive letter, different volume underneath.
+    #[test]
+    fn a_folder_in_other_volume_folders_carries_the_other_volume_serial() {
+        let host = FixtureHost::from_yaml_str(
+            "platform: windows\nusn_journal:\n  folders:\n    'C:\\Windows\\Prefetch': 1\n    'C:\\Plugins': 4\n  other_volume_folders:\n    - 'C:\\Plugins'\n",
+            "inline",
+        )
+        .unwrap();
+        let prefetch = host.file_id(r"C:\Windows\Prefetch").unwrap().unwrap();
+        let plugins = host.file_id(r"C:\Plugins").unwrap().unwrap();
+        assert_eq!(prefetch.volume_serial, JOURNAL_VOLUME_SERIAL);
+        assert_eq!(plugins.volume_serial, OTHER_VOLUME_SERIAL);
+        assert_ne!(prefetch.volume_serial, plugins.volume_serial);
+    }
+
+    /// A path in `other_volume_folders` that no `folders:` entry describes is a fixture that claims a
+    /// junction over a folder nobody said existed, so it is rejected rather than silently ignored.
+    #[test]
+    fn an_other_volume_folders_entry_missing_from_folders_is_rejected() {
+        let error = FixtureHost::from_yaml_str(
+            "platform: windows\nusn_journal:\n  folders:\n    'C:\\Windows\\Prefetch': 1\n  other_volume_folders:\n    - 'C:\\Elsewhere'\n",
+            "inline",
+        )
+        .unwrap_err();
+        assert!(matches!(error, FixtureError::Parse { .. }), "{error}");
+        assert!(
+            error.to_string().contains("other_volume_folders"),
+            "{error}"
+        );
+    }
+}

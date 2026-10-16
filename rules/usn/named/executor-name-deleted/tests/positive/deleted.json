@@ -1,0 +1,23 @@
+{
+  "description": "Synthetic positive case for usn/named/executor-name-deleted: deleted.",
+  "observations": [
+    {
+      "collector": "usn",
+      "fields": {
+        "location": "named",
+        "name": "Solara.exe",
+        "tool_id": "solara",
+        "tool_kind": "executor",
+        "match_kind": "ambiguous_alias",
+        "records": 4,
+        "created": 1,
+        "deleted": 1,
+        "renamed": 0,
+        "data_changed": 2,
+        "first_seen": "2026-10-14T20:00:00Z",
+        "last_seen": "2026-10-14T22:00:00Z"
+      }
+    }
+  ],
+  "expect_matches": 1
+}

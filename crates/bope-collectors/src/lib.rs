@@ -1,0 +1,742 @@
+// SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+
+//! Collectors read one kind of artifact from a [`Host`] and report what they saw.
+//! Rules for writing one are in `crates/bope-collectors/AGENTS.md` and `CONVENTIONS.md` §3.
+
+pub mod amcache;
+pub mod autostart;
+pub mod bam;
+pub mod browser_ext;
+pub mod catalog;
+pub mod common;
+pub mod defender_exclusion;
+pub mod driver_service;
+pub mod evtx;
+pub mod executor_footprint;
+pub mod failure;
+pub mod fastflags;
+pub mod feature_usage;
+pub mod fivem_dir;
+pub mod fivem_edition;
+pub mod fivem_servers;
+pub mod hijack;
+pub mod install_marker;
+pub mod installed_programs;
+pub mod location;
+pub mod machine_identity;
+pub mod mft;
+pub mod muicache;
+pub mod net_adapter;
+pub mod net_config;
+pub mod os_image;
+pub mod paths;
+pub mod pca;
+pub mod pci_device;
+pub mod posture;
+pub mod powershell_text;
+pub mod prefetch;
+pub mod process;
+pub mod recycle_bin;
+pub mod roblox;
+pub mod roblox_files;
+pub mod roblox_process;
+pub mod roblox_trace;
+pub mod scan;
+pub mod shell_mru;
+pub mod shellbags;
+pub mod shimcache;
+pub mod shortcuts;
+pub mod srum;
+pub mod usb_device;
+pub mod user_files;
+pub mod userassist;
+pub mod usn;
+pub mod windows_service;
+pub mod windows_start;
+pub mod wmi_subscription;
+
+use bope_core::model::{CollectorRun, UnmeasuredReason};
+pub use bope_core::model::{ScanTier, SensitiveKind};
+use bope_host::Host;
+
+/// What kind of value an observation field carries, so that `cargo xtask check-rules` can refuse an
+/// operator the field cannot take (ADR 0029).
+///
+/// The engine never sees this: it dispatches on the JSON value it is handed, and the rules bundle
+/// loads in a build whose collectors this declaration does not reach. It exists so that a rule
+/// asking `name|gt: 3` is refused at review time rather than reported `not_found` for ever.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FieldKind {
+    /// A string with no order of its own: a path, a file name, a channel, a status word.
+    Text,
+    /// A JSON number: a count, a size, an id.
+    Number,
+    /// A JSON boolean.
+    Bool,
+    /// A string holding one instant, written by `jiff::Timestamp::to_string` (RFC 3339, UTC).
+    Timestamp,
+}
+
+impl FieldKind {
+    /// Stable identifier used in the messages `check-rules` prints.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Text => "text",
+            Self::Number => "a number",
+            Self::Bool => "a boolean",
+            Self::Timestamp => "a timestamp",
+        }
+    }
+}
+
+/// One observation field a collector declares it can emit.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Field {
+    /// The field name a rule's `match` may use.
+    pub name: &'static str,
+    /// What kind of value it carries.
+    pub kind: FieldKind,
+    /// The kind of sensitive value it carries, which SS mode hides unless the player agreed to show
+    /// that kind, or `None` (ADR 0052).
+    pub sensitive: Option<SensitiveKind>,
+    /// Whether a timestamp field's values are timeline times (ADR 0051). `true` for every timestamp
+    /// field unless it was declared [`Self::off_timeline`]; meaningless for the other kinds.
+    pub on_timeline: bool,
+}
+
+impl Field {
+    /// A field carrying text.
+    pub const fn text(name: &'static str) -> Self {
+        Self {
+            name,
+            kind: FieldKind::Text,
+            sensitive: None,
+            on_timeline: false,
+        }
+    }
+
+    /// A field carrying a number.
+    pub const fn number(name: &'static str) -> Self {
+        Self {
+            name,
+            kind: FieldKind::Number,
+            sensitive: None,
+            on_timeline: false,
+        }
+    }
+
+    /// A field carrying a boolean.
+    pub const fn boolean(name: &'static str) -> Self {
+        Self {
+            name,
+            kind: FieldKind::Bool,
+            sensitive: None,
+            on_timeline: false,
+        }
+    }
+
+    /// This field, marked as carrying a sensitive value of `kind` (ADR 0052). Only a collector whose
+    /// tier is `full` may mark one: a standard scan's reads are what every player agrees to.
+    #[must_use]
+    pub const fn sensitive(self, kind: SensitiveKind) -> Self {
+        Self {
+            sensitive: Some(kind),
+            ..self
+        }
+    }
+
+    /// A field carrying one instant as RFC 3339 text.
+    pub const fn timestamp(name: &'static str) -> Self {
+        Self {
+            name,
+            kind: FieldKind::Timestamp,
+            sensitive: None,
+            on_timeline: true,
+        }
+    }
+
+    /// This timestamp field, kept off the timeline: its values are read for one named purpose and
+    /// are not timeline times (ADR 0062 owner decision 8, `process`'s `started_at`, read for the
+    /// session statement only). The field is still a timestamp to `check-rules`.
+    #[must_use]
+    pub const fn off_timeline(self) -> Self {
+        Self {
+            on_timeline: false,
+            ..self
+        }
+    }
+}
+
+/// Reads one kind of artifact. Implementations must be read-only and must never panic.
+pub trait Collector {
+    /// Stable id, equal to the `collector` field of the rules that read it.
+    fn id(&self) -> &'static str;
+    /// Every observation field this collector can emit, with the kind of value it carries, sorted
+    /// by name.
+    ///
+    /// This is the vocabulary a rule's `match` may name, and `cargo xtask check-rules` rejects a
+    /// rule that names anything outside it (ADR 0026). Since ADR 0029 each entry also carries a
+    /// [`FieldKind`], and `check-rules` rejects an operator the kind cannot take — an ordinal
+    /// comparison against a field that is only ever text, for one. It is a declaration rather than
+    /// something derived from the code, so it can drift from what `collect` really puts in a field
+    /// map; what holds the two together is `every_emitted_field_is_declared` and
+    /// `every_emitted_value_has_its_declared_kind` in this file, which run every collector over
+    /// every fixture host and fail on a field no list names or a value of the wrong shape.
+    ///
+    /// There is deliberately no default implementation: a new collector that forgets this does not
+    /// compile, rather than declaring an empty vocabulary that would reject every rule written for
+    /// it.
+    fn fields(&self) -> &'static [Field];
+    /// Every reason this collector can give for not having looked, in a run or in `gaps`.
+    ///
+    /// This is what a rule's `unmeasured_when` may name, and `cargo xtask check-rules` rejects a
+    /// rule that declares a reason its collector cannot produce (ADR 0027) — a declaration that can
+    /// never come true, which since ADR 0027 also silently suppresses nothing. `collector_unavailable`
+    /// is not listed by anyone: the engine produces it when no run for the collector exists at all.
+    ///
+    /// Like [`Collector::fields`] it is a declaration, bound to the code by the
+    /// `every_reason_a_collector_reports_is_declared` test in this file rather than derived from it,
+    /// and with the same limit: a reason no fixture host provokes cannot be proved reachable.
+    fn unmeasured_reasons(&self) -> &'static [UnmeasuredReason];
+    /// The **discriminator**: the field whose value says which of several places this collector reads
+    /// an observation is about, when it reads more than one, or `None` (ADR 0044).
+    ///
+    /// Two things follow from declaring one. A place that could not be read is reported as
+    /// `DiscriminatorGaps` for that value rather than as a gap for the whole run, so a rule whose
+    /// `match` rules that place out keeps the answer the other places give it. And
+    /// `cargo xtask check-baseline` does not count an observation that differs from a rule **only** in
+    /// the discriminator as confronting that rule: it is about another place, so it was never asked
+    /// the rule's question (ADR 0033, amended).
+    ///
+    /// The collector promises that every observation it emits carries the field. That promise is bound
+    /// by `every_observation_carries_its_collectors_discriminator` in this file, and
+    /// `discriminator_gaps_name_the_declared_discriminator` binds the gaps to the declaration.
+    fn discriminator(&self) -> Option<&'static str> {
+        None
+    }
+    /// The two timestamp fields that bound what this collector's source could see, when it has
+    /// such a span, or `None` (ADR 0051).
+    ///
+    /// The timeline shows the span beside the times, because "nothing recorded here" can only be read
+    /// inside it. `Coverage::place` narrows it to the one observation about the whole source, for a
+    /// collector whose other observations carry the same two fields about something smaller.
+    fn coverage(&self) -> Option<Coverage> {
+        None
+    }
+    /// How this collector's observations say how far back its source reaches, when they do, or
+    /// `None` (ADR 0061).
+    ///
+    /// The core never guesses which field is a source's oldest time; `scan::run` copies this into the
+    /// report, and the trace-ages view reads it. A collector that declares one also has a text in
+    /// `rules/ages/<collector>.yaml` saying what the source ordinarily keeps, which
+    /// `cargo xtask check-rules` requires.
+    fn age(&self) -> Option<Age> {
+        None
+    }
+    /// Which scan reads this collector (ADR 0052). A `full` collector is not called in a standard
+    /// scan: its run is `not_consented`. A collector is `full` when its own ADR says so.
+    fn tier(&self) -> ScanTier {
+        ScanTier::Standard
+    }
+    /// Looks at the host.
+    fn collect(&self, host: &dyn Host) -> CollectorRun;
+}
+
+/// What [`Collector::coverage`] declares.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Coverage {
+    /// The timestamp field holding the oldest time the source still holds.
+    pub from: &'static str,
+    /// The timestamp field holding the newest.
+    pub to: &'static str,
+    /// The discriminator value of the observation about the whole source, when there is one.
+    pub place: Option<&'static str>,
+}
+
+/// What [`Collector::age`] declares (ADR 0061).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Age {
+    /// The timestamp fields whose minimum over a row's observations is the oldest time it holds.
+    pub oldest: &'static [&'static str],
+    /// How much a row holds.
+    pub count: AgeCount,
+    /// What one row is.
+    pub rows: AgeRows,
+    /// For [`AgeRows::PerPlace`], the discriminator values that each get a row, in order.
+    pub places: &'static [&'static str],
+    /// Fields shown beside a row and never compared.
+    pub extra: &'static [&'static str],
+    /// Places whose row is read differently from the rest.
+    pub by_place: &'static [AgePlace],
+}
+
+/// How much a trace-age row holds (ADR 0061).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AgeCount {
+    /// The row's observations that carry one of its oldest fields.
+    Observations,
+    /// The sum of one number field over the row's observations.
+    Field(&'static str),
+}
+
+/// What one trace-age row is (ADR 0061).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AgeRows {
+    /// One row for the collector.
+    One,
+    /// One row per value of the collector's discriminator.
+    PerPlace,
+    /// One row per value of a field.
+    PerValue(&'static str),
+}
+
+/// One place whose trace-age row is read differently (ADR 0061).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AgePlace {
+    /// The discriminator value.
+    pub place: &'static str,
+    /// The oldest fields for this place.
+    pub oldest: &'static [&'static str],
+    /// How much it holds.
+    pub count: AgeCount,
+    /// Only the place's observations without this field count.
+    pub without: Option<&'static str>,
+}
+
+/// Every kind of sensitive value the collectors a scan at `tier` would call declare, so a front end
+/// can ask about each before the scan starts (ADR 0052).
+pub fn sensitive_kinds(tier: ScanTier) -> std::collections::BTreeSet<SensitiveKind> {
+    all()
+        .iter()
+        .filter(|collector| collector.tier() <= tier)
+        .flat_map(|collector| {
+            collector
+                .fields()
+                .iter()
+                .filter_map(|field| field.sensitive)
+        })
+        .collect()
+}
+
+/// Every collector in this build.
+pub fn all() -> Vec<Box<dyn Collector>> {
+    vec![
+        Box::new(amcache::Amcache),
+        Box::new(autostart::Autostart::default()),
+        Box::new(bam::Bam),
+        Box::new(browser_ext::BrowserExt),
+        Box::new(defender_exclusion::DefenderExclusion),
+        Box::new(driver_service::DriverService::default()),
+        Box::new(evtx::Evtx::default()),
+        Box::new(executor_footprint::ExecutorFootprint),
+        Box::new(fastflags::FastFlags),
+        Box::new(fivem_dir::FivemDir),
+        Box::new(feature_usage::FeatureUsage),
+        Box::new(fivem_servers::FivemServers),
+        Box::new(hijack::Hijack),
+        Box::new(install_marker::InstallMarker),
+        Box::new(installed_programs::InstalledPrograms),
+        Box::new(machine_identity::MachineIdentity),
+        Box::new(mft::Mft),
+        Box::new(muicache::MuiCache),
+        Box::new(net_adapter::NetAdapter),
+        Box::new(net_config::NetConfig),
+        Box::new(os_image::OsImage),
+        Box::new(pca::Pca),
+        Box::new(pci_device::PciDevice),
+        Box::new(posture::Posture),
+        Box::new(powershell_text::PowershellText),
+        Box::new(prefetch::Prefetch),
+        Box::new(process::Process),
+        Box::new(recycle_bin::RecycleBin),
+        Box::new(roblox::Roblox),
+        Box::new(roblox_files::RobloxFiles),
+        Box::new(roblox_process::RobloxProcess),
+        Box::new(shell_mru::ShellMru),
+        Box::new(shellbags::ShellBags),
+        Box::new(shortcuts::Shortcuts),
+        Box::new(shimcache::ShimCache),
+        Box::new(srum::Srum),
+        Box::new(usb_device::UsbDevice),
+        Box::new(user_files::UserFiles),
+        Box::new(userassist::UserAssist),
+        Box::new(usn::Usn::default()),
+        Box::new(windows_service::WindowsService),
+        Box::new(windows_start::WindowsStart),
+        Box::new(wmi_subscription::WmiSubscription),
+        // Last: it correlates the runs before it (ADR 0123).
+        Box::new(roblox_trace::RobloxTrace),
+    ]
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::{BTreeMap, BTreeSet};
+    use std::path::PathBuf;
+
+    use bope_core::model::{CollectorRun, UnmeasuredReason};
+    use bope_host::FixtureHost;
+
+    use super::*;
+
+    /// Every fixture host in the repository, in name order.
+    fn fixture_hosts() -> Vec<(String, PathBuf)> {
+        let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/hosts");
+        let mut hosts: Vec<(String, PathBuf)> = std::fs::read_dir(&dir)
+            .expect("fixtures/hosts is readable")
+            .map(|entry| entry.expect("a readable directory entry"))
+            .filter(|entry| entry.path().join("host.yaml").is_file())
+            .map(|entry| {
+                (
+                    entry.file_name().to_string_lossy().into_owned(),
+                    entry.path(),
+                )
+            })
+            .collect();
+        hosts.sort();
+        assert!(!hosts.is_empty(), "no fixture host was found");
+        hosts
+    }
+
+    /// `Collector::fields` is a declaration, and `cargo xtask check-rules` rejects a rule that names
+    /// a field outside it (ADR 0026). A declaration that has drifted from what `collect` emits turns
+    /// that gate into a wrong answer in either direction — a real field rejected, or a renamed one
+    /// still accepted — so the two are bound here rather than by review.
+    ///
+    /// This proves one half: no collector emits a field it did not declare. The other half — that a
+    /// declared field is reachable at all — is what the fixture hosts cannot prove, since a name is
+    /// only seen on a host that produces it; `fields_are_sorted_and_unique` is what keeps the lists
+    /// readable, and ADR 0026 records the limit.
+    #[test]
+    fn every_emitted_field_is_declared() {
+        for (name, dir) in fixture_hosts() {
+            let host = FixtureHost::load(&dir).expect("a fixture host loads");
+            for collector in all() {
+                let declared: BTreeSet<&str> =
+                    collector.fields().iter().map(|field| field.name).collect();
+                let CollectorRun::Measured { observations, .. } = collector.collect(&host) else {
+                    continue;
+                };
+                for observation in &observations {
+                    for field in observation.fields.keys() {
+                        assert!(
+                            declared.contains(field.as_str()),
+                            "fixtures/hosts/{name}: collector `{}` emitted `{field}`, which `Collector::fields` does not declare",
+                            collector.id()
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    /// A declared [`FieldKind`] is what `check-rules` refuses an operator against, so a kind that
+    /// does not match the value a collector really emits would refuse a correct rule, or — worse —
+    /// accept `oldest_record_time|gt:` against a field that turns out to hold a count.
+    ///
+    /// This proves the same half `every_emitted_field_is_declared` proves, and has the same limit: a
+    /// field no fixture host produces is not checked here. `Timestamp` is checked as far as it can
+    /// be from this side — the value is a string that `bope_core::rules::is_rfc3339` accepts,
+    /// which is the same function the engine's ordinal comparison parses with.
+    #[test]
+    fn every_emitted_value_has_its_declared_kind() {
+        for (name, dir) in fixture_hosts() {
+            let host = FixtureHost::load(&dir).expect("a fixture host loads");
+            for collector in all() {
+                let declared: BTreeMap<&str, FieldKind> = collector
+                    .fields()
+                    .iter()
+                    .map(|field| (field.name, field.kind))
+                    .collect();
+                let CollectorRun::Measured { observations, .. } = collector.collect(&host) else {
+                    continue;
+                };
+                for observation in &observations {
+                    for (field, value) in &observation.fields {
+                        let Some(kind) = declared.get(field.as_str()) else {
+                            continue; // `every_emitted_field_is_declared` is what reports this one.
+                        };
+                        let ok = match kind {
+                            FieldKind::Text => value.is_string(),
+                            FieldKind::Number => value.is_number(),
+                            FieldKind::Bool => value.is_boolean(),
+                            // The engine's own test for one, so the kind is bound to what
+                            // `<field>|gt:` will actually be able to put in order (ADR 0029).
+                            FieldKind::Timestamp => {
+                                value.as_str().is_some_and(bope_core::rules::is_rfc3339)
+                            }
+                        };
+                        assert!(
+                            ok,
+                            "fixtures/hosts/{name}: collector `{}` emitted `{field}` as {value}, which is not {}",
+                            collector.id(),
+                            kind.as_str()
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    /// A declared span names two fields the collector declares as timestamps, and a place only for a
+    /// collector with a discriminator (ADR 0051).
+    #[test]
+    fn a_declared_coverage_names_declared_timestamps() {
+        let mut declared = 0;
+        for collector in all() {
+            let Some(coverage) = collector.coverage() else {
+                continue;
+            };
+            declared += 1;
+            for name in [coverage.from, coverage.to] {
+                assert!(
+                    collector
+                        .fields()
+                        .iter()
+                        .any(|field| field.name == name && field.kind == FieldKind::Timestamp),
+                    "collector `{}` declares coverage by `{name}`, which is not one of its timestamp fields",
+                    collector.id()
+                );
+            }
+            assert!(
+                coverage.place.is_none() || collector.discriminator().is_some(),
+                "collector `{}` scopes its coverage to a place without a discriminator",
+                collector.id()
+            );
+        }
+        assert_eq!(declared, 2, "evtx and usn declare a span");
+    }
+
+    /// A declared age names fields the collector declares, of the kinds the view reads them as: its
+    /// oldest fields are timestamps, a counted field is a number, a row per place needs a
+    /// discriminator, and the six collectors ADR 0061 names declare one (ADR 0061).
+    #[test]
+    fn a_declared_age_names_declared_fields_of_the_right_kind() {
+        let mut declared = BTreeSet::new();
+        for collector in all() {
+            let Some(age) = collector.age() else {
+                continue;
+            };
+            declared.insert(collector.id());
+            let kind = |name: &str| {
+                collector
+                    .fields()
+                    .iter()
+                    .find(|field| field.name == name)
+                    .map(|field| field.kind)
+            };
+            let id = collector.id();
+            let oldest = age
+                .oldest
+                .iter()
+                .chain(age.by_place.iter().flat_map(|place| place.oldest));
+            for name in oldest {
+                assert_eq!(kind(name), Some(FieldKind::Timestamp), "{id}: `{name}`");
+            }
+            let counts = std::iter::once(age.count).chain(age.by_place.iter().map(|p| p.count));
+            for count in counts {
+                if let AgeCount::Field(name) = count {
+                    assert_eq!(kind(name), Some(FieldKind::Number), "{id}: `{name}`");
+                }
+            }
+            for name in age.extra {
+                assert!(kind(name).is_some(), "{id}: `{name}`");
+            }
+            for place in age.by_place {
+                assert!(age.places.contains(&place.place), "{id}: `{}`", place.place);
+                if let Some(name) = place.without {
+                    assert!(kind(name).is_some(), "{id}: `{name}`");
+                }
+            }
+            match age.rows {
+                AgeRows::One => assert!(age.places.is_empty(), "{id}"),
+                AgeRows::PerPlace => assert!(collector.discriminator().is_some(), "{id}"),
+                AgeRows::PerValue(name) => assert_eq!(kind(name), Some(FieldKind::Text), "{id}"),
+            }
+        }
+        assert_eq!(
+            declared,
+            BTreeSet::from(["bam", "evtx", "fivem_dir", "pca", "prefetch", "usn"])
+        );
+    }
+
+    /// A gap names the field it is a gap in, so a `gaps` key outside the declared list is the same
+    /// drift as an undeclared observation field: a rule matching that field would be `NotFound`
+    /// where the collector meant `Unmeasured`.
+    #[test]
+    fn every_gap_key_is_a_declared_field() {
+        for (name, dir) in fixture_hosts() {
+            let host = FixtureHost::load(&dir).expect("a fixture host loads");
+            for collector in all() {
+                let declared: BTreeSet<&str> =
+                    collector.fields().iter().map(|field| field.name).collect();
+                let CollectorRun::Measured {
+                    gaps,
+                    discriminator_gaps,
+                    ..
+                } = collector.collect(&host)
+                else {
+                    continue;
+                };
+                let every_gap = gaps.keys().chain(
+                    discriminator_gaps
+                        .iter()
+                        .flat_map(|place| place.gaps.keys()),
+                );
+                for field in every_gap {
+                    assert!(
+                        declared.contains(field.as_str()),
+                        "fixtures/hosts/{name}: collector `{}` gapped `{field}`, which `Collector::fields` does not declare",
+                        collector.id()
+                    );
+                }
+            }
+        }
+    }
+
+    /// `Collector::unmeasured_reasons` is a declaration too, and since ADR 0027 it decides which
+    /// `unmeasured_when` entries `check-rules` accepts. A collector that reports a reason it did
+    /// not declare would have that reason rejected in every rule written for it, so the two are
+    /// bound here the same way the field lists are.
+    ///
+    /// This proves one half — nothing reported is undeclared. The other half is what the fixture
+    /// hosts cannot prove: a reason is only seen on a host that provokes it. ADR 0027 records it.
+    #[test]
+    fn every_reason_a_collector_reports_is_declared() {
+        for (name, dir) in fixture_hosts() {
+            let host = FixtureHost::load(&dir).expect("a fixture host loads");
+            for collector in all() {
+                let declared: BTreeSet<&str> = collector
+                    .unmeasured_reasons()
+                    .iter()
+                    .map(|reason| reason.as_str())
+                    .collect();
+                let reported: Vec<UnmeasuredReason> = match collector.collect(&host) {
+                    CollectorRun::Unmeasured { reason, .. } => vec![reason],
+                    CollectorRun::Measured {
+                        gaps,
+                        discriminator_gaps,
+                        ..
+                    } => gaps
+                        .values()
+                        .chain(
+                            discriminator_gaps
+                                .iter()
+                                .flat_map(|place| place.gaps.values()),
+                        )
+                        .copied()
+                        .collect(),
+                };
+                for reason in reported {
+                    assert!(
+                        declared.contains(reason.as_str()),
+                        "fixtures/hosts/{name}: collector `{}` reported `{}`, which `Collector::unmeasured_reasons` does not declare",
+                        collector.id(),
+                        reason.as_str()
+                    );
+                }
+            }
+        }
+    }
+
+    /// `DiscriminatorGaps` reach a rule through the value of one field, and stop an observation from
+    /// satisfying `exists: false` only when it carries that value. An observation about an unreadable
+    /// place that did **not** carry the field would slip past both, and a rule asking for an absent
+    /// field would be `found` about a place nobody read — the collapse ADR 0029 exists to prevent. So
+    /// every observation of a collector that declares a discriminator carries it (ADR 0044).
+    #[test]
+    fn every_observation_carries_its_collectors_discriminator() {
+        let mut seen = 0;
+        for (name, dir) in fixture_hosts() {
+            let host = FixtureHost::load(&dir).expect("a fixture host loads");
+            for collector in all() {
+                let Some(discriminator) = collector.discriminator() else {
+                    continue;
+                };
+                let CollectorRun::Measured { observations, .. } = collector.collect(&host) else {
+                    continue;
+                };
+                for observation in &observations {
+                    seen += 1;
+                    assert!(
+                        observation
+                            .fields
+                            .get(discriminator)
+                            .is_some_and(serde_json::Value::is_string),
+                        "fixtures/hosts/{name}: collector `{}` emitted an observation without its discriminator `{discriminator}`: {observation:?}",
+                        collector.id()
+                    );
+                }
+            }
+        }
+        assert!(seen > 0, "no fixture host produced an observation to check");
+    }
+
+    /// A place's gaps name the field the collector declared as its discriminator, that field is one it
+    /// declares it can emit, and a collector without one reports none: otherwise the engine would be
+    /// scoping gaps by a field no rule author was told about (ADR 0044). At least one fixture host has
+    /// to produce such gaps, or this test proves nothing.
+    #[test]
+    fn discriminator_gaps_name_the_declared_discriminator() {
+        let mut seen = 0;
+        for (name, dir) in fixture_hosts() {
+            let host = FixtureHost::load(&dir).expect("a fixture host loads");
+            for collector in all() {
+                if let Some(discriminator) = collector.discriminator() {
+                    assert!(
+                        collector
+                            .fields()
+                            .iter()
+                            .any(|field| field.name == discriminator),
+                        "collector `{}` declares `{discriminator}` as its discriminator and not as a field",
+                        collector.id()
+                    );
+                }
+                let CollectorRun::Measured {
+                    discriminator_gaps, ..
+                } = collector.collect(&host)
+                else {
+                    continue;
+                };
+                for place in &discriminator_gaps {
+                    seen += 1;
+                    assert_eq!(
+                        Some(place.discriminator.as_str()),
+                        collector.discriminator(),
+                        "fixtures/hosts/{name}: collector `{}`",
+                        collector.id()
+                    );
+                }
+            }
+        }
+        assert!(seen > 0, "no fixture host produced discriminator gaps");
+    }
+
+    /// The lists are read by a person writing a rule and by `check-rules` when it names what a
+    /// collector can emit, so an unsorted or duplicated entry is a defect in both.
+    #[test]
+    fn fields_are_sorted_and_unique() {
+        for collector in all() {
+            let declared: Vec<&str> = collector.fields().iter().map(|field| field.name).collect();
+            let mut sorted = declared.clone();
+            sorted.sort_unstable();
+            sorted.dedup();
+            assert_eq!(
+                sorted,
+                declared,
+                "collector `{}` declares fields that are unsorted or repeated",
+                collector.id()
+            );
+        }
+    }
+
+    /// Two collectors sharing an id would make `collector:` in a rule ambiguous, and `check-rules`
+    /// resolves a rule's collector by that id alone.
+    #[test]
+    fn collector_ids_are_unique() {
+        let ids: BTreeSet<&str> = all().iter().map(|collector| collector.id()).collect();
+        assert_eq!(ids.len(), all().len(), "two collectors share an id");
+    }
+}

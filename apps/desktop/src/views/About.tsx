@@ -1,0 +1,123 @@
+// SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+
+import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { codeLinks } from "../api";
+import type { CodeLinks, ReportHeader } from "../types";
+import { CodeLink } from "./CodeLink";
+
+interface Props {
+  /** The header the app already asked for; `null` while that call is in flight. */
+  header: ReportHeader | null;
+  /** The app's call for the header failed, so `header` will stay `null`. */
+  headerFailed: boolean;
+}
+
+/** Where this program's code is and how to check that this file came from it (ADR 0045). */
+export function About({ header, headerFailed }: Props) {
+  const { t } = useTranslation();
+  const [links, setLinks] = useState<CodeLinks | null>(null);
+  const [linksFailed, setLinksFailed] = useState(false);
+
+  useEffect(() => {
+    void codeLinks()
+      .then(setLinks)
+      .catch(() => setLinksFailed(true));
+  }, []);
+
+  if (!header || !links) {
+    // A failed call is said; one in flight shows the title only.
+    return (
+      <section className="about panel" aria-labelledby="about-title">
+        <h3 id="about-title">{t("about.title")}</h3>
+        {(headerFailed || linksFailed) && <p className="note">{t("about.load_failed")}</p>}
+      </section>
+    );
+  }
+  const { provenance, rules_bundle } = header;
+  const repositoryName = links.repository.replace(/^https:\/\/github\.com\//, "");
+  const asset = `aeterna-rongroi-${provenance.version}-windows-x64.exe`;
+
+  return (
+    <section className="about page-stack" aria-labelledby="about-title">
+      <h3 id="about-title">{t("about.title")}</h3>
+      <p className="muted">{t("about.intro")}</p>
+      <div className="cards">
+        <article className="card">
+          <h3>{t("about.repository")}</h3>
+          <CodeLink text={links.repository} copy={links.repository} qr />
+        </article>
+        <article className="card">
+          <h3>{t("about.this_build_code")}</h3>
+          {links.commit ? (
+            <CodeLink text={links.code} copy={links.code} qr />
+          ) : provenance.official ? (
+            <p>{t("about.code_commit_unknown")}</p>
+          ) : (
+            <p>{t("about.code_unknown")}</p>
+          )}
+        </article>
+        <article className="card">
+          <h3>{t("about.this_file")}</h3>
+          <dl className="facts">
+            <dt>{t("about.build")}</dt>
+            <dd>
+              {provenance.official ? (
+                t("about.official")
+              ) : (
+                <span className="build-mark">{t("banner.unofficial")}</span>
+              )}
+            </dd>
+            <dt>{t("about.version")}</dt>
+            <dd>{provenance.version}</dd>
+            <dt>{t("about.commit")}</dt>
+            <dd>
+              <code className="selectable">{provenance.commit ?? t("about.unknown")}</code>
+            </dd>
+            <dt>{t("about.exe_sha256")}</dt>
+            <dd>
+              <code className="selectable">{provenance.exe_sha256 ?? t("about.unknown")}</code>
+            </dd>
+            <dt>{t("about.rules")}</dt>
+            <dd>
+              {rules_bundle.rule_count} · <code className="selectable">{rules_bundle.sha256}</code>
+            </dd>
+            <dt>{t("about.license")}</dt>
+            <dd>
+              <code>GPL-3.0-or-later</code>
+            </dd>
+          </dl>
+        </article>
+        <article className="card">
+          <h3>{t("about.verify_title")}</h3>
+          <ol>
+            <li>{t("about.verify_hash")}</li>
+            <li>
+              {t("about.verify_attestation")}{" "}
+              <code className="selectable">{`gh attestation verify ${asset} -R ${repositoryName}`}</code>
+            </li>
+            <li>{t("about.verify_unofficial")}</li>
+          </ol>
+        </article>
+        <article className="card wide">
+          <h3>{t("ui.about.credits_title")}</h3>
+          <p>{t("ui.about.credits")}</p>
+          <p>
+            <span className="build-mark">{t("banner.unofficial")}</span>{" "}
+            {t("banner.unofficial_body")}
+          </p>
+          <p className="small muted">{t("ui.about.licenses")}</p>
+        </article>
+        <article className="card wide">
+          <h3>{t("about.no_web_title")}</h3>
+          <p>{t("about.no_web_body")}</p>
+          {/* ADR 0003: this wording is used verbatim wherever the program speaks about the network. */}
+          <p>{t("consent.sends")}</p>
+          <p>{t("consent.webview")}</p>
+        </article>
+      </div>
+    </section>
+  );
+}

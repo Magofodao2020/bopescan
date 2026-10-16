@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: 84c8f9d7-14cb-4481-9c31-5d37a11720eb
+title: "An Image File Execution Options debugger is set"
+description: >-
+  Windows is told to start another program instead of the one named in the row. Shown as context;
+  the most common case is Process Explorer replacing Task Manager.
+status: experimental
+collector: hijack
+strength: context
+match:
+  mechanism: "ifeo_debugger"
+retention: >-
+  The setting as it is at scan time.
+unmeasured_when: [not_windows]
+falsepositives:
+  - "Process Explorer's \"Replace Task Manager\" option"
+  - "Debuggers configured by developers"
+author: B.O.P.E Scanner contributors
+date: 2026-10-15
+tags: [persistence, ifeo]
+level: info
+category: persistence

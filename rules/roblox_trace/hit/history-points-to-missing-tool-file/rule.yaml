@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: 8c20b430-e3c5-4bfb-b5c6-e1048351066d
+title: "A history source names a Roblox executor or injector file that is not at that path now"
+description: >-
+  BAM, Amcache, ShimCache, UserAssist or a shortcut records a path to a file named like a Roblox
+  executor or injector, and nothing is at that path today. It may have been moved, renamed, deleted
+  or kept on a drive that is not connected; this does not say which.
+status: experimental
+collector: roblox_trace
+strength: context
+match:
+  scope: "hit"
+  tool_kind: ["executor", "injector"]
+  exists: false
+  roblox_context: true
+retention: >-
+  Each history source's own retention; the file system as it is at scan time.
+falsepositives:
+  - "The file was moved or renamed, or is on a removable drive that is not plugged in"
+author: B.O.P.E Scanner contributors
+date: 2026-10-15
+tags: [roblox, history]
+level: warn
+category: roblox_tools

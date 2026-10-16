@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: da5a1b8d-6278-432a-9172-81b365f22e1b
+title: "The Roblox player holds private executable memory"
+description: >-
+  A walk of the running player's address space found committed private memory that is executable.
+  Manually mapped code and shellcode look like this — and so does Roblox's own anti-cheat, which
+  allocates and decrypts code at run time, as do just-in-time compilers and many overlays. Shown
+  with the counts as context only; it is never a finding on its own. No memory content is read.
+status: experimental
+collector: roblox_process
+strength: context
+match:
+  scope: "roblox_memory"
+  "private_regions|gte": 1
+retention: >-
+  The address space at the moment of the scan.
+unmeasured_when: [not_windows, access_denied]
+falsepositives:
+  - "Roblox's anti-cheat (Hyperion), which is expected to produce exactly this"
+  - "Overlays and capture tools that place hook trampolines in game processes"
+references:
+  - https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-virtualqueryex
+author: B.O.P.E Scanner contributors
+date: 2026-10-15
+tags: [roblox, memory]
+level: info

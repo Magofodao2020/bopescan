@@ -1,0 +1,19 @@
+{
+  "description": "Synthetic negative case for roblox_process/memory/private-executable-memory: none.",
+  "observations": [
+    {
+      "collector": "roblox_process",
+      "fields": {
+        "scope": "roblox_memory",
+        "player_name": "RobloxPlayerBeta.exe",
+        "private_regions": 0,
+        "private_bytes": 0,
+        "mapped_regions": 0,
+        "mapped_bytes": 0,
+        "image_regions": 50,
+        "regions_walked": 900,
+        "memory_walk_complete": true
+      }
+    }
+  ]
+}

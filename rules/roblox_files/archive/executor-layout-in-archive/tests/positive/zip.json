@@ -1,0 +1,17 @@
+{
+  "description": "Synthetic positive case for roblox_files/archive/executor-layout-in-archive: zip.",
+  "observations": [
+    {
+      "collector": "roblox_files",
+      "fields": {
+        "scope": "archive",
+        "place": "downloads",
+        "name": "pack.zip",
+        "path": "C:\\Users\\fixtureuser\\Downloads\\pack.zip",
+        "executor_layout": true,
+        "location_kind": "user_downloads"
+      }
+    }
+  ],
+  "expect_matches": 1
+}

@@ -1,0 +1,17 @@
+{
+  "description": "Synthetic negative case for usb_device/dev-board/dev-board-connected: hub.",
+  "observations": [
+    {
+      "collector": "usb_device",
+      "fields": {
+        "source": "device_list",
+        "bus": "usb",
+        "model_id": "USB\\VID_05E3&PID_0610",
+        "vid": "05E3",
+        "pid": "0610",
+        "dev_board_vendor": false,
+        "present": true
+      }
+    }
+  ]
+}

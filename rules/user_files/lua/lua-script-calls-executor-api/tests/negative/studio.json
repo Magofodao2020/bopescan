@@ -1,0 +1,19 @@
+{
+  "description": "Synthetic negative case for user_files/lua/lua-script-calls-executor-api: studio.",
+  "observations": [
+    {
+      "collector": "user_files",
+      "fields": {
+        "kind": "lua_script",
+        "folder": "documents",
+        "name": "module.lua",
+        "path": "C:\\Users\\fixtureuser\\Documents\\module.lua",
+        "location_kind": "user_documents",
+        "extension": "lua",
+        "distinct_markers": 0,
+        "markers": "request",
+        "remote_loadstring": false
+      }
+    }
+  ]
+}

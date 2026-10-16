@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: 04792358-2883-4e4c-92e1-7b7f0a5ff5b7
+title: "A name matches the Roblox tool catalog without context"
+description: >-
+  A generic term (executor, injector, FastFlag, ClientSettings), a partial name (strap, trap) or an
+  ordinary-word executor name (Wave, Delta, Solara, Synapse) appears with nothing tying it to
+  Roblox, or a FastFlag tool is present. Listed so it can be looked at, never weighed on its own.
+status: experimental
+collector: roblox_trace
+strength: context
+match:
+  scope: "tool"
+  status: "info"
+  common_legitimate: false
+retention: >-
+  Whatever the sources read in this scan still hold.
+falsepositives:
+  - "Ordinary software whose name holds these letters, such as Razer Synapse or a wave editor"
+author: B.O.P.E Scanner contributors
+date: 2026-10-15
+tags: [roblox, correlation]
+level: info
+category: roblox_tools

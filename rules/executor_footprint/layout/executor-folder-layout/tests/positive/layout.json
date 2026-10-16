@@ -1,0 +1,20 @@
+{
+  "description": "Synthetic positive case for executor_footprint/layout/executor-folder-layout: layout.",
+  "observations": [
+    {
+      "collector": "executor_footprint",
+      "fields": {
+        "scope": "layout",
+        "name": "tool",
+        "path": "C:\\Users\\fixtureuser\\Downloads\\tool",
+        "location_kind": "user_downloads",
+        "has_autoexec": true,
+        "has_workspace": true,
+        "has_scripts": false,
+        "has_bin": true,
+        "autoexec_files": 2
+      }
+    }
+  ],
+  "expect_matches": 1
+}

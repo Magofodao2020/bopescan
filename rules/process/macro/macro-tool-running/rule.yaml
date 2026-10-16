@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: d2436b4d-95ef-4cd7-b71b-18613bdd4a76
+title: "A macro interpreter is running during the check"
+description: >-
+  AutoHotkey, AutoIt or TinyTask is running at scan time, under its usual file name. These run
+  scripts that send keyboard and mouse input. A renamed copy is not seen by name, and an ordinary
+  hotkey script runs the same interpreter.
+status: experimental
+collector: process
+strength: context
+match:
+  name: ["AutoHotkey.exe", "AutoHotkey64.exe", "AutoHotkey32.exe", "AutoHotkeyU64.exe", "AutoHotkeyU32.exe", "AutoHotkeyA32.exe", "AutoIt3.exe", "AutoIt3_x64.exe", "TinyTask.exe"]
+retention: >-
+  Processes running at the moment of the scan.
+unmeasured_when: [not_windows]
+falsepositives:
+  - "Productivity hotkeys, text expansion and accessibility scripts left running in the background"
+author: B.O.P.E Scanner contributors
+date: 2026-10-15
+tags: [macro, process]
+level: warn
+category: macros_peripherals

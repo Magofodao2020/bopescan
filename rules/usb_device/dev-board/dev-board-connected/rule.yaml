@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: e4ae1194-c460-4e8a-81e3-112e94381f23
+title: "A microcontroller or USB-serial board has been connected"
+description: >-
+  Windows remembers a USB device whose vendor id belongs to a maker of microcontroller boards or of
+  the USB-serial chips clone boards use. Context for the input-device row; on its own this is an
+  electronics project, a 3D printer or a flashing cable.
+status: experimental
+collector: usb_device
+strength: context
+match:
+  bus: "usb"
+  dev_board_vendor: true
+retention: >-
+  Devices Windows still remembers.
+unmeasured_when: [not_windows]
+falsepositives:
+  - "3D printers, flashing cables, hobby electronics and microcontroller programming"
+author: B.O.P.E Scanner contributors
+date: 2026-10-15
+tags: [usb]
+level: info
+category: usb_devices

@@ -1,0 +1,16 @@
+{
+  "description": "Synthetic negative case for srum/app/executor-named-program-used-cpu: no-cpu.",
+  "observations": [
+    {
+      "collector": "srum",
+      "fields": {
+        "scope": "app",
+        "name": "Fluxus.exe",
+        "used_cpu": false,
+        "tool_id": "fluxus",
+        "tool_kind": "executor",
+        "match_kind": "known_tool"
+      }
+    }
+  ]
+}

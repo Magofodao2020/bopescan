@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: ef38eab7-9baf-4ce0-9882-1614a4aed672
+title: "The ClientAppSettings.json the Roblox player reads sets network or physics FastFlags"
+description: >-
+  The FastFlag file in the newest Roblox version folder holding the player sets flags whose names
+  are about physics, replication, packets or network sending. Edited values of such flags have been
+  used to desynchronise a character from the server. The row lists the flag names, never their
+  values. Recent Roblox clients ignore flags outside an allow-list, so a flag in the file may have
+  no effect; nothing here compares the file with a trusted reference, because there is none.
+status: experimental
+collector: fastflags
+strength: presence
+match:
+  active_version: true
+  "flags_network|gte": 1
+retention: >-
+  The file as it is at scan time; a Roblox update creates a new version folder.
+falsepositives:
+  - "Flags copied from a performance guide without knowing what they do"
+  - "Flags that a bootstrapper wrote for an unrelated setting whose name mentions the network"
+author: B.O.P.E Scanner contributors
+date: 2026-10-15
+tags: [roblox, fastflags]
+level: warn
+category: fastflags

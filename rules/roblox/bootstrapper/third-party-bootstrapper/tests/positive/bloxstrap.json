@@ -1,0 +1,14 @@
+{
+  "description": "Synthetic positive case for roblox/bootstrapper/third-party-bootstrapper: bloxstrap.",
+  "observations": [
+    {
+      "collector": "roblox",
+      "fields": {
+        "location": "bootstrapper",
+        "name": "Bloxstrap",
+        "path": "C:\\Users\\fixtureuser\\AppData\\Local\\Bloxstrap"
+      }
+    }
+  ],
+  "expect_matches": 1
+}

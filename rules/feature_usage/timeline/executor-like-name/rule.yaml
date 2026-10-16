@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: a6944ed9-500f-40b4-aadb-3d53a3825552
+title: "Times of a program whose name starts like a public Roblox executor's"
+description: >-
+  Puts on the timeline the times this source records for a program whose file name starts with the
+  name of a publicly discussed Roblox executor. A file name is not an identity: anyone can name a
+  file anything, and several of these names are ordinary words.
+status: experimental
+role: timeline
+collector: feature_usage
+strength: context
+match:
+  "name|startswith": ["Solara", "Xeno", "Celery", "Fluxus", "KRNL", "JJSploit", "Synapse", "Seliware", "Nihon", "Script-Ware"]
+retention: >-
+  Whatever this source still holds.
+falsepositives:
+  - "A file renamed or named this way for an unrelated reason; a name does not identify a program, and a missing time is not evidence of anything"
+author: B.O.P.E Scanner contributors
+date: 2026-10-15
+tags: [timeline, roblox]
+category: roblox

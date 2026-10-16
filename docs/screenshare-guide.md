@@ -1,0 +1,571 @@
+# Screenshare guide
+
+For server staff checking a player's PC over a screenshare (an SS, also called a PC check), and for the player. It covers
+aeterna-rongroi **0.9.0**. อ่านภาษาไทย: [screenshare-guide.th.md](screenshare-guide.th.md)
+
+> ⚠️ **Pre-alpha.** Fifty-five rules ship in 0.9.0, and fifty-three of them are `experimental`. Do not ban anyone
+> because of what this tool shows, or clear anyone because of it.
+
+## 1. What it can and cannot show
+
+| It can show | It cannot show |
+|---|---|
+| Machine settings that make kernel-level cheats easier to load: Secure Boot, test signing, memory integrity (HVCI), TPM. Also whether the firmware agrees with Windows about Secure Boot, and whether a machine or per-user policy turns script block logging off for Windows PowerShell or PowerShell 7 | Cheats running on a **second PC** (DMA). They leave no program on the checked PC; a DMA card whose firmware imitates an ordinary device looks like that device |
+| A PCI device in the PC that Windows installed no driver for, and a PCI device Windows set up earlier that is not in the PC now — with the last start of Windows it was present at, and a removal time only when Windows recorded one (after a full shutdown it records none), beside each start of Windows marked as after a full or a Fast Startup shutdown | A box between the mouse and the PC that moves or clicks it for a cheat: this program does not read USB or HID devices |
+| That the Security log or an event log file recorded being cleared | Overlays hidden from screen capture |
+| For each check, whether it was answered and, if not, why | Anything, if Windows on that PC was modified to lie to the programs that run on it |
+| | That a PC is clean. **No result means that** |
+
+Every row is one of three states. **Found** shows the evidence. **Not found** shows how far back that
+source can see. **Not measured** shows the reason. A person decides what a row means. The tool
+never does.
+
+## 2. Get the real file
+
+1. The player downloads it from the project's GitHub **Releases** page. Send the player the page,
+   not a copy of the file.
+   - `bope-scanner-cli-X.Y.Z-windows-x64.exe` is the command-line version. It does not use
+     WebView2.
+   - `aeterna-rongroi-X.Y.Z-windows-x64.exe` is the version with a window.
+2. Do not open it from the browser. Windows SmartScreen will warn, because releases are not
+   code-signed yet, and the hash check comes first.
+3. Before running it, the player opens **Command Prompt** (`cmd`) in the download folder — type `cmd` in
+   File Explorer's address bar and press Enter — and runs:
+
+   ```bat
+   for %f in (aeterna-rongroi-*-windows-x64.exe) do @certutil -hashfile %f SHA256
+   ```
+
+   `certutil` takes one file at a time and no `*`, so the `for` hands it each downloaded file in turn and it
+   prints every file's name above its hash (checked on Windows 11 build 26220). The line is the same for
+   every version. Compare each hash with the line for the same file name in `SHA256SUMS` on the release
+   page. Upper or lower case does not matter.
+
+   **Use Command Prompt, not PowerShell, during a screenshare.** PowerShell keeps its own records on the
+   PC — a history of typed commands and its event logs — and Windows records when PowerShell last ran
+   (Prefetch, BAM and PCA, whose latest time is the one this program reads). A check typed into
+   PowerShell during the call puts the call's own time into those records, over the time that was
+   there before. Command Prompt keeps no history file. `certutil` is part of Windows; its output is lower case, without spaces (checked on
+   Windows 11 build 26220).
+4. Only when the hash matches: right-click the file → **Properties** → tick **Unblock** → **OK**. That
+   removes the "downloaded from the internet" mark from that one file; the box is only there while the
+   file carries the mark. If SmartScreen still shows **Windows protected your PC**, click **More
+   info**, check the app name, and click **Run anyway**. The publisher shows as unknown until
+   releases are signed. Do not turn SmartScreen off for the whole PC.
+5. When it runs, the header must say **official build**. If it says **UNOFFICIAL BUILD**, or the
+   hash does not match, **stop**. The result means nothing.
+
+The CLI report header also prints the program's own `exe sha256`. In the window version it is not in
+the report header: open **About & code**, which shows it as **SHA-256**. It should match `SHA256SUMS`. A
+match shows the running file is consistent with the release. It cannot prove it: a modified program
+could print any value.
+
+## 3. Administrator rights
+
+Some checks need administrator rights. The report says how many, once, above the evidence:
+
+> Scope: N check(s) could not be answered because this scan does not have administrator rights.
+> Running it again as administrator answers them.
+
+That line is not a finding. It says this scan could not answer those checks. Measured on one
+Windows 11 machine without administrator rights: Prefetch and BAM gave almost nothing, both
+log-clearing rules came out *not measured*, and the four posture rules 0.2.0 had and PCA worked normally.
+Four rules that are new in 0.3.0 were also *not measured* under a limited token, and count in that line:
+the one that reads the firmware's own Secure Boot state, the two about a Prefetch or event log file marked
+read-only, and the one about an event log file that is not the file Windows writes its channel to
+([ADR 0037](adr/0037-prefetch-configuration-and-the-read-only-attribute.md),
+[ADR 0038](adr/0038-firmware-secure-boot-and-script-block-logging-policy.md),
+[ADR 0042](adr/0042-what-the-event-log-service-says-a-channel-writes.md)).
+
+- **Window version:** on the start screen, click **Scan as administrator** and accept the Windows
+  prompt. The program closes, starts again with those rights and scans from the beginning. The
+  button only appears when the current scan ran without administrator rights.
+- **CLI:** open **Command Prompt as administrator** (Start → type `cmd` → **Run as administrator**), go to
+  the download folder with `cd /d "<folder>"`, and run the scan in that window (§4). Command Prompt rather
+  than PowerShell, for the reason in §2.
+  `--elevate` runs the scan in a **new** console window instead. In 0.3.0 that window stayed open
+  until Enter was pressed ([ADR 0012](adr/0012-elevation-relaunch.md)) — not re-measured for 0.4.0, whose
+  full-scan work touched that code, or for 0.5.0, 0.6.0, 0.7.0, 0.8.0, 0.8.1, 0.8.2 and 0.9.0 — but the report from
+  `--elevate` stays in that window and never reaches a file redirected with `>`. With 0.2.0, do not
+  use `--elevate`: Windows closes that window the moment the scan finishes, taking the report with it
+  (measured on a real Windows 11 machine).
+
+The player may decline administrator rights. The scan still runs, with more checks in the scope
+line.
+
+## 4. Run SS mode
+
+SS mode is the screenshare view. It asks the player for consent first. It lists what matched a rule and
+a timeline of the times its consent screen names, and it replaces the player's user folder in paths with `%USERPROFILE%`.
+
+**Window version:** **Screenshare check (SS mode)** → read the consent screen → **I agree — show the
+SS view**. The window version scans when it starts, **before** its window opens, so the window cannot
+change the results. The consent screen decides what is shown.
+
+**CLI** (in the Command Prompt from §3):
+
+```bat
+.\bope-scanner-cli-0.9.0-windows-x64.exe scan --mode ss
+```
+
+Add `--lang th` for Thai. The program asks `Continue? [y/N]`, and **the player** answers it.
+
+- **Do not use `--yes` to skip a question the player has not answered.** The flag exists for a
+  player who has already agreed.
+- If the player refuses, the program prints `Scan cancelled. Nothing was read.` and reads nothing.
+  What your server does after a refusal is your server's rule. The tool does not measure it.
+
+## 5. Read the report
+
+### The header
+
+```
+aeterna-rongroi 0.9.0
+official build
+mode: ss · windows <build> · administrator · rules: <n> (<bundle hash>)
+exe sha256: <hash>
+Windows start: <time>, <days, hours, minutes> before this scan. Not reset by "Shut down" with Fast Startup (the Windows default), sleep or hibernation; reset by a restart.
+```
+
+Check four things: `official build`, `mode: ss`, whether it says `administrator` or `standard user`,
+and the rule count.
+
+**`Windows start`** is context for reading the times on the rows, not a finding. Times in the report are
+UTC. A row that says a log's oldest record, or a clearing, is from before this time happened before
+Windows last started; one after it happened since. Four things about it:
+
+- **Days old is normal.** On Windows' default settings, **Shut down** does not end Windows: Fast Startup
+  saves it to disk and the next power-on resumes it. Microsoft: "fast startup is the default transition
+  when a system shutdown is requested". Only **Restart**, or a shutdown with Fast Startup off, starts the
+  count again. A player who shuts down every night can see "3d" here. On one Windows 11 machine this
+  project checked, 27 of the 48 starts its System log recorded were Fast Startup resumes
+  ([ADR 0039](adr/0039-a-time-anchor-for-the-report.md)).
+- **Sleep and hibernation do not reset it either**, and time spent asleep is counted.
+- **A clock change moves it.** It is worked out from the PC's clock now. If the clock was changed or
+  corrected since then, records written before the change carry times on the old clock. On the machine
+  above, the System log's own record of the start was 7 hours away from this time for that reason.
+- **A modified Windows can report any time.** Like everything else in the report, this is what Windows
+  told the program.
+
+### Each row
+
+```
+[FOUND] check: <rule title>  (<strength>, <collector>)
+    <evidence>
+    About this check: <what it means and what it does not prove>
+    Ordinary things that also produce this:
+      - …
+```
+
+- **`check:`** comes before the title because the title says what the rule looks for, not what was
+  seen.
+- **Strength** says what kind of evidence the rule gives. `tamper`: traces were removed or altered.
+  `posture`: a machine setting that makes cheating easier. `presence`: a file exists, which does not
+  show it ran. `context`: background for the reviewer. (`execution` exists, but no rule uses it yet.)
+- **Ordinary things that also produce this** appears beside every `FOUND` row. **Read it out loud.**
+  Every rule has to have it, and it is the part most likely to be skipped.
+- **`NOT MEASURED (expected here)`** means the rule's author said this machine state is ordinary.
+  **`NOT MEASURED (not expected)`** means it was not anticipated. Neither one is a finding.
+
+### The line at the bottom
+
+```
+Hidden in SS mode: NOT FOUND <n> · NOT MEASURED (expected here) <n> · NOT MEASURED (not expected) <n> · unmatched observations <n>
+```
+
+These are counts of what SS mode does not list. §7 says why.
+
+### Beside what your server recorded
+
+Some servers record signals of their own — a combat check, a report from another player, a time a
+player connected. aeterna-rongroi does not read them and sends nothing to your server. Copy what you
+need by hand, and compare it with the report yourself.
+
+- **Use one clock.** Times in the report are UTC. If your server shows local time, convert it first
+  (Thailand is UTC+7).
+- **A row near the time your server flagged is something to ask about, not proof.** A row days away
+  from it is ordinary. Every row still needs its *ordinary things that also produce this*.
+- **Is this the PC they played on?** The **session statement** (§7) gives the start of FiveM's
+  **last** session on this PC. If your server says the player connected at a time, and they are still
+  connected during the call, that session should have started before they connected. A last session
+  that started after the connection, or that ended days before it, or no session at all, is a reason to
+  ask whether this is the PC they played on — not proof that it is not. Ordinary causes: a second PC
+  they use for the same account, another Windows account on this PC, FiveM started again since the
+  connection, Prefetch switched off, a changed clock.
+- **Which rows to read first** depends on what your server saw. As a starting point, not a rule:
+
+  | What your server saw | Rows that can carry related traces |
+  |---|---|
+  | Changed numbers in the game: reach, damage, health | FiveM plugin and `.asi` folders and their change-journal rows, `FiveM.exe`'s signature, drivers, what starts by itself, Defender's exclusions and detections |
+  | Aim that looks automatic | the same, and the timeline of programs Prefetch, BAM and PCA recorded |
+  | Something only a cheat menu sends | FiveM plugin and `.asi` folders, their change-journal rows, `FiveM.exe`'s signature |
+
+  None of these rows sees a cheat that runs on a second PC or a DMA device (§1).
+
+## 6. The rules, and what else produces them
+
+| Rule | Strength | Status | Ordinary causes (from the rule itself) |
+|---|---|---|---|
+| Secure Boot is turned off | posture | `test` | legacy BIOS/CSM boot, dual-boot, turned off for hardware or overclocking tools |
+| Windows test signing is turned on | posture | `experimental` | people who write or test drivers, hardware engineers, software whose install asks for it |
+| Memory integrity (HVCI) is configured off | posture | `experimental` | hardware that cannot support it, switched off to fix a driver conflict, off by default on many PCs |
+| No TPM is present | context | `experimental` | older or self-built PCs, TPM off in firmware, virtual machines |
+| The Security log records that it was cleared | tamper | `experimental` | "optimiser" and "debloat" scripts, a prebuilt or repaired PC, troubleshooting in Event Viewer, Windows updates |
+| An event log file was cleared | tamper | `experimental` | the same, plus software whose setup resets the local log |
+| A file in FiveM's plugins folder has no embedded signature that verifies here | presence | `experimental` | ReShade or ENB installed as the Cfx.re forum guides say, their `.ini` and log files (text is never signed), overlays and FPS tools, a damaged file, a signature this PC cannot verify offline |
+| A file in FiveM's plugins folder carries a valid embedded signature | presence | `experimental` | signed overlays, capture and performance tools, signed graphics mods, a developer who signs in their own name |
+| A file in FiveM for GTA V Enhanced's asi folder has no embedded signature that verifies here | presence | `experimental` | the same as for Legacy's plugins folder; whether Enhanced loads this folder at all is not known |
+| A file in FiveM for GTA V Enhanced's asi folder carries a valid embedded signature | presence | `experimental` | the same as for Legacy's plugins folder |
+| A FiveM file's signature could not be checked | context | `experimental` | antivirus or an updater holding the file open, a path too long, a Windows answer this program does not classify, security software blocking the read |
+| FiveM.exe has no embedded signature that verifies here | presence | `experimental` | a PC whose certificate store does not yet hold the root the signature chains to (measured with other publishers' files: that reads as could not be verified offline, not as invalid; FiveM.exe's own chain was not measured), an interrupted update or a disk problem, a client built from Cfx.re's source, beta builds (not measured) |
+| FiveM.exe is validly signed, but not with the certificate this rule knows | presence | `experimental` | **the publisher renewed its certificate**, a FiveM.exe not updated since before 2026-07-21, beta builds (not measured) |
+| The firmware reports Secure Boot off while Windows reports it on | posture | `experimental` | virtual machines, firmware that reports Secure Boot inconsistently after an update or a key reset, a disk moved to other hardware or a firmware setting changed before Windows recorded it. Needs administrator rights |
+| A machine policy turns Windows PowerShell script block logging off | posture | `experimental` | PCs managed by an employer or school, security or privacy baselines, debloat guides and optimiser tools, policies left over from earlier management |
+| A per-user policy turns Windows PowerShell script block logging off | posture | `experimental` | the same, and a scan restarted with a different administrator's password, which reads that administrator's policy |
+| A machine policy turns PowerShell 7 script block logging off | posture | `experimental` | the same as the Windows PowerShell row, a PowerShell 7 policy set to use the Windows PowerShell one, and a policy left on a PC without PowerShell 7 |
+| A per-user policy turns PowerShell 7 script block logging off | posture | `experimental` | the same, and a scan restarted with a different administrator's password |
+| The firmware describes no IOMMU to Windows | posture | `experimental` | VT-d or AMD-Vi (IOMMU, SVM) off in the firmware, which many motherboards ship with, older processors, virtual machines. Says how the PC is set up, not that a DMA device is in it, and not whether Kernel DMA Protection is on. Not read on Arm PCs |
+| A Prefetch file is marked read-only | tamper | `experimental` | read-only chosen in a folder's Properties, files restored or copied by software that keeps attributes |
+| An event log file is marked read-only | tamper | `experimental` | the same two |
+| An event log file is not the file Windows writes its channel to | tamper | `experimental` | Windows' own archive of a full log, a log saved or exported into the folder, a log moved by an administrator or Group Policy, a log copied from another PC |
+| A registered driver is on LOLDrivers' list of vulnerable drivers | posture | `test` | overclocking, fan and RGB control, and hardware-monitoring utilities (LOLDrivers' `RTCore64.sys` entry is MSI Afterburner's driver), a driver service left registered after its program was uninstalled |
+| A PCI device has no driver installed | presence | `experimental` | Windows installed again before the chipset or device drivers, a capture, sound or expansion card whose driver was never installed, hardware newer or older than Windows' drivers, a virtual machine |
+| A PCI device Windows set up earlier is not present now | context | `experimental` | a graphics card, SSD or network card replaced or moved, a BIOS update or setting, an external PCIe device unplugged, Windows moved to another PC |
+| FiveM for GTA V Enhanced keeps a cache folder for a server (full scan only) | context | `experimental` | joining any server with FiveM for GTA V Enhanced, a folder kept from a server joined long ago or by another person on the same Windows account |
+| The hosts file gives a FiveM or Rockstar name an address | posture | `experimental` | ad, tracking and telemetry blocklists, guides that block the Rockstar launcher's update or sign-in servers, software that writes its own hosts entries (a VPN, a security suite, a development tool) |
+| The registered organisation names a Windows-modification playbook | posture | `experimental` | anyone who applied Atlas or ReviOS for privacy, battery life or an old PC; a second-hand PC that came with it; a name typed in by hand |
+| The OEM model shown in Settings names a Windows-modification playbook | posture | `experimental` | the same three |
+| The OEM manufacturer shown in Settings is a Windows-modification project | posture | `experimental` | the same three |
+| Microsoft Defender's service is not registered on this PC | posture | `experimental` | a pre-modified Windows image installed for performance or an old PC, an edition or managed build without Defender, a removal tool the owner ran |
+| Microsoft Defender's service is set never to start | posture | `experimental` | **any third-party antivirus**, which disables it when it installs itself; an employer's or school's policy; a tweaking script or pre-modified image |
+| The Windows Event Log service does not start with Windows | posture | `experimental` | a pre-modified Windows image, a tweaking script the owner ran, a managed build whose policy sets it differently |
+| Windows Update's service cannot start on this PC | posture | `experimental` | an owner who turned updates off to stop reboots or keep a driver, a PC updated another way by an employer, a tweaking script or pre-modified image |
+| A folder or key the Atlas playbook installs is on this PC | posture | `experimental` | anyone who applied the playbook and never touched a game, a second-hand PC that came with it, a folder left behind after it was removed |
+| A folder the ReviOS playbook installs is on this PC | posture | `experimental` | the same three |
+| Microsoft Defender's platform folder is not on this PC | posture | `experimental` | a pre-modified Windows image, an edition or managed build without Defender, a removal tool the owner ran, a Defender installed somewhere other than the default folder |
+| The speculative-execution mitigations are switched off | posture | `experimental` | performance advice for an older processor, a tweaking script or pre-modified image, a PC set up this way by the shop that built it |
+| Structured exception handling overwrite protection (SEHOP) is switched off | posture | `experimental` | older software whose instructions ask for it, a tweaking script or pre-modified image, an employer's policy |
+| The kernel object namespace is not protected as Windows ships it | posture | `experimental` | older software whose instructions ask for it, a tweaking script or pre-modified image, an employer's policy |
+| Microsoft Defender recorded that its real-time protection was switched off | context | `experimental` | **the PC's maker, a shop or a Windows image** switching it off before the PC was handed over (measured on two GitHub-hosted runner images), the owner switching it off for a while to install something Defender flagged, possibly installing another antivirus, a Defender update or an employer's policy, troubleshooting a slow PC |
+| The change journal holds a deletion in FiveM's plugin folder | context | `experimental` | the player removed or replaced a graphics mod, ReShade, an ENB or another plugin, FiveM or its updater (not measured), a clean-up or optimiser tool, antivirus |
+| The change journal holds a rename in FiveM's plugin folder | context | `experimental` | the player renamed, moved or replaced a plugin, an update that swaps a new copy in by renaming (not measured), a file moved to the Recycle Bin, antivirus quarantine |
+| The change journal holds a deletion in FiveM for GTA V Enhanced's asi folder | context | `experimental` | the same as for Legacy's plugin folder; whether Enhanced loads this folder at all is not known |
+| The change journal holds a rename in FiveM for GTA V Enhanced's asi folder | context | `experimental` | the same as for Legacy's plugin folder |
+| The change journal holds a deletion in PowerShell's command history folder | context | `experimental` | the player clearing their own PowerShell history, a privacy or clean-up tool, a profile reset or restore, antivirus. PowerShell itself does not delete the file (ADR 0063) |
+| The change journal holds a rename in PowerShell's command history folder | context | `experimental` | the player moving the file, the Recycle Bin, an editor that saves by renaming, a backup or sync tool |
+| A program that starts by itself has no valid embedded signature and is outside the Windows and Program Files folders | posture | `experimental` | programs installed per user in AppData — launchers, chat and voice apps, cloud sync clients, and above all their updaters and helpers; peripheral, RGB, fan and overclocking utilities; service wrappers and servers from a package manager; management and provisioning agents; open-source and self-built tools; a file signed through a catalog; a Run entry switched off in Task Manager |
+| A Microsoft Defender exclusion covers a FiveM folder | posture | `experimental` | performance and FPS guides that tell players to exclude the game or FiveM folder, game and mod installers and launchers that add their own exclusion, developers and build machines that exclude a whole drive, another security product or an administrator managing Defender |
+| **Full scan:** a command in the PowerShell history downloaded something and ran it | presence | `experimental` | installers and package managers installed with one line of this shape — the development PC measured held three, all from installing software; scripts that set up developer tools, terminals or Windows tweaks; a command that failed or was cancelled, which the history keeps either way |
+| **Full scan:** a command in the PowerShell history told Microsoft Defender to look away | tamper | `experimental` | developers and IT staff excluding build folders or tools, game, emulator or mod guides that tell players to exclude a folder, turning protection off to install a program Defender flagged by mistake |
+| **Full scan:** a command in the PowerShell history cleared a log, the history or Prefetch | tamper | `experimental` | clean-up and optimiser scripts that clear logs and Prefetch in one click, a person clearing their own command history, an administrator resetting a log while testing |
+| **Full scan:** a command in a Windows PowerShell start downloaded something and ran it | presence | `experimental` | the same as the history row, and a program or scheduled task that starts PowerShell this way to update itself |
+| **Full scan:** a command in a Windows PowerShell start told Microsoft Defender to look away | tamper | `experimental` | the same as the history row |
+| **Full scan:** a command in a Windows PowerShell start cleared a log, the history or Prefetch | tamper | `experimental` | the same as the history row |
+
+Four things to know about the thirteen rows above, which are all about **which Windows this is**:
+
+- **None of them is about cheating.** A person may install any operating system on a PC they own. What
+  they say is which parts of Windows are there and how they are set — including the parts this program
+  and a server's anti-cheat read.
+- **"Defender's service is disabled" is most often another antivirus.** That is what installing one
+  does. Read it beside the platform-folder row: a service that is registered and disabled, with the
+  folder still there, is the ordinary picture.
+- **The two playbooks name themselves; the pre-modified ISOs do not.** Atlas and ReviOS write their own
+  name where Windows shows it, so those rows say which one. KernelOS, Ghost Spectre and images built
+  with tiny11builder publish no such name, so what you see instead is which components are missing.
+- **Nothing inside the folders was read.** The folder rows answer one question — is it there.
+
+Three things to know about the Defender row:
+
+- **Read its times.** A record written before the PC was handed over looks exactly like one written
+  yesterday. Both GitHub-hosted runners measured carried one from their image.
+- **It records a change, not a state.** It does not say whether protection is on now, who switched it off,
+  or whether it was switched on again.
+- **Not found says little.** The log rotates, a cleared log holds nothing, and a PC without Defender's log
+  reads not found too.
+
+Three things to know about the two log-clearing rules:
+
+- **They can be one action, not two.** Clearing the Security log can be recorded in both logs.
+- **A high count points to an optimiser, not to something worse.** Those scripts clear every log at
+  once.
+- **Both fired on a GitHub Actions Windows runner, an imaged machine nobody was accusing of
+  anything.** Preparing a Windows image deletes the event logs. The rules did what they are written to do, and it shows
+  what a `tamper` row on an ordinary PC looks like.
+
+Four things to know about the seven FiveM rules:
+
+- **Every file in a plugin folder appears in exactly one of them**: a valid signature, no signature that
+  verifies, or a check that failed. A ReShade install is typically several files — its DLL and its text
+  files — under one row.
+- **A valid signature says who signed a file, not what it does, and no signature is not a finding.**
+  Certificates stolen from real companies have signed malware and hacking tools; many graphics mods are
+  not signed at all. The signer's name is
+  there for you to look up.
+- **The Enhanced rules say less.** Nobody has established that FiveM for GTA V Enhanced loads anything
+  from its `asi` folder.
+- **"validly signed, but not with the certificate this rule knows" goes stale.** It knows the certificate
+  FiveM.exe carried on 2026-09-13, which expires on 2027-09-05. If you see it on many players' reports
+  with the same signer name, it is most likely a renewed certificate: treat it as saying nothing,
+  check the certificate of a FiveM.exe freshly installed from Cfx.re on your own machine, and tell this
+  project.
+
+A 0.2.0 report has only the first six rules in this table; the next fifteen are new in 0.3.0, the sixteen after them — vulnerable drivers, a server cache folder, the hosts file, and the thirteen about which Windows this is — are new in 0.4.0, and the last seven — Defender's real-time protection, the four about the change journal, a program that starts by itself and a Defender exclusion — are new in 0.5.0. 0.6.0 and 0.7.0 add no rules, and eight are new in 0.8.0: the two about PowerShell's command history folder and the six full-scan PowerShell rows. 0.8.1 and 0.8.2 add none, and three are new in 0.9.0: the two PCI device rows and the IOMMU row. None of the
+firmware and PowerShell posture rows means "a policy nobody wrote" or "Secure Boot is off" on its own: the
+firmware row needs the two readings to disagree, each PowerShell row needs a policy written to off. The two
+per-user rows read the Windows account the scan ran as, which is the player's only when the
+scan was not restarted with somebody else's administrator password. The firmware rule does not detect DMA hardware (§1) and says nothing about a second PC.
+
+**A Windows PowerShell row that is found changes how to read the PowerShell rows further down.** With
+script block logging off, PowerShell flags no script, so the timeline has no time of a flagged script block
+and a full scan finds no kind of word in one — whatever ran. Their absence then says nothing. The command
+lines Windows PowerShell started with are still written while the policy is off (measured on a GitHub-hosted
+runner), and the command history is written by PSReadLine, whose source does not read the policy, so read
+those rows as usual (ADR 0063, ADR 0064). The two PowerShell 7
+rows concern a log this program does not read.
+
+The three rules about a file (ADR 0037, ADR 0042) say what state a Prefetch or log **file** is in, never
+what a record in it says. None of them says who changed it or when, and on the one Windows 11 machine
+this project measured, all three were "Not found".
+
+Three things to know about the vulnerable-driver rule:
+
+- **A hardware utility is enough to trigger it.** On the one Windows 11 PC this project scanned, it was
+  "Found" twice, both times for drivers that ASUS signed, on a PC with ASUS's graphics-card utility
+  installed ([ADR 0048](adr/0048-the-driver-service-collector.md)). The drivers on LOLDrivers' list are
+  genuine, signed drivers with a known weakness.
+- **Registered is not loaded, and not used.** The row says a driver service points at that file. It does
+  not say the driver is running, that anything used its weakness, or who installed it. The row gives the
+  service name, the file path and its SHA-256: search for the hash in the rule's list (the
+  [rule reference](rules-reference.md) names the file) to see which LOLDrivers entry it is, and ask the
+  player which program the service belongs to.
+- **Windows may still block it.** Microsoft keeps its own list of vulnerable drivers that Windows refuses
+  to load. This program does not read whether that list is on, and a driver on LOLDrivers' list is not
+  necessarily on Microsoft's.
+
+Three things to know about a full scan (ADR 0052, ADR 0055):
+
+- **The player chooses it before the scan starts**, in the program that reads: `scan --full` asks and only
+  `yes` starts it; in the desktop app, "Full scan" restarts the program and a Windows dialog asks before
+  anything is read. You cannot start one for them with a flag. A standard scan says once, above the
+  evidence, how many checks only a full scan answers.
+- **A server cache folder row says the game joined a server, nothing more.** Its name is shown as
+  `%SERVER_IDENTITY%` unless the player also agreed to show server names. The same name in two reports of
+  one PC is the same server; whether another PC gets the same name is not known, so do not compare it with
+  a folder on your own PC.
+- **Its absence says nothing.** A player who never used GTA V Enhanced, reinstalled it, or deleted the
+  folder has none.
+
+Four things to know about the full scan's PowerShell rows (ADR 0064):
+
+- **They say what kind of words a command held, never the command.** This program reads each command only
+  to sort its words into kinds and keeps no text of it, so a row cannot say what was downloaded, what ran
+  or whether it worked. The one piece of text kept is the website's name, shown as `%DOWNLOAD_HOST%` unless
+  the player also agreed to show website names; a website that is an address is shown as its kind only.
+- **Ordinary PCs match them.** Many installers are one line that downloads a script and runs it — the
+  development PC measured held three such lines in its history, all from installing software. Ask the
+  player what they installed before reading anything into the row.
+- **The history has no times.** A history row says how many commands ago the newest such line was typed,
+  and it holds only the account running the scan. `account: other` means that is not the account signed in
+  at the keyboard — usually because the scan was restarted with another administrator's password — so the
+  history is that administrator's, not the player's. The Windows PowerShell rows have times, inside the
+  span its log still holds — about six days on the one PC measured.
+- **A missing row says nothing.** PowerShell leaves out of its history every line holding the words
+  password, token, key or secret; a command built with other tricks than PowerShell's ordinary escapes is
+  not recognised; and a cleared history or log holds nothing. That is also why the guide asks you to use
+  Command Prompt, not PowerShell, during the call: a check typed into PowerShell adds a line to the
+  history this scan reads.
+
+Two things to know about the hosts-file rule:
+
+- **The kind of address is what to read.** `loopback` or `unspecified` sends the name nowhere, which is
+  how a blocklist blocks a service; `private` or `public` sends it to another machine. SS mode shows only
+  the kind: the address itself can name the player's own server, so ask them if you need it.
+- **It reads settings, not traffic.** This program never reads where a PC connected — not the DNS cache,
+  the open connections or any log of them ([ADR 0054](adr/0054-network-settings-not-network-traffic.md)).
+  The proxy and the Windows Firewall rules for FiveM are read too, and no rule reads them: an allowed
+  FiveM program and a proxy are what ordinary PCs have. SS mode only counts them.
+
+Five things to know about the six change-journal rules (ADR 0047, amendment of 2026-09-30; ADR 0063):
+
+- **A count is for a short span, and the row says which.** Windows' change journal keeps a fixed size and
+  drops its oldest records first. On one Windows 11 PC it held 39 minutes. Every row shows the span it
+  covered: "Not found" means nothing within that span, not "never".
+- **The journal does not say who.** A deletion by the player, by FiveM's updater, by an antivirus and by
+  Windows look alike in it. The row says a file left the folder, not what it was — no file name is read.
+- **They need administrator rights.** Without them, the six are part of the scope line's count of checks
+  administrator rights would answer.
+- **"On another drive" is not a failure.** If the player's FiveM folder is on another drive, the program
+  does not read that drive's journal, and says so instead of counting.
+- **PowerShell's history folder is the one place no other part of the report reads** (ADR 0063). PowerShell
+  adds each command typed into its window to a file there and never deletes or renames the file itself, so
+  a deletion is a person or another program — clearing one's own history is the ordinary one. The row never
+  says what the file held. A PC where nobody ever typed into a PowerShell window has no such folder.
+
+Three things to know about the rule on what starts by itself (ADR 0060):
+
+- **Most PCs have ordinary programs that match it.** A launcher's updater in AppData or an RGB utility's
+  helper is set to start by itself and is often not signed the way this checks. On the one Windows 11 PC
+  this project measured it matched one scheduled task, and on a GitHub runner it matched GitHub's own
+  agent ([ADR 0060](adr/0060-what-starts-by-itself.md)). The row gives the file's path, its SHA-256 and
+  where it is registered (`service`, `run` or `task`): ask the player what the program is.
+- **The name of a `Run` value or a scheduled task is not shown.** A task's name can carry the player's
+  account identifier. The service name, the file and whether it starts by itself are shown.
+- **It says what is set to start, not what it runs.** The arguments a program is given are never read, so
+  a Windows program that runs a script (`cmd`, `powershell`, `rundll32`) is shown as that Windows program.
+  Files in the Windows folder are not checked at all. A scan without administrator rights cannot read the
+  task files, and says so once above the evidence.
+
+Two things to know about the Defender-exclusion rule (ADR 0060):
+
+- **Excluding the game from scanning is common advice.** FPS guides tell players to do it, and some
+  launchers do it for them. A whole-drive exclusion covers FiveM too; a developer's PC and a GitHub runner
+  have one. The row shows the exclusion as Defender holds it and whether a policy set it.
+- **It needs administrator rights.** Without them the exclusions cannot be read, and the report says so
+  once above the evidence. Network-address exclusions are only counted, never shown.
+
+The posture rules describe the **machine**, not the person. Each rule's own text says that on
+its own, it is not evidence of cheating.
+
+Every rule's full text, including exactly what it matches, is in the
+[rule reference](rules-reference.md).
+
+## 7. What SS mode does not show, and why
+
+The program reads more than the rules ask about. It reads what Windows recorded about programs
+that ran (Prefetch, BAM, the Program Compatibility Assistant), and the list of running programs. **No rule reads those today** — the one Prefetch rule asks whether a file is read-only, not what it records —
+so they are *unmatched observations*:
+
+- **Self mode** lists them, for the player.
+- **SS mode** shows only how many there were, except on its timeline.
+
+Two fields are never shown in SS mode, even on a row that matched: a hosts line's address (only its kind)
+and the name of a `Run` value or a scheduled task.
+
+This is deliberate. The consent screen promises what matches a rule, and a timeline it names. A list of every program
+someone ran would show staff what else is on that PC. Replacing the user name in the paths would not
+change that. [ADR 0034](adr/0034-prefetch-bam-and-pca-carry-no-identity.md) explains why there is no
+rule for them: these records name a program only by its file name or path, so renaming the file
+defeats such a rule, and it cannot tell a legitimate program with the same name apart.
+
+**The timeline** (ADR 0051) is the one exception, and the consent screen names it program by program:
+for programs named `FiveM.exe`, `GTA5.exe`, `GTA5_Enhanced.exe`, `PlayGTAV.exe` or
+`FiveM_b<number>_GTAProcess.exe`, SS mode shows the time Windows recorded, with the name. It is not a
+row and not evidence. A name is all Windows keeps, so a time there says a program **of that name** ran
+then, not that the game did, and a missing time does not say the game never ran. The timeline also
+shows the times of FiveM's log, crash and cache folders, the first and last time the Code Integrity log
+recorded Windows refusing to load a file and Microsoft Defender's log recorded a detection (ADR 0059), the
+first and last time Windows PowerShell's log recorded a script block PowerShell itself flagged as
+suspicious (ADR 0063), in a full scan the first and last time either PowerShell log recorded a command
+that downloaded something and ran it (ADR 0064), the span each Windows log and the change journal could see, and which of those could
+not be read. Those event times are not rows: this program does not read which file was refused, what was
+detected or what a script said, Windows 11 refuses some drivers by default, an ordinary PC measured for this
+held hundreds of refusals and a detection, and PowerShell flags ordinary scripts too — the development PC
+measured held 369 flagged blocks in a day and a half. Read a time only inside its source's span, and
+never read the space between two times as something someone removed.
+
+**How far back the traces reach** (ADR 0061) is a section of its own, in both modes, and the consent
+screen names it. For each event log, Prefetch, BAM, the Program Compatibility Assistant, the change journal
+and FiveM's log, crash and cache folders it shows the oldest time still there, how many days before the
+scan that is, and how much the source holds — never a program's or a file's name — with what that source
+ordinarily keeps. Above them are dates of when parts of the PC were set up: `InstallDate` (installed **or
+last feature-upgraded**, not first installed), the earliest installation Windows Setup kept, when the change
+journal, the drive's root and `$Recycle.Bin` were created, and when FiveM's program folders were. Each is
+shown with what ordinarily resets it. A source Windows would not show without administrator rights says
+"not known": it was not read, it is not empty. Nothing in the section is compared for you, and there is no
+"machine age": the dates disagree by years on ordinary PCs.
+
+When Prefetch or BAM was read, holds no entry for the names above and still reaches back before FiveM's
+folders were last written, a **statement** above the timeline puts FiveM's side and those records side by
+side, one line per record, with the ordinary causes of the same result under it. It is not a row and not
+evidence. A record that could not be read is stated as not known, never as "no entry".
+
+For each FiveM edition, a **session statement** (ADR 0062) puts its last session beside its own folders.
+The session's start comes from a FiveM process running now, or else from Prefetch; its end from BAM, or
+"still running". Each folder it compares — Legacy's logs, cache and resource cache index, Enhanced's logs —
+is shown as a time before or after that start — "before"
+only when more than 10 minutes before it — and Enhanced's log folder also against the end. Nothing is
+compared with the scan's own time: after a long session, or one days ago, old folders are ordinary.
+Without administrator rights and with nothing of FiveM's running, the statement says when FiveM last ran
+is not known. Its ordinary causes are printed under it, first among them a player standing still: FiveM
+writes its folders when something happens, not on a clock. It is not a row and not evidence. Under the
+trace ages row of Legacy's resource cache, each launch mode's index folder creation date is shown beside
+its oldest cache file's, never compared.
+
+Self mode is the player's view, and the player's consent covers SS mode. Asking to see Self mode is
+asking for something the player did not agree to.
+
+## 8. Own traces
+
+The program is running while it scans, so it sees itself. The **own traces** section, shown in both
+modes, lists what it saw of itself. It is not evidence about the PC.
+
+## 9. Keeping a record
+
+- **The window version has no export or save button** in 0.9.0 either: nothing in its source writes a
+  file.
+- **The CLI** can write the SS view as JSON, redacted the same way as the screen:
+
+  ```bat
+  .\bope-scanner-cli-0.9.0-windows-x64.exe scan --mode ss --json > report.json
+  ```
+
+  The consent question stays on screen, the player answers it there, and the file holds only the JSON.
+  Run it from an administrator Command Prompt (§3), not with `--elevate`.
+
+  **With 0.2.0** the consent question goes to the same output as the JSON: with `>`, the player does not
+  see it, the program waits with nothing on screen, and the question ends up at the top of the file. With
+  0.2.0, first run the SS-mode scan from §4 without `--json`, so the player answers on screen; if they
+  agree, run the command above with `--yes` added. It is a second scan, so a running-program list can
+  differ slightly from the one on screen.
+- A file the player sends to staff becomes the server's responsibility, including how long it is
+  kept ([PRIVACY.md](../PRIVACY.md)).
+
+## 10. What not to conclude
+
+| The report shows | It does not mean |
+|---|---|
+| a `FOUND` row | the player cheated |
+| no `FOUND` rows | the PC is clean |
+| `NOT MEASURED` | the player is hiding something |
+| the scope line about administrator rights | the player refused anything |
+| both log-clearing rows | two separate clearings |
+| a large number of cleared logs | a more serious clearing |
+| a posture row | anything about the person |
+| `Windows start` days before the scan | the player avoided restarting, or is hiding anything |
+| `Windows start` minutes before the scan | the player restarted to hide something |
+| sources that reach back only days | someone removed traces — full logs, Windows' own clean-up and a new installation all do this |
+| sources that reach back months or years | nothing was removed |
+| setup dates weeks old | Windows was reinstalled to hide something — a feature upgrade resets `InstallDate` on its own |
+| setup dates years old | the PC was never reset or reinstalled |
+| the FiveM statement | FiveM ran and its records were removed — read the causes under it |
+| no FiveM statement | Windows' records of programs that ran are complete |
+| a FiveM folder written "before the session began" | the player cleared or changed FiveM's folders — a player standing still, another Windows account or folder, an update, Prefetch switched off and a changed clock all produce it: read the causes under the statement |
+| Enhanced's latest log write "before the session ended" | the player closed FiveM to hide something — Task Manager, a crash or a shutdown may skip the write FiveM makes when it closes |
+| "when FiveM last ran is not known" | FiveM ran, or did not — Prefetch and BAM were not read |
+| a resource cache index created later than its oldest cache file | the cache was tampered with — FiveM rebuilding its index, its own "clear cache", a copied or restored cache and a reinstall that kept the cache all do this |
+
+Treat the report as one piece of evidence for a person to judge, next to everything else your
+server knows.
+
+## 11. What a report does not prove about itself
+
+§10 is about what the rows say. This is about the report.
+
+- **A report is not signed.** A file someone sends you after the session is text. Anyone who had it
+  could have changed it, and nothing in it can show that they did not.
+- **`official build` and `exe sha256` are what the running program says about itself.** They make an
+  unofficial build easy to notice. A modified program could print the same lines (§2).
+- **An unmodified program still reports what Windows told it.** If Windows on that PC was modified to
+  lie to the programs that run on it, the real program shows, and writes, what it was told (§1).
+- **What you can rely on is what you watched:** the download from the Releases page, the hash, the
+  header, the player answering the consent question, the rows appearing. A file that arrives later is
+  worth what that session was worth.
+- **If you are offered "signed" or "unforgeable" reports, from any tool, ask where the key is and who
+  checks the signature.** A key inside a program the player runs is on the player's PC.
+  [ADR 0040](adr/0040-reports-are-not-signed.md) explains why this project does not sign reports.
+
+## Found a mistake in this guide?
+
+Open an issue or a pull request ([CONTRIBUTING.md](../CONTRIBUTING.md)). If you found a way around a
+detection, report it privately ([SECURITY.md](../SECURITY.md)).

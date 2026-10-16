@@ -1,0 +1,15 @@
+{
+  "description": "Synthetic positive case for roblox/player/player-exe-without-verified-signature: unsigned.",
+  "observations": [
+    {
+      "collector": "roblox",
+      "fields": {
+        "location": "player_exe",
+        "path": "C:\\Users\\fixtureuser\\AppData\\Local\\Roblox\\Versions\\version-0123456789abcdef\\RobloxPlayerBeta.exe",
+        "name": "RobloxPlayerBeta.exe",
+        "signature": "invalid"
+      }
+    }
+  ],
+  "expect_matches": 1
+}

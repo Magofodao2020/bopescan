@@ -1,0 +1,18 @@
+{
+  "description": "Synthetic positive case for roblox_files/archive/archive-with-encrypted-headers: locked.",
+  "observations": [
+    {
+      "collector": "roblox_files",
+      "fields": {
+        "scope": "archive",
+        "place": "downloads",
+        "name": "locked.rar",
+        "path": "C:\\Users\\fixtureuser\\Downloads\\locked.rar",
+        "archive_format": "rar5",
+        "encrypted_headers": true,
+        "executor_layout": false
+      }
+    }
+  ],
+  "expect_matches": 1
+}

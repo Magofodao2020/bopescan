@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: d615135a-756a-4da8-ae18-ef2737a3e921
+title: "The Master File Table keeps a freed record named like a Roblox executor or injector"
+description: >-
+  A file record of the system volume's Master File Table that NTFS marked as no longer in use still
+  holds the name of a file or folder matching a Roblox executor or injector, with its folder path and
+  its NTFS times. That is the metadata of a deleted entry; its content is not recovered or read, the
+  record can be reused at any moment, and a name is not proof of what the file was or that it ran.
+status: experimental
+collector: mft
+strength: presence
+match:
+  scope: "entry"
+  in_use: false
+  tool_kind: ["executor", "injector"]
+retention: >-
+  A freed record lasts until NTFS reuses it for a new file: hours on a busy volume, months on a quiet
+  one.
+unmeasured_when: [not_admin, source_absent]
+falsepositives:
+  - "A download deleted unopened, or an antivirus quarantining and removing a file it flagged"
+  - "An unrelated file with the same name, deleted for any reason"
+author: B.O.P.E Scanner contributors
+date: 2026-10-15
+tags: [roblox, mft]
+level: warn
+category: files

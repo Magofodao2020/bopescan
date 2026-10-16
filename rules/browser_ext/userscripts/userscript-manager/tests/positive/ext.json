@@ -1,0 +1,19 @@
+{
+  "description": "Synthetic positive case for browser_ext/userscripts/userscript-manager: ext.",
+  "observations": [
+    {
+      "collector": "browser_ext",
+      "fields": {
+        "browser": "chrome",
+        "profile": "Default",
+        "extension_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "name": "Ext",
+        "version": "1.0",
+        "user_scripts": true,
+        "roblox_access": true,
+        "all_sites": true
+      }
+    }
+  ],
+  "expect_matches": 1
+}

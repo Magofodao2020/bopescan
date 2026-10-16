@@ -1,0 +1,15 @@
+{
+  "description": "Synthetic negative case for hijack/ifeo/debugger-on-roblox: taskmgr.",
+  "observations": [
+    {
+      "collector": "hijack",
+      "fields": {
+        "mechanism": "ifeo_debugger",
+        "target": "taskmgr.exe",
+        "program": "C:\\Tools\\procexp64.exe",
+        "program_name": "procexp64.exe",
+        "location_kind": "other"
+      }
+    }
+  ]
+}

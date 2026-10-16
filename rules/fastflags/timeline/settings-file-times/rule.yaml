@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: 2eb52c4a-3641-4089-9268-6227fa91fdc0
+title: "Times of Roblox FastFlag files"
+description: >-
+  Puts on the timeline when each FastFlag file was created and last written, beside the Roblox
+  launches and tool traces.
+status: experimental
+role: timeline
+collector: fastflags
+strength: context
+match:
+  "location|exists": true
+retention: >-
+  The file as it is at scan time.
+falsepositives:
+  - "A launcher rewrites the file at every start"
+author: B.O.P.E Scanner contributors
+date: 2026-10-15
+tags: [timeline, roblox]
+category: fastflags

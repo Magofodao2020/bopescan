@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: 4686e7ad-1ff0-4d42-8ec2-883222bcd7da
+title: "The change journal records the deletion of a file named like a Roblox executor or injector"
+description: >-
+  The NTFS change journal of the system drive holds a deletion record for a file whose name matches
+  a Roblox executor or injector. The journal names the file, not its folder; the same name can
+  belong to unrelated files. Ordinary programs delete their own temporary files.
+status: experimental
+collector: usn
+strength: context
+match:
+  location: "named"
+  tool_kind: ["executor", "injector"]
+  "deleted|gte": 1
+retention: >-
+  The change journal keeps a bounded number of recent records, often days to weeks.
+falsepositives:
+  - "An installer or updater deleting its own temporary file of that name"
+author: B.O.P.E Scanner contributors
+date: 2026-10-15
+tags: [roblox, usn]
+level: warn
+category: files

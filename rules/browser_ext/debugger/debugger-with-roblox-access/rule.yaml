@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: b125fe47-1ce6-4239-bad4-b4d67b98ebde
+title: "A browser extension with DevTools control can reach Roblox's website"
+description: >-
+  An extension holds the debugger permission, which lets it control pages through the DevTools
+  protocol, and can reach roblox.com. That combination can change what the website does far beyond a
+  content script.
+status: experimental
+collector: browser_ext
+strength: presence
+match:
+  debugger: true
+  roblox_access: true
+retention: >-
+  Extensions installed in each browser profile at scan time.
+unmeasured_when: [not_windows]
+falsepositives:
+  - "Web-development, automated-testing and accessibility extensions that need DevTools access"
+references:
+  - https://developer.chrome.com/docs/extensions/reference/permissions-list
+author: B.O.P.E Scanner contributors
+date: 2026-10-15
+tags: [browser]
+level: warn
+category: browser_scripts

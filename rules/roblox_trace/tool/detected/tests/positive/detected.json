@@ -1,0 +1,29 @@
+{
+  "description": "Synthetic positive case for roblox_trace/tool/detected: detected.",
+  "observations": [
+    {
+      "collector": "roblox_trace",
+      "fields": {
+        "scope": "tool",
+        "tool_id": "solara",
+        "tool_kind": "executor",
+        "display": "Solara",
+        "status": "detected",
+        "hits": 3,
+        "families": "file_listing, prefetch",
+        "families_count": 2,
+        "classes": "execution, executor_layout",
+        "execution": true,
+        "interaction": false,
+        "deleted": false,
+        "missing_now": false,
+        "roblox_context": true,
+        "common_legitimate": false,
+        "match_kind": "ambiguous_alias",
+        "first_seen": "2026-10-14T20:00:00Z",
+        "last_seen": "2026-10-14T21:00:00Z"
+      }
+    }
+  ],
+  "expect_matches": 1
+}

@@ -1,0 +1,14 @@
+{
+  "description": "Synthetic negative case for shellbags/dialog/executor-named-file-picked: launcher.",
+  "observations": [
+    {
+      "collector": "shellbags",
+      "fields": {
+        "list": "open_save",
+        "path": "C:\\x\\Bloxstrap.exe",
+        "tool_id": "bloxstrap",
+        "tool_kind": "bootstrapper"
+      }
+    }
+  ]
+}

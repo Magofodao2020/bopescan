@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: 1a665dfa-9a53-4dcb-a9ec-942ac07d57e6
+title: "An unsigned program or DLL sits beside the Roblox player"
+description: >-
+  A .dll, .exe or .asi file directly in a Roblox version folder carries no embedded signature, or
+  one that does not verify. Roblox signs the binaries it ships; a file without a signature there was
+  most likely put there by something else. It does not say what the file does or that it was loaded.
+status: experimental
+collector: roblox
+strength: presence
+match:
+  location: "version_binary"
+  signature: ["no_embedded_signature", "invalid"]
+retention: >-
+  The version folder as it is at scan time.
+unmeasured_when: [not_windows]
+falsepositives:
+  - "A Roblox binary signed through a Windows catalog rather than embedded, which this check does not read; not observed for Roblox"
+  - "Graphics or overlay tools that drop a DLL into game folders"
+references:
+  - https://learn.microsoft.com/en-us/windows/win32/seccrypto/authenticode
+author: B.O.P.E Scanner contributors
+date: 2026-10-15
+tags: [roblox, signature]
+level: warn

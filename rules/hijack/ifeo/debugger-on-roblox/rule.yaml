@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: 32d96608-ac3e-4571-ac9b-2f11763e6fdc
+title: "Windows is told to start another program instead of Roblox"
+description: >-
+  An Image File Execution Options "Debugger" value exists for a Roblox executable, so Windows starts
+  the named program instead, passing it the Roblox command line. Debuggers use this; so does
+  software that wants to run before or around a game. Only the program is shown, never its
+  arguments.
+status: experimental
+collector: hijack
+strength: tamper
+match:
+  mechanism: "ifeo_debugger"
+  "target|startswith": "Roblox"
+retention: >-
+  The setting as it is at scan time.
+unmeasured_when: [not_windows]
+falsepositives:
+  - "A developer debugging the Roblox client with a debugger configured this way"
+references:
+  - https://learn.microsoft.com/en-us/previous-versions/windows/desktop/xperf/image-file-execution-options
+author: B.O.P.E Scanner contributors
+date: 2026-10-15
+tags: [persistence, ifeo, roblox]
+level: flag
+category: persistence

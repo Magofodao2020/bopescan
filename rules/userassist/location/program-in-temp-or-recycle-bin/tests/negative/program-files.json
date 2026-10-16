@@ -1,0 +1,13 @@
+{
+  "description": "Synthetic negative case for userassist/location/program-in-temp-or-recycle-bin: program-files.",
+  "observations": [
+    {
+      "collector": "userassist",
+      "fields": {
+        "path": "C:\\Program Files\\App\\app.exe",
+        "name": "app.exe",
+        "location_kind": "program_files"
+      }
+    }
+  ]
+}

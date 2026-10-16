@@ -1,0 +1,17 @@
+{
+  "description": "Synthetic negative case for usb_device/dev-board/dev-board-as-input-device: logitech.",
+  "observations": [
+    {
+      "collector": "usb_device",
+      "fields": {
+        "source": "device_list",
+        "bus": "hid",
+        "model_id": "HID\\VID_046D&PID_C52B&MI_00",
+        "vid": "046D",
+        "pid": "C52B",
+        "dev_board_vendor": false,
+        "present": true
+      }
+    }
+  ]
+}

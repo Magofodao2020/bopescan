@@ -1,0 +1,26 @@
+{
+  "description": "Synthetic positive case for roblox_trace/hit/history-points-to-missing-tool-file: missing.",
+  "observations": [
+    {
+      "collector": "roblox_trace",
+      "fields": {
+        "scope": "hit",
+        "tool_id": "solara",
+        "tool_kind": "executor",
+        "display": "Solara",
+        "match_kind": "ambiguous_alias",
+        "matched_on": "name",
+        "evidence_class": "execution",
+        "source": "bam",
+        "family": "bam",
+        "name": "SOLARA.EXE",
+        "roblox_context": true,
+        "common_legitimate": false,
+        "time": "2026-10-14T20:00:00Z",
+        "path": "C:\\Users\\fixtureuser\\Downloads\\Solara\\Solara.exe",
+        "exists": false
+      }
+    }
+  ],
+  "expect_matches": 1
+}

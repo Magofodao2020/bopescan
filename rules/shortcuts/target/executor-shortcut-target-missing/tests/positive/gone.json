@@ -1,0 +1,20 @@
+{
+  "description": "Synthetic positive case for shortcuts/target/executor-shortcut-target-missing: gone.",
+  "observations": [
+    {
+      "collector": "shortcuts",
+      "fields": {
+        "place": "desktop",
+        "name": "Solara.lnk",
+        "path": "C:\\Users\\fixtureuser\\Desktop\\Solara.lnk",
+        "target_path": "C:\\Users\\fixtureuser\\Downloads\\Solara\\Solara.exe",
+        "target_exists": false,
+        "tool_id": "solara",
+        "tool_kind": "executor",
+        "match_kind": "ambiguous_alias",
+        "why": "catalog_match"
+      }
+    }
+  ],
+  "expect_matches": 1
+}

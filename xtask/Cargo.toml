@@ -1,0 +1,32 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+
+[package]
+name = "xtask"
+description = "aeterna-rongroi repository tasks: scaffolding and project checks"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+clap.workspace = true
+jiff.workspace = true
+bope-collectors.workspace = true
+bope-core = { workspace = true, features = ["source-tree"] }
+# `check-baseline` runs the shipped pipeline against fixture hosts, so it needs the fixture host.
+bope-host = { workspace = true, features = ["fixture"] }
+serde.workspace = true
+serde-saphyr.workspace = true
+serde_json.workspace = true
+uuid = { workspace = true, features = ["v4"] }
+
+[dev-dependencies]
+insta.workspace = true
+
+[lints]
+workspace = true

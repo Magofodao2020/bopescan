@@ -1,0 +1,15 @@
+{
+  "description": "Synthetic positive case for installed_programs/peripheral-suite/installed: x.",
+  "observations": [
+    {
+      "collector": "installed_programs",
+      "fields": {
+        "hive": "hklm",
+        "uninstall_key": "X",
+        "name": "X",
+        "category": "peripheral_suite"
+      }
+    }
+  ],
+  "expect_matches": 1
+}

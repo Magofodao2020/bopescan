@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: b77bd209-8711-4277-82a9-ae7c6b349a62
+title: "A .zip archive holds a Roblox executor's folder layout"
+description: >-
+  A .zip in Downloads, Desktop, Temp or another place read holds folders named autoexec and
+  workspace side by side, the layout Roblox script executors use. Only the archive's directory was
+  read; nothing was extracted.
+status: experimental
+collector: roblox_files
+strength: presence
+match:
+  scope: "archive"
+  executor_layout: true
+retention: >-
+  The archive as it is at scan time.
+falsepositives:
+  - "An archive of scripts for Roblox Studio or a game's own development kept with these folder names"
+author: B.O.P.E Scanner contributors
+date: 2026-10-15
+tags: [roblox, executor]
+level: warn
+category: files

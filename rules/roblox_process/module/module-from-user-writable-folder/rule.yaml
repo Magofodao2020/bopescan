@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: d01b990f-c1bd-45db-810a-41a2e057aab8
+title: "The running Roblox player has a module loaded from a user folder"
+description: >-
+  A DLL loaded in the running Roblox player comes from Temp, Downloads, Desktop, Documents,
+  AppData\Roaming, the Public profile, the Recycle Bin or elsewhere in a user profile — folders any
+  program may write to. Overlays and drivers normally load from Program Files, AppData\Local or
+  Windows. It shows the module was loaded when the scan ran; it does not say what it does. Modules
+  can only be listed when Roblox's anti-cheat allows it; otherwise this row is not measured.
+status: experimental
+collector: roblox_process
+strength: presence
+match:
+  scope: "roblox_module"
+  location_kind: ["temp", "user_downloads", "user_desktop", "user_documents", "appdata_roaming", "users_public", "recycle_bin", "user_profile"]
+retention: >-
+  The modules loaded at the moment of the scan. A module unloaded earlier is not seen.
+unmeasured_when: [not_windows, access_denied]
+falsepositives:
+  - "An overlay, recorder or input tool that installs per user outside AppData\\Local"
+  - "A shell extension or accessibility tool loaded into every process from a user folder"
+references:
+  - https://learn.microsoft.com/en-us/windows/win32/api/psapi/nf-psapi-enumprocessmodulesex
+author: B.O.P.E Scanner contributors
+date: 2026-10-15
+tags: [roblox, injection, module]
+level: flag

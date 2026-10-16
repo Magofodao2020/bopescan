@@ -1,0 +1,16 @@
+{
+  "description": "Synthetic positive case for hijack/ifeo/debugger-from-user-folder: temp.",
+  "observations": [
+    {
+      "collector": "hijack",
+      "fields": {
+        "mechanism": "ifeo_debugger",
+        "target": "notepad.exe",
+        "program": "C:\\Users\\fixtureuser\\AppData\\Local\\Temp\\x.exe",
+        "program_name": "x.exe",
+        "location_kind": "temp"
+      }
+    }
+  ],
+  "expect_matches": 1
+}

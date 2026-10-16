@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: 003a01bc-baff-4536-bee2-034a19a3eee4
+title: "A memory editor, debugger or process inspector is running during the check"
+description: >-
+  Cheat Engine, Process Hacker, System Informer or x64dbg is running at scan time under its usual
+  file name. These can read and change other programs' memory. A renamed copy is not seen by name.
+status: experimental
+collector: process
+strength: presence
+match:
+  name: ["cheatengine-x86_64.exe", "cheatengine-x86_64-SSE4-AVX2.exe", "cheatengine-i386.exe", "Cheat Engine.exe", "ProcessHacker.exe", "SystemInformer.exe", "x64dbg.exe", "x32dbg.exe"]
+retention: >-
+  Processes running at the moment of the scan.
+unmeasured_when: [not_windows]
+falsepositives:
+  - "Developers and modders using these tools for unrelated work"
+  - "System Informer kept open to watch the system"
+author: B.O.P.E Scanner contributors
+date: 2026-10-15
+tags: [process, memory]
+level: warn
+category: processes_memory

@@ -1,0 +1,31 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: 3daec665-7482-4667-a268-3be496783a83
+title: "A microcontroller board has been a keyboard or mouse on this PC"
+description: >-
+  Windows' device list has a keyboard, mouse or other input device whose vendor id belongs to a
+  maker of microcontroller and development boards (Arduino, SparkFun, Adafruit, Raspberry Pi,
+  Teensy's shared id and others), present now or remembered. Input-automation and "Bad USB" devices
+  are built on such boards. The row shows whether it is connected and its install, arrival and
+  removal times. Windows does not log what a keyboard typed, and a board can claim any vendor id.
+status: experimental
+collector: usb_device
+strength: presence
+match:
+  bus: "hid"
+  dev_board_vendor: true
+retention: >-
+  Devices Windows still remembers; a device removed with a cleanup tool or before a reinstall is not
+  seen.
+unmeasured_when: [not_windows]
+falsepositives:
+  - "Hand-built mechanical keyboards, macro pads and flight-simulator button boxes, which are commonly built on Arduino Pro Micro or RP2040 boards"
+  - "Electronics hobby projects that act as a keyboard or game controller"
+references:
+  - https://www.usb.org/developers
+author: B.O.P.E Scanner contributors
+date: 2026-10-15
+tags: [usb, hid, badusb]
+level: warn
+category: macros_peripherals

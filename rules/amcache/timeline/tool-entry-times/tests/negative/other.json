@@ -1,0 +1,14 @@
+{
+  "description": "Synthetic negative case for amcache/timeline/tool-entry-times: other.",
+  "observations": [
+    {
+      "collector": "amcache",
+      "fields": {
+        "scope": "file",
+        "name": "app.exe",
+        "path": "c:\\users\\fixtureuser\\downloads\\app.exe",
+        "key_written": "2026-10-14T20:00:00Z"
+      }
+    }
+  ]
+}

@@ -1,0 +1,60 @@
+# Governance
+
+## Maintainers
+
+| Role | Who |
+|---|---|
+| Lead maintainer | [@tanakon8529](https://github.com/tanakon8529) |
+| Rule reviewer | **open** |
+| Thai-language reviewer | **open** |
+| Release approver (second person) | **open** |
+
+## How decisions are made
+
+- Day-to-day changes: pull request, green CI, merged by a maintainer.
+- Changes to the architecture, the rule format, the license terms or the purpose boundary in
+  [AGENTS.md](AGENTS.md): an ADR in `docs/adr/`, open for comment before merge.
+
+## Releases
+
+Releases are built only by the GitHub release workflow; that workflow is the only place the official-build
+marker is set. While there is a single maintainer, releases are not code-signed. Code signing through the
+SignPath Foundation requires separate author, reviewer and approver roles, so it will be requested once a
+second maintainer can act as release approver.
+
+### How to release
+
+The design and its reasons are in [ADR 0008](docs/adr/0008-release-pipeline.md).
+
+Enabling **immutable releases** in the repository settings, and the rehearsal (`vYYYY.MM.DD-X.Y.Z-rc.N`)
+described in ADR 0008 including the desktop-app gate failure test, were one-time steps before the first
+release. 0.1.0 shipped on 2026-09-11 and ADR 0008 records what the rehearsal found; a later release
+repeats neither. Step 6 below assumes immutable releases are still enabled — check the repository
+settings if you have not seen that yourself.
+
+1. Open a pull request `chore(release): X.Y.Z` against `dev`. It renames `## [Unreleased]` in `CHANGELOG.md` to
+   `## [X.Y.Z] - YYYY-MM-DD` and sets version `X.Y.Z` in `Cargo.toml`, `apps/desktop/src-tauri/tauri.conf.json`
+   and `apps/desktop/package.json`, and the version in the README's Status section (both languages) and in both
+   screenshare guides. `cargo xtask check-versions` fails the pull request when one of them still names the
+   previous version. Squash-merge it when CI is green. The landing page is not edited: `cargo xtask site` fills
+   its version and links from the published release (step 7).
+2. Open a pull request from `dev` to `main`, also titled `chore(release): X.Y.Z`, and merge it with a **merge
+   commit** when CI is green.
+3. Tag that merge commit on `main` with the date from the changelog heading and push the tag:
+   `git tag -a vYYYY.MM.DD-X.Y.Z -m "aeterna-rongroi X.Y.Z" <commit>`, then `git push origin vYYYY.MM.DD-X.Y.Z`.
+   A rehearsal uses `vYYYY.MM.DD-X.Y.Z-rc.N`.
+4. Wait for the `release` workflow. It creates a **draft** release with both executables, `SHA256SUMS`, the SBOMs
+   and the notes. It never publishes. Do not re-run its `draft release` job: a re-run creates a second draft for
+   the same tag; delete a stray draft instead.
+5. Download the draft's files and check them on a real Windows machine (hash, no **UNOFFICIAL BUILD** banner,
+   version). Builds are not byte-for-byte reproducible, so a check of an earlier `-rc.N` build does not carry over.
+6. Open the draft, read the notes and the file list, and publish it. With immutable releases enabled, a published
+   release cannot have its tag or files changed; a wrong file needs a new version.
+7. Publishing starts the `pages` workflow, which rebuilds the landing page and `release.json` from the new release.
+   It refuses to deploy when GitHub's digest of an executable differs from its line in `SHA256SUMS`; check that the
+   run is green and that `https://aeterna.github.io/aeterna-rongroi/release.json` names the new version.
+
+## Becoming a maintainer
+
+Sustained, good-quality contributions in an area (rules, a language, a collector) lead to an invitation for
+that role.

@@ -1,0 +1,17 @@
+{
+  "description": "Synthetic positive case for roblox_process/module/module-from-user-writable-folder: temp-dll.",
+  "observations": [
+    {
+      "collector": "roblox_process",
+      "fields": {
+        "scope": "roblox_module",
+        "path": "C:\\Users\\fixtureuser\\AppData\\Local\\Temp\\x.dll",
+        "name": "x.dll",
+        "location_kind": "temp",
+        "under_player_folder": false,
+        "signature": "no_embedded_signature"
+      }
+    }
+  ],
+  "expect_matches": 1
+}

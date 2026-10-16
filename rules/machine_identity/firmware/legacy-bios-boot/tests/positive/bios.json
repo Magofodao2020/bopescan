@@ -1,0 +1,14 @@
+{
+  "description": "Synthetic positive case for machine_identity/firmware/legacy-bios-boot: bios.",
+  "observations": [
+    {
+      "collector": "machine_identity",
+      "fields": {
+        "manufacturer": "X",
+        "firmware_type": "bios",
+        "vm_hint": false
+      }
+    }
+  ],
+  "expect_matches": 1
+}

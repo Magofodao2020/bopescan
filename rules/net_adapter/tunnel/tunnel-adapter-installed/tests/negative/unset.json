@@ -1,0 +1,15 @@
+{
+  "description": "Synthetic negative case for net_adapter/tunnel/tunnel-adapter-installed: unset.",
+  "observations": [
+    {
+      "collector": "net_adapter",
+      "fields": {
+        "place": "adapter",
+        "description": "Intel(R) Ethernet",
+        "component_id": "PCI\\VEN_8086",
+        "software_adapter": false,
+        "tunnel_like": false
+      }
+    }
+  ]
+}

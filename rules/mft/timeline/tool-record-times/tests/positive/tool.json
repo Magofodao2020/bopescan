@@ -1,0 +1,15 @@
+{
+  "description": "Synthetic positive case for mft/timeline/tool-record-times: tool.",
+  "observations": [
+    {
+      "collector": "mft",
+      "fields": {
+        "scope": "entry",
+        "name": "Fluxus.exe",
+        "tool_id": "fluxus",
+        "si_created": "2026-10-14T19:58:00Z"
+      }
+    }
+  ],
+  "expect_matches": 1
+}

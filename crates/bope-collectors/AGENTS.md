@@ -1,0 +1,36 @@
+# AGENTS.md — collectors
+
+Adds to the root [`AGENTS.md`](../../AGENTS.md); read that first.
+
+Collectors are the part of this project that reads a player's machine, so the boundary is strictest here.
+
+- **Read-only, always.** Open files, keys and logs for reading only. Never write, delete, rename, lock,
+  truncate or change timestamps — not even temporarily, not even "to restore it afterwards". The
+  exception is this process's own token, never the machine: a privilege the token already holds may be
+  enabled for one read that an ADR names and restored from the previous state straight after (ADR 0038).
+  A new one needs its own ADR, and a write that privilege would permit is banned in `clippy.toml`.
+- **Collect only what a rule needs.** No browser history, screenshots, documents, credentials, tokens or
+  unrelated personal files. A new kind of source needs an ADR.
+  - **One exception, `powershell_text` (ADR 0064):** a `full` collector that reads what a person typed into
+    PowerShell — its history file and two kinds of PowerShell event — because the line that downloads a
+    cheat and runs it is visible nowhere else. It hands each text straight to
+    `bope_parsers::powershell_text`, keeps which kinds of words it held and how many, and no substring of
+    it, except a download's host behind its own SS-mode question. No other collector may read typed text
+    or a program's arguments without an ADR that amends this line.
+- **No network, no child processes.** Do not shell out to other programs. Restarting the program itself with
+  administrator rights (`bope_host_windows::elevate`, ADR 0012) is application lifecycle rather than a
+  Collector, so it is not an exception to this rule.
+- **Environment problems are `Unmeasured`.** Missing rights, a disabled service or an unsupported OS
+  produce `CollectorRun::Unmeasured` or a `gaps` entry with a reason — never a panic and never an
+  empty "measured" result that would read as "not found".
+- **Every collector declares the field names it can emit** (`Collector::fields`). That list is the
+  vocabulary a rule's `match` may name and `cargo xtask check-rules` rejects everything outside it, so a
+  field emitted and not declared is a correct rule the gate will refuse (ADR 0026). The declaration is
+  bound to reality by `every_emitted_field_is_declared` in `src/lib.rs`, which runs every collector over
+  every fixture host.
+- **Every collector is tested against `FixtureHost`** for each outcome: found, not found, unmeasured.
+- **A new collector needs a `baseline-*` host that reads it.** A source no baseline describes makes the
+  collector `Unmeasured` there, and `cargo xtask check-baseline` then passes every rule written for it
+  whatever it says (ADR 0026).
+- **Out of scope:** code or comments that describe how to hide from, disable, or fool a collector.
+  Detection bypasses go to [`SECURITY.md`](../../SECURITY.md) privately.

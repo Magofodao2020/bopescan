@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: e315d48a-2cf4-4e84-8a0b-4fd9ccfac04e
+title: "A third-party Roblox bootstrapper is installed"
+description: >-
+  Bloxstrap, Fishstrap or Voidstrap has a folder under %LOCALAPPDATA%. These are open-source
+  launchers that install and start the official Roblox player with extra settings; they are not
+  cheats. Shown as context for the client-settings row and the timeline.
+status: experimental
+collector: roblox
+strength: context
+match:
+  location: "bootstrapper"
+retention: >-
+  The folder as it is at scan time.
+unmeasured_when: [not_windows]
+falsepositives:
+  - "Any player who prefers these launchers for their settings, Discord presence or FPS unlock"
+author: B.O.P.E Scanner contributors
+date: 2026-10-15
+tags: [roblox]
+level: info

@@ -1,0 +1,16 @@
+{
+  "description": "Synthetic negative case for srum/app/executor-named-program-used-cpu: launcher.",
+  "observations": [
+    {
+      "collector": "srum",
+      "fields": {
+        "scope": "app",
+        "name": "Bloxstrap.exe",
+        "used_cpu": true,
+        "tool_id": "bloxstrap",
+        "tool_kind": "bootstrapper",
+        "match_kind": "known_tool"
+      }
+    }
+  ]
+}

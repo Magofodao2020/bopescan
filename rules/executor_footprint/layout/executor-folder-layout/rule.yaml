@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: 37172247-176e-4b49-a26c-b2781ba64696
+title: "A folder is laid out like a Roblox script executor"
+description: >-
+  A folder in Desktop, Downloads, Documents, AppData or Temp holds both an "autoexec" and a
+  "workspace" subfolder — the layout Roblox script executors create beside themselves for scripts
+  they run automatically and files scripts write. The row lists the folder, whether it also has
+  "scripts" and "bin", and how many scripts autoexec holds. It shows the folder exists, not that the
+  executor ran.
+status: experimental
+collector: executor_footprint
+strength: presence
+match:
+  scope: "layout"
+retention: >-
+  The folders as they are at scan time, two levels below each place looked at.
+unmeasured_when: [not_windows]
+falsepositives:
+  - "An executor that was downloaded and never opened, or one kept to study"
+  - "Script-hub developers and anti-cheat researchers who keep executor folders on purpose"
+references:
+  - https://github.com/unified-naming-convention/NamingStandard
+author: B.O.P.E Scanner contributors
+date: 2026-10-15
+tags: [roblox, executor]
+level: flag

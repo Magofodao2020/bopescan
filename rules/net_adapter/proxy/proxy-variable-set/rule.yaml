@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: 3709cca0-3371-49e6-b687-9eb46b21977e
+title: "A proxy environment variable is set"
+description: >-
+  HTTP_PROXY, HTTPS_PROXY, ALL_PROXY or NO_PROXY is set for this account. Command-line tools and
+  script runtimes follow these. The value is not read.
+status: experimental
+collector: net_adapter
+strength: context
+match:
+  place: "proxy_variable"
+  set: true
+retention: >-
+  The configuration at scan time.
+unmeasured_when: [not_windows]
+falsepositives:
+  - "Work and school VPNs, privacy VPNs, development proxies, virtual machines and LAN-gaming tools"
+author: B.O.P.E Scanner contributors
+date: 2026-10-15
+tags: [network]
+level: info
+category: network

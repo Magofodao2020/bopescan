@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: 3788a085-39d3-40ec-95e8-55a95df0868c
+title: "The System log records that a service or driver was installed"
+description: >-
+  The System log holds event 7045, "A service was installed in the system", with how many and the
+  first and last time. Kernel drivers are installed the same way, so this puts driver and service
+  installs on the timeline. Which service is not read.
+status: experimental
+collector: evtx
+strength: context
+match:
+  provider: "Service Control Manager"
+  channel: "System"
+  event_id: 7045
+retention: >-
+  Only what the System log still holds.
+unmeasured_when: [not_windows]
+falsepositives:
+  - "Every driver update, game anti-cheat, antivirus and many ordinary installers"
+author: B.O.P.E Scanner contributors
+date: 2026-10-15
+tags: [evtx, driver]
+level: info
+category: system_logs

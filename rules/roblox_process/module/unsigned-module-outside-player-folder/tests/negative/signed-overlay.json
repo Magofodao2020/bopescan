@@ -1,0 +1,16 @@
+{
+  "description": "Synthetic negative case for roblox_process/module/unsigned-module-outside-player-folder: signed-overlay.",
+  "observations": [
+    {
+      "collector": "roblox_process",
+      "fields": {
+        "scope": "roblox_module",
+        "path": "C:\\Program Files\\NVIDIA\\x.dll",
+        "name": "x.dll",
+        "location_kind": "program_files",
+        "under_player_folder": false,
+        "signature": "valid"
+      }
+    }
+  ]
+}

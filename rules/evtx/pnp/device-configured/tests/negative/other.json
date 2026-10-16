@@ -1,0 +1,18 @@
+{
+  "description": "Synthetic negative case for evtx/pnp/device-configured: other.",
+  "observations": [
+    {
+      "collector": "evtx",
+      "fields": {
+        "log": "System.evtx",
+        "channel": "System",
+        "provider": "Service Control Manager",
+        "event_id": 7036,
+        "level": 4,
+        "count": 3,
+        "first_seen": "2026-10-14T10:00:00Z",
+        "last_seen": "2026-10-15T09:00:00Z"
+      }
+    }
+  ]
+}

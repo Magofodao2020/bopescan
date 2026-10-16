@@ -1,0 +1,206 @@
+# Conventions
+
+How code, rules and docs look in this repository. [CONTRIBUTING.md](CONTRIBUTING.md) covers *how to
+contribute*; this file covers *what the result should look like*. Each rule names what enforces it — when
+nothing enforces it, reviewers do.
+
+## 1. Glossary — one name per idea
+
+Use exactly these words in code, UI text keys, docs, issues and PRs. Before naming something new, grep the
+repository; if the idea already has a name, use it. A new term is a PR to this table.
+
+| Term | Meaning | In code |
+|---|---|---|
+| **Host** | Where artifacts are read from. `LiveHost` = the real Windows machine; `FixtureHost` = a fake `C:\` folder used by tests | `bope_host::Host` |
+| **Collector** | Reads one kind of artifact from a Host and produces Observations | `bope_collectors::Collector` |
+| **Observation** | One typed fact a Collector saw (e.g. "Secure Boot is off") | `bope_core::model::Observation` |
+| **Rule** | Data file that says which Observations are worth showing and how strong they are | `rules/**/rule.yaml` |
+| **Evidence** | The result of one Rule: `Found`, `NotFound` or `Unmeasured` | `bope_core::model::Evidence` |
+| **Found** | The Rule matched; the matching Observations are attached | `EvidenceState::Found` |
+| **NotFound** | The Collector ran and nothing matched; carries the **retention window** | `EvidenceState::NotFound` |
+| **Unmeasured** | The Collector could not look; carries a **reason** and whether the Rule **expected** it | `EvidenceState::Unmeasured` |
+| **expected unmeasured** | An Unmeasured result whose reason the Rule named in `unmeasured_when`; SS mode counts it. One whose reason it did not name is **unexpected** and SS mode lists it (ADR 0027) | `EvidenceState::Unmeasured::expected` |
+| **source absent** / **source empty** | Opposite Unmeasured reasons: the place the artifact is kept is not on this PC, versus it is there and holds nothing. One word until ADR 0030 | `UnmeasuredReason::SourceAbsent`, `::SourceEmpty` |
+| **scope statement** | An Unmeasured reason that is one fact about the **scan** — `not_admin`, `not_attempted`, `not_consented` — stated once above the evidence and never as a row per Rule | `UnmeasuredReason::is_scope_statement`, `view::ScopeNotes` |
+| **scope statement** | A fact about the **scan** rather than about the machine, said once above the evidence in both modes. Today: how many Rules missing administrator rights left unanswered | `bope_core::view::ScopeNotes` |
+| **unmatched observation** | Something a Collector saw that no Rule matched; shown in Self mode only, counted in SS mode | `bope_core::model::UnmatchedGroup` |
+| **strength** | What the evidence can show: `execution`, `presence`, `tamper`, `posture`, `context` | `Strength` |
+| **retention window** | How far back a source can see, in words shown to the user | `Rule::retention` |
+| **cased** | A `match` field a Rule compares byte for byte; every other string folds ASCII case (ADR 0025) | `Rule::cased` |
+| **operator** | How one `match` entry compares its value, written `field\|operator`: `gt`, `gte`, `lt`, `lte`, `startswith`, `endswith`, `contains`, `exists`. A key with no `\|` compares for equality, and a list value means **or** (ADR 0029) | `bope_core::rules::Operator` |
+| **field kind** | What a Collector declares one of its observation fields holds — text, a number, a boolean or a timestamp — so that `check-rules` can refuse an operator the field cannot take | `bope_collectors::FieldKind` |
+| **boot time** | Report-header context: when the running Windows kernel started counting — the scan's clock minus `GetTickCount64` — or why there is no value. Never evidence and never read by a rule. Not "when the PC was last turned on": a "Shut down" with Fast Startup, sleep and hibernation do not reset it (ADR 0039) | `bope_core::model::BootTime`, `bope_host::BootTimeSource`, header field `boot_time` |
+| **profile root** | A folder SS-mode redaction treats as holding user profiles: `Users`, `Documents and Settings` or its 8.3 short name on any drive, or the machine's `ProfilesDirectory` on its own drive. The folder after it is the name that `%USERPROFILE%` replaces. Report-header field `profiles_directory` carries the machine's own one; never evidence and never read by a rule (ADR 0049) | `bope_core::view::redact_profile_paths`, header field `profiles_directory` |
+| **Self mode / SS mode** | Full local view / screenshare view with consent, matches only, redacted paths | `Mode::SelfCheck`, `Mode::Ss` |
+| **rules bundle** | All rules compiled and embedded in the executable, identified by its SHA-256 | `bope_core::bundle` |
+| **listed counts** | How many pieces of the evidence a view lists are in each state — found, not found, unmeasured. Three numbers, never added into one: not a pass/fail total (ADR 0045) | `bope_core::view::ListedCounts` |
+| **rule files** | Where a Rule's `rule.yaml`, its fixtures folder and its Collector's file are in the repository, with its references | `bope_core::rules::RuleFiles` |
+| **code link** | Where to read this binary's code: the commit of an official build, the repository otherwise | `Provenance::code_url`, `REPOSITORY_URL` |
+| **official build** | A binary built by the upstream release workflow; anything else is **unofficial** | `bope_core::provenance` |
+| **build marker** | The text `aeterna-rongroi build marker: official=<flag>;commit=<sha>;` embedded in every binary; the report's provenance is read from it | `bope_core::provenance::build_marker` |
+| **path** | Observation field: the full path of the file the observation is about, as it was read. Redacted to `%USERPROFILE%` in SS mode | observation field `path` |
+| **sha256** | Observation field: SHA-256 of that file, 64 lowercase hex characters. The only file hash, and one of the two things `allow` may compare | observation field `sha256` |
+| **signature** | Observation field: what Windows says about the Authenticode signature **embedded** in that file — `valid`, `no_embedded_signature`, `invalid` or `unverifiable_offline` — checked without the network. Never "unsigned": a catalog signature is not looked at (ADR 0035) | `bope_host::SignatureCheck`, observation field `signature` |
+| **discriminator** | The observation field a collector that reads several places uses to say which one an observation is about — today `fivem_dir`, `usn`, `net_config` and `autostart`'s `location`. A place that could not be read is a gap for that place's observations only, and a baseline observation that differs from a rule in the discriminator alone does not confront it (ADR 0044, ADR 0033) | `bope_collectors::Collector::discriminator`, `bope_core::model::DiscriminatorGaps` |
+| **location** | The discriminator field of `fivem_dir`, `usn`, `net_config` and `autostart`: which place an observation is about. `fivem_dir` and `usn` use the same value for the same folder (`plugins`, `enhanced_asi`); `net_config`'s are `hosts`, `proxy` and `firewall`; `autostart`'s are `service`, `run` and `task` | observation field `location` |
+| **first_seen** / **last_seen** | Observation fields: the oldest and newest time among the records an observation counts — `evtx` records of one kind, `usn` journal records | observation fields `first_seen`, `last_seen` |
+| **change journal records** | `usn`'s counts: `records` per `location`, and of those `created`, `deleted`, `renamed`, `data_changed`; on the journal's own observation also `records_version_2`/`_3`, `trimmed`, `maximum_size`. Never a name (ADR 0047) | `bope_collectors::usn` |
+| **folder activity** | What `fivem_dir` reports of a log, crash or cache folder: `files`, `folders`, `size_bytes`, `files_without_times`, the bounds `earliest_created_at`, `latest_created_at`, `earliest_modified_at`, `latest_modified_at`, and the folder's own `created_at` and `modified_at` — from the folder's listing only, never a file name (ADR 0053) | `bope_collectors::fivem_dir`, `Reads::FolderActivity` |
+| **created_at / modified_at** | Observation fields of `fivem_dir`: a folder's creation and last-write time as its parent's listing reports them, in whole seconds (ADR 0050, ADR 0053). Not `usn`'s `created`, which is a count | observation fields `created_at`, `modified_at` |
+| **index_created_at** / **index_modified_at** / **index_files** / **index_latest_created_at** / **index_latest_modified_at** | Observation fields of `fivem_dir`'s `legacy_server_cache`: its resource cache index, the fixed `db` subfolder — the folder's own times from the cache's listing, and from one listing of `db` how many files it holds and the latest of their creation and last-write times, never a file name (ADR 0062, amending ADR 0053) | observation fields of the same names |
+| **variant** | Observation field of `fivem_dir`'s `legacy_server_cache`: FiveM's launch-mode suffix of that cache folder — `default`, `priv` or `fxdk` (ADR 0053) | observation field `variant` |
+| **timeline** | The times a report holds in one list, oldest first, with its anchors, coverage bands and unmeasured sources; a view, never evidence, and nothing is computed from it (ADR 0051) | `bope_core::view::Timeline`, `view::timeline` |
+| **timeline selector** | A rule file with `role: timeline`: the observations it matches put their timestamp fields on the timeline in both modes; it makes no evidence and no count, and may select `prefetch`, `bam` and `pca` records by name (ADR 0051) | `Rule::role`, `Role::Timeline`, `rules/*/timeline/` |
+| **anchor** | A timeline entry that is the scan's own time: `generated_at`, and `boot_time` when measured (ADR 0051). Widened by ADR 0061: a dated fact in the report header about when part of this PC was set up — `InstallDate`, the earliest installation Windows Setup kept, the change journal's creation, the system drive root's and `$Recycle.Bin`'s creation, FiveM's program folders — a UTC date, never a time, shown with what ordinarily resets it; never read by a rule | `EntrySource::Anchor`; `bope_core::model::Anchor`, `AnchorKind`, header field `anchors` |
+| **trace age** | How far back one source still reaches on this PC: the oldest time it holds, the days before the scan, how much it holds and its ordinary retention, or why it was not read — `not_admin` is "not known", never "empty". A fact about a source, not a timeline entry; nothing is sorted, compared or summed (ADR 0061) | `bope_core::view::TraceAges`, `view::trace_ages`, `Collector::age`, `Report.age_fields`, `rules/ages/<collector>.yaml` |
+| **cross-source statement** | Facts from different collectors printed together, of two kinds: FiveM's folders beside Prefetch, BAM and PCA — shown only when Prefetch or BAM was read, holds no entry for the FiveM selectors' names and reaches back before FiveM's last write (ADR 0061) — and the **session statement** (ADR 0062); always with its ordinary causes. Not evidence: no state, no rule, never counted | `bope_core::view::CrossSourceStatement` (`kind`: `fivem_and_records`, `session`), `view::RecordsStatement`, `view::cross_source` |
+| **session** | One FiveM edition's last run as Windows' records give it: its **start** — the earliest `started_at` of a running `FiveM.exe` (or Legacy's `FiveM_b…_GTAProcess.exe`) of that edition, else Prefetch's latest `last_run` of those names — and its **end** — "still running", or BAM's latest `last_run` when not earlier than the start. Never GTA V's executables, never the scan's time, never kept between scans (ADR 0062) | `bope_core::view::SessionStart`, `SessionEnd` |
+| **session statement** | The cross-source statement of kind `session`: one per FiveM edition, its session beside the edition's log and cache folders it compares (Legacy's logs, `data\cache` and resource cache index; Enhanced's logs — not its per-server cache) as a duration before or after the start — "before" only beyond the ten-minute margin — and Enhanced's log folder against the end too; or "when FiveM last ran is not known". Always with its ordinary causes; not evidence (ADR 0062) | `bope_core::view::SessionStatement`, `view::session` |
+| **coverage band** | The span one source could see, from its oldest to its newest record — each event log, and the change journal (ADR 0051) | `CoverageBand`, `Collector::coverage`, `Report.coverage_fields` |
+| **unmeasured source** | A collector, or one place of it, whose timestamp fields could not be read, shown on the timeline in place of a band (ADR 0051) | `bope_core::model::UnmeasuredSource` |
+| **journal_created_on** | Observation field of `usn`'s journal: the UTC date its identifier gives when read as a `FILETIME` — not documented to be a time; the identifier itself is never reported (ADR 0047, amended by ADR 0061) | observation field `journal_created_on`, `UsnJournalState::created_on` |
+| **program_folder_created_at** / **app_folder_created_at** | Observation fields of `fivem_dir`'s `FiveM.exe`: its program folder's own creation time, and Legacy's `FiveM.app`'s — never `FiveM.exe`'s, which an update replaces (ADR 0061) | `bope_host::FilesystemSource::times` |
+| **fivem_edition** | Observation field of `process`, `bam` and `prefetch`: `legacy` or `enhanced`, when the path the collector reads — a process image, a BAM value name, a Prefetch file's own string-table entry — is below a profile's `AppData\Local\FiveM\` or `AppData\Local\FiveM for GTAV Enhanced\`; omitted otherwise. Where a file of that name ran from, not which program it was, and never a path the collector does not already emit (ADR 0062) | `bope_collectors::fivem_edition` |
+| **folder** | Observation field: what was seen of a folder as a whole — `fivem_dir`: `listed`, `absent`, `unreadable`; `usn`: `identified`, `absent`, `unreadable`, `other_volume` | observation field `folder` |
+| **read_only** | Observation field: whether the file the observation is about carries the read-only attribute — the one attribute bit this program reads (ADR 0037) | `bope_host::FilesystemSource::is_read_only`, observation field `read_only` |
+| **configured_path** / **at_configured_path** | Observation fields of an `evtx` log account: the file the Windows Event Log service states it writes that log's channel to, as the service spells it, and whether that is the file that was read (ADR 0042) | `bope_host::EventLogConfigSource`, observation fields `configured_path`, `at_configured_path` |
+| **signer** / **signer_cert_sha256** | Observation fields of a `valid` signature: the signing certificate's display name, for the reader, and the SHA-256 of the certificate, the other thing `allow` may compare. A name is never compared: stolen certificates carry the real publisher's (ADR 0035) | observation fields `signer`, `signer_cert_sha256` |
+| **match_lists** | A rule key naming, per `match` field, a CSV file beside `rule.yaml` whose first column is that field's list of values; expanded into `match` when the bundle loads (ADR 0048) | `Rule::match_lists`, `rules::expand_match_lists` |
+| **service** | Observation field of `driver_service` and `autostart`: the name of a service's key under `HKLM\SYSTEM\CurrentControlSet\Services`, as the registry spells it (ADR 0048, ADR 0060) | observation field `service` |
+| **start** | Observation field of `driver_service` and `autostart`: the service's `Start` value as stored — 0 boot, 1 system, 2 automatic, 3 on demand, 4 disabled (ADR 0048) | observation field `start` |
+| **scan tier** | How much a scan reads, chosen before it starts: `standard` or `full`. Each collector has one; a scan does not call a collector above its tier (ADR 0052) | `bope_core::model::ScanTier`, `Collector::tier`, header `scan_tier` |
+| **full scan** | The scan that also reads the `full` collectors, started only when the player answers yes in the process that reads — never by a flag alone (ADR 0052) | `ScanTier::Full`, `scan --full`, the desktop's pre-scan dialog |
+| **other_volume** | The Unmeasured reason of a `usn` place on another drive than the one whose change journal is read: declarable, not a scope statement, and never `read_failed`, because nothing failed. Also the value of that place's `folder` field (ADR 0047, amendment of 2026-09-30) | `UnmeasuredReason::OtherVolume`, `usn::FOLDER_OTHER_VOLUME` |
+| **row band** | The coverage band of the one place a collector's coverage names — `usn`'s journal — paired with each `found` and `not_found` row of that collector, so a count is read as a count for that span; or the statement that the source held no record (ADR 0047, amendment of 2026-09-30) | `bope_core::view::RowBand`, `ReportView::row_bands` |
+| **not_consented** | The Unmeasured reason of a `full` collector's rules in a standard scan; a scope statement, expected by every rule, declarable by none (ADR 0052) | `UnmeasuredReason::NotConsented`, `ScopeNotes.not_consented` |
+| **sensitive field** | A field a `full` collector declares as carrying a server identity, an account identifier or a download host; SS mode shows its placeholder unless the player agreed to show that kind (ADR 0052) | `Field::sensitive`, `SensitiveKind`, `Report.sensitive_fields`, `view::SsOptions`, `%SERVER_IDENTITY%`, `%ACCOUNT_IDENTIFIER%`, `%DOWNLOAD_HOST%` |
+| **server_folder** / **server_folders** | Observation fields of `fivem_servers`: the name of one Enhanced server cache folder, a sensitive server identity; and how many such folders the server cache holds (ADR 0055) | observation fields `server_folder`, `server_folders` |
+| **host_name** / **address** / **address_kind** | Observation fields of `net_config`'s `hosts`: a name on a line in effect that is `cfx.re`, `fivem.net` or `rockstargames.com` or a subdomain of one, as the line spells it; the address the line gives it, as written; and that address's kind — `loopback`, `unspecified`, `private`, `public` or `not_an_address`. SS mode never shows `address` (ADR 0054) | observation fields `host_name`, `address`, `address_kind`; `bope_core::view::SS_WITHHELD_FIELDS` |
+| **lines_in_effect** / **present** / **line** | Observation fields of `net_config`'s `hosts`: how many lines are not blank once a `#` and what follows it are removed; whether the file is there; and a reported line's number, from 1 (ADR 0054) | observation fields `lines_in_effect`, `present`, `line` |
+| **proxy_enabled** / **proxy_server_set** / **auto_config_url_set** | Observation fields of `net_config`'s `proxy`: whether `ProxyEnable` is a non-zero `REG_DWORD`, and whether a `ProxyServer` and an `AutoConfigURL` value exist — never their data (ADR 0054) | observation fields of the same names |
+| **firewall_rules** / **unparsed_rules** | Observation fields of `net_config`'s `firewall`: how many values the local firewall rule store holds, and how many of them this program could not read as a rule (ADR 0054) | observation fields of the same names |
+| **action** / **enabled** / **direction** / **protocol** / **profiles** | Observation fields of a Windows Firewall rule for a program in a FiveM folder: `Action` (`Allow`, `Block`), `Active` as a boolean, `Dir` (`In`, `Out`), `Protocol` as a number (6 TCP, 17 UDP), and every `Profile` joined with `,` (ADR 0054). `autostart` reuses `enabled` for a scheduled task's `Settings/Enabled`, true when the element is absent (ADR 0060) | observation fields of the same names |
+| **entry** / **hive** / **run_once** | Observation fields of `autostart`: a `Run` value's name or a scheduled task's path below `%SystemRoot%\System32\Tasks` (`\Folder\Name`), as read — SS mode never shows it; which key a `Run` value is under — `machine`, `machine_32` (`WOW6432Node`) or `user`; and whether it is in `RunOnce` (ADR 0060) | observation fields of the same names; `bope_core::view::SS_WITHHELD_FIELDS` |
+| **trigger_start** / **service_dll** / **triggers** | Observation fields of `autostart`: whether a service has a `TriggerInfo` key; whether `path` is the service's `ServiceDll` rather than its `ImagePath`; and the kinds of a task's triggers — `boot`, `logon`, `time`, `calendar`, `event`, `idle`, `registration`, `session_change`, `wnf`, `other` — sorted and joined with `,`, empty when it has none (ADR 0060) | observation fields of the same names |
+| **starts_by_itself** | Observation field of `autostart`: whether Windows starts the entry without being asked — a service whose `Start` is 0, 1 or 2, or 3 with a trigger; every `Run` value; an enabled task with a trigger. Explorer's `StartupApproved` switch is not read (ADR 0060) | observation field `starts_by_itself` |
+| **path_kind** | Observation field of `autostart`: the kind of folder `path` is in — `windows` (under `%SystemRoot%`, except its `Temp`), `program_files`, `program_data`, `user_profile` (under a profile root) or `other`. A file of kind `windows` is not hashed or checked (ADR 0060) | observation field `path_kind` |
+| **set_by** / **exclusion** / **covers_fivem** / **ip_addresses** | Observation fields of `defender_exclusion`: which key an exclusion is in — `settings` (Defender's own) or `policy`; the exclusion as Defender holds it; whether a path or process exclusion is, is above, or is inside one of FiveM's three folders, with `%…%` expanded and never for a wildcard; and how many values `IpAddresses` holds, never an address. `kind` is reused for `path`, `process` or `extension` (ADR 0060) | observation fields of the same names |
+| **product_name** / **edition_id** / **composition_edition_id** / **display_version** / **current_build** / **ubr** / **build_lab_ex** / **installation_type** | Observation fields of `os_image`: the values `HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion` gives for `ProductName`, `EditionID`, `CompositionEditionID`, `DisplayVersion`, `CurrentBuild`, `UBR`, `BuildLabEx` and `InstallationType`, as Windows spells them. `ProductName` reads `Windows 10 Home` on a genuine Windows 11, so no rule reads it as a version (ADR 0056) | observation fields of the same names |
+| **registered_organization** | Observation field of `os_image`: what `winver` shows as the registered organisation. Both published Windows-modification playbooks write their own name here (ADR 0056). `RegisteredOwner`, a person's name, is never read | observation field `registered_organization` |
+| **oem_manufacturer** / **oem_model** / **oem_support_url** | Observation fields of `os_image`: `Manufacturer`, `Model` and `SupportURL` from `HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\OEMInformation` — the board or laptop vendor's own values on an unmodified PC, and the second place the two playbooks write their name (ADR 0056) | observation fields of the same names |
+| **service_windefend** / **service_wuauserv** / **service_wersvc** / **service_eventlog** / **service_sysmain** / **service_dps** / **service_wsearch** / **service_diagtrack** | Observation fields of `os_image`: how each service Windows ships with is set to start — `boot`, `system`, `automatic`, `manual`, `disabled` — or `absent` when its key is not under `HKLM\SYSTEM\CurrentControlSet\Services` at all, which says the component was removed rather than turned off (ADR 0056) | observation fields of the same names; `os_image::SERVICES`, `os_image::SERVICE_ABSENT` |
+| **marker** / **kind** / **present** | Observation fields of `install_marker`: the canonical spelling of a named place with its environment variable unexpanded, which is the discriminator and what a rule matches; whether it is a `folder` or a `registry_key`; and whether it is there. `path` beside them is where this PC puts it (ADR 0057) | observation fields of the same names; `install_marker::MARKERS` |
+| **speculative_execution_mitigations** / **exception_chain_validation** / **object_namespace_protection** | Observation fields of `posture`: whether the Spectre variant 2 and Meltdown mitigations, SEHOP, and the kernel object-namespace protection are switched off — `enabled`, `disabled`, `not_configured` (nobody wrote the value) or `configured_other` (written to something this program does not read as on or off) (ADR 0057) | observation fields of the same names |
+
+Never introduce a score, a "clean" flag, a pass/fail total, or synonyms such as "detection result",
+"hit", "finding" for Evidence.
+
+## 2. Rust
+
+| Convention | Enforced by |
+|---|---|
+| Edition 2024, toolchain pinned in `rust-toolchain.toml` | cargo |
+| Libraries return typed errors with `thiserror`; `anyhow` only in binaries and `xtask` | review |
+| No `unwrap`, `expect`, `panic!`, `todo!`, `unimplemented!` outside tests | clippy workspace lints |
+| A machine problem (no admin rights, missing log, unsupported OS) is `Unmeasured { reason }`, never an `Err` that reaches the UI | tests per collector |
+| `unsafe` only in `bope-host-windows`, each block with a `// SAFETY:` comment | workspace `unsafe_code = "deny"`, allowed locally only there · clippy `undocumented_unsafe_blocks` |
+| Public items have doc comments | `missing_docs` lint |
+| No global mutable state; no `std::net` | clippy `disallowed-types` · cargo-deny |
+| Timestamps are UTC, RFC 3339 in reports | review · snapshot tests |
+| Formatting | `rustfmt.toml` · `cargo fmt --check` |
+
+## 3. Layout
+
+- One collector per file: `crates/bope-collectors/src/<collector_id>.rs`.
+- Unit tests live in the same file (`#[cfg(test)] mod tests`); cross-crate tests live in `tests/`.
+- Parsers (`bope-parsers`, from M2) are pure: bytes in, structs out, no OS calls — so they can be
+  fuzzed and tested on any platform.
+- Only `bope-host-windows` calls Windows APIs.
+
+## 4. Privacy in code
+
+- Never print or log a raw user path outside Self mode. Redaction goes through `bope_core::view`.
+- Logging (when added) goes to local stderr only. No telemetry, no crash upload, no network.
+- Test fixtures never contain a real person's user name, host name or SID. Nothing checks this
+  automatically: `cargo xtask scrub-check` has been named here since M1 and was never written, so what
+  holds the rule up is this sentence and the person who reviews a new fixture, together with the
+  provenance document every vendored fixture has to come with.
+
+> **An open gap, as of 2026-09-12.** An automated scrub check does not exist and no ADR has decided to
+> write one. The provenance document of each vendored fixture set records the same absence
+> (`fixtures/evtx/PROVENANCE.md`, `fixtures/prefetch/PROVENANCE.md`), and ADR 0016 counts
+> `cargo xtask scrub-check` among the promises this repository has made with no code behind them.
+> Review by hand is what there is, and it has already failed once: a vendored Event Log fixture was
+> committed carrying a real machine SID that a byte scan had missed, and was removed again
+> (`CHANGELOG.md`). A vendored artifact cannot be cleaned in place either: its records are checksummed
+> inside their container, so editing a string breaks the container. The choice is to vendor a file
+> whole or not at all.
+
+## 5. TypeScript / React (`apps/desktop`)
+
+| Convention | Enforced by |
+|---|---|
+| Function components, strict TypeScript | `tsc --noEmit` |
+| No user-visible literal strings; everything goes through i18n keys `namespace.section.item` in `snake_case` | review · `cargo xtask check-locales` |
+| Files in `src/generated/` are produced from Rust types and never edited by hand | review |
+| No `fetch`, `XMLHttpRequest`, `WebSocket`, `EventSource` | ESLint `no-restricted-globals` · CSP |
+
+## 6. Rules
+
+| Convention | Enforced by |
+|---|---|
+| Path `rules/<collector>/<category>/<slug>/rule.yaml`, `slug` in kebab-case | `cargo xtask check-rules` |
+| `id` is a UUIDv4 and is never reused, even after deletion | `check-rules` |
+| `collector` is a collector in this build, and every `match` field name one it declares it can emit | `check-rules` |
+| English `title`, `description`, `falsepositives` live in the rule; translations in `rules/i18n/<lang>.yaml` | `check-rules` · `check-locales` |
+| `status: test` or `stable` requires at least one positive and one negative fixture in `tests/` | `check-rules` |
+| `match` strings compare without regard to ASCII case; `cased` names the fields compared exactly | `check-rules` · engine tests |
+| A `match` key is a field name, optionally `\|` and one of the eight operators; a list value means **or** | `check-rules` · engine tests |
+| An operator the field's declared kind cannot take, an empty list, and a `cased` entry `match` compares no text of are rejected | `check-rules` |
+| `allow` entries identify software by `sha256` or `signer_cert_sha256` — exactly one, 64 hex characters — never by a file's or a signer's name (ADR 0035) | `check-rules` |
+| No rule on `prefetch`, `bam` or `pca` identifies a program by `name` or `path`: nothing they emit identifies software, so such a rule can neither `allow` a legitimate program nor survive a rename (ADR 0034). `check-rules` and `check-baseline` both accept one today | review |
+| `docs/rules-reference.md` and `docs/rules-reference.th.md` are generated from the bundle and never edited by hand; a change to a rule, `rules/i18n/` or a report label reruns `cargo xtask rules-reference` in the same pull request | `cargo xtask rules-reference --check` |
+| `falsepositives` is never empty — write what legitimately produces this evidence; it is shown to the reader beside every `found` row | `check-rules` |
+| `unmeasured_when` names only reasons the rule's collector can report, each once, and never `partial`, `budget_spent` or `read_failed` — a view lists those whatever a rule declares, so naming one is a failure rather than a line that changes nothing (ADR 0030, ADR 0032) | `check-rules` |
+| The rule is quiet on every `fixtures/hosts/baseline-*` host, or a `rules/known-fps.csv` row accepts the match with a reason; an unused row fails too (ADR 0017) | `cargo xtask check-baseline` |
+| The rule is **confronted** by some baseline observation — one carrying every field its `match` names and one unsatisfied condition away from firing, that condition not being the collector's discriminator — or a `rules/unconfronted.csv` row gives a reason and a `resolved_when`; a row for a rule that is confronted fails too. Quiet on a machine that was never put the question is not a measurement (ADR 0033, ADR 0044) | `check-baseline` |
+
+## 7. Git
+
+- Conventional Commits for PR titles: `feat`, `fix`, `docs`, `test`, `refactor`, `chore`, `rules`, `i18n`, `ci`.
+- Scope is the crate or area: `feat(collectors): …`, `rules(posture): …`, `i18n(th): …`.
+- Permanent branches: `main` holds released code and carries the release tags; `dev` is where work is
+  integrated and is the default branch.
+- Work branches are named `<type>/<short-description>`, start from `dev`, and return to `dev` through a pull
+  request that is squash-merged. One concern per PR.
+- `dev` reaches `main` only through a release pull request from `dev` to `main`, merged with a merge commit
+  (GOVERNANCE.md, "How to release").
+- Repository rulesets enforce this: `main` and `dev` accept changes only through pull requests with the
+  required checks green, and cannot be deleted or force-pushed.
+
+## 8. Docs and comments
+
+- Source docs are written in English. `README` and the screenshare guide (`docs/screenshare-guide.md`)
+  also exist in Thai, and a change to either language's copy changes the other in the same pull request.
+- Comments explain *why*, not *what*.
+- Changing the architecture, the rule format or adding a new kind of source needs an ADR in `docs/adr/`.
+
+## 9. File headers
+
+Every source file starts with an SPDX header and one purpose line:
+
+```rust
+// SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+```
+
+Rule files use `#` comments and `CC-BY-SA-4.0`. Files that cannot carry comments are covered by
+`REUSE.toml`. Enforced by `reuse lint`. Zero-width and bidi control characters are forbidden everywhere
+(`cargo xtask check-unicode`).
+
+## 10. Versions
+
+- The application follows SemVer.
+- The rules bundle and the report carry `schema_version`. A breaking change to the report format is a major
+  version.

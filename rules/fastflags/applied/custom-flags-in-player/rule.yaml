@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: 884dbc2d-24c2-4564-8bcc-3130ecd302d8
+title: "The Roblox player reads a FastFlag file with custom flags"
+description: >-
+  The newest Roblox version folder holding the player has a ClientAppSettings.json that sets
+  FastFlags. Most edited flags change graphics or the frame-rate cap; the row counts them by kind.
+status: experimental
+collector: fastflags
+strength: context
+match:
+  active_version: true
+  "flag_count|gte": 1
+retention: >-
+  The file as it is at scan time.
+falsepositives:
+  - "Bloxstrap and its forks write this file for their own graphics and FPS settings"
+author: B.O.P.E Scanner contributors
+date: 2026-10-15
+tags: [roblox, fastflags]
+level: info
+category: fastflags

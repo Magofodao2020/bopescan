@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+#
+# Matches that `cargo xtask check-baseline` accepts on a baseline host: one row each, with the reason
+# it is accepted. Lines starting with `#` and blank lines are ignored; a `reason` containing a comma is
+# double-quoted.
+#
+# The gate reads this file strictly, because a file that silently accumulates permissions stops being
+# an exception list:
+#   - `rule_id` must be a rule in the bundle and `baseline` a `fixtures/hosts/baseline-*` host.
+#   - `reason` must not be empty.
+#   - A row whose rule no longer matches that baseline is a failure, not a warning. An unused row is a
+#     claim about the rule set that is no longer true.
+#
+# A row is for a match that is a genuine false positive — the rule's own `falsepositives` list should
+# already say so. It is never a way to quiet a rule that is wrong, and tuning a rule so that a baseline
+# goes quiet is out of scope (AGENTS.md, "weakening a rule or collector without a documented
+# false-positive reason"). ADR 0017 has the reasoning.
+#
+rule_id,baseline,reason,added
+72820eaf-1469-4ea7-bb0f-17f145d26dfc,baseline-elevated-win11,"The runner image's own provisioning agent, C:\ProgramData\GitHub\Primer\primer.exe, is an enabled boot-triggered task with no embedded signature; a management and provisioning agent is a false positive the rule names (ADR 0060, owner decision 6)",2026-09-30
+d7191cf3-ce56-480b-8501-66a198f83e08,baseline-elevated-win11,"The runner image excludes its whole C drive from Microsoft Defender, which covers FiveM's folders; a build machine excluding a whole drive is a false positive the rule names (ADR 0060, owner decision 6)",2026-09-30
+77316dfc-9588-441f-8c89-0c0ceeddb73c,baseline-roblox-win11,"Logitech G HUB is installed on this profile because the player owns a Logitech mouse; a peripheral suite that can store macros is context the rule names, at level info (B.O.P.E, ADR 0101)",2026-10-15
+e315d48a-2cf4-4e84-8a0b-4fd9ccfac04e,baseline-roblox-win11,"Bloxstrap is installed on this profile, as it is for a large share of Roblox players; an open-source launcher is context the rule names, at level info (B.O.P.E, ADR 0101)",2026-10-15
+d197a1c8-51da-41a7-9728-5daeb2ad622d,baseline-roblox-win11,"Bloxstrap is installed on this profile and its deleted installer is still named by Recent, Amcache and the change journal; an open-source launcher is context the rule names, at level info (B.O.P.E, ADR 0123)",2026-10-15

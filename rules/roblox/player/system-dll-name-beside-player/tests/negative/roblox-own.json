@@ -1,0 +1,14 @@
+{
+  "description": "Synthetic negative case for roblox/player/system-dll-name-beside-player: roblox-own.",
+  "observations": [
+    {
+      "collector": "roblox",
+      "fields": {
+        "location": "version_binary",
+        "name": "RobloxPlayerBeta.dll",
+        "path": "C:\\Users\\fixtureuser\\AppData\\Local\\Roblox\\Versions\\version-0123456789abcdef\\RobloxPlayerBeta.dll",
+        "signature": "valid"
+      }
+    }
+  ]
+}

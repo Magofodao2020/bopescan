@@ -1,0 +1,19 @@
+{
+  "description": "Synthetic negative case for browser_ext/debugger/debugger-with-roblox-access: other.",
+  "observations": [
+    {
+      "collector": "browser_ext",
+      "fields": {
+        "browser": "chrome",
+        "profile": "Default",
+        "extension_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "name": "Ext",
+        "version": "1.0",
+        "debugger": false,
+        "roblox_access": true,
+        "all_sites": true,
+        "user_scripts": false
+      }
+    }
+  ]
+}

@@ -1,0 +1,97 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+
+[package]
+name = "bope-host-windows"
+description = "aeterna-rongroi live Windows host (read-only). Empty on other platforms."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+bope-host.workspace = true
+thiserror.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+jiff.workspace = true
+windows-registry.workspace = true
+# `ShellExecuteExW` is declared under `Win32_UI_Shell`, but its `SHELLEXECUTEINFOW` carries an `HKEY`, so
+# the generated function is gated on `Win32_System_Registry` as well.
+# `NtQuerySystemInformation` lives in the `Wdk` namespace, while `SYSTEM_CODEINTEGRITY_INFORMATION` — the
+# struct it fills for `SystemCodeIntegrityInformation` — is declared under `Win32_System_WindowsProgramming`,
+# so reading code integrity needs both. `Tbsi_GetDeviceInfo` is gated on `Win32_System_TpmBaseServices`
+# (ADR 0011; each feature name read from the `windows` 0.62.2 manifest rather than assumed).
+# `CreateToolhelp32Snapshot` and the `Process32*W` walk are gated on `Win32_System_Diagnostics_ToolHelp`,
+# and `OpenProcess`/`QueryFullProcessImageNameW` on `Win32_System_Threading` (ADR 0010); both names were
+# read from the same manifest, and `CloseHandle` comes with `Win32_Foundation`, already listed here.
+# `WinVerifyTrust` is under `Win32_Security_WinTrust`, but `WINTRUST_DATA` is gated on
+# `Win32_Security_Cryptography` and `WTHelperProvDataFromStateData`/`WTHelperGetProvSignerFromChain` on
+# `Win32_Security_Cryptography_Catalog` and `_Sip` as well; `CertGetNameStringW` is in `Cryptography`
+# (ADR 0035; each gate read from the `windows` 0.62.2 sources).
+# `GetTickCount64` is gated on `Win32_System_SystemInformation` and on nothing else: it takes no argument
+# and returns a `u64` (ADR 0039; read from `src/Windows/Win32/System/SystemInformation/mod.rs` in 0.62.2).
+# `GetFirmwareType` is gated on `Win32_System_SystemInformation` as well; `GetFirmwareEnvironmentVariableExW`
+# is in `Win32_System_WindowsProgramming`, `AdjustTokenPrivileges` and `LookupPrivilegeValueW` in
+# `Win32_Security`, and `OpenProcessToken` in `Win32_System_Threading` behind `Win32_Security` — all
+# already listed (ADR 0038; read from the same sources).
+# `EvtOpenChannelConfig` and `EvtClose` are under `Win32_System_EventLog`; `EvtGetChannelConfigProperty`
+# and the `EVT_VARIANT` it fills are gated on `Win32_Security` as well, already listed (ADR 0042; read
+# from the same sources).
+# `CreateFileW` on a volume or a folder, `GetFileInformationByHandle`, `GetFileInformationByHandleEx` and
+# `FILE_ID_INFO` are under `Win32_Storage_FileSystem` (`CreateFileW` also behind `Win32_Security`, listed);
+# `DeviceIoControl` is under `Win32_System_IO`, and `FSCTL_QUERY_USN_JOURNAL` / `FSCTL_READ_USN_JOURNAL`
+# under `Win32_System_Ioctl` (ADR 0047; read from the same sources).
+# `MessageBoxW` and its `MB_*` and `IDYES` constants are under `Win32_UI_WindowsAndMessaging`, gated on
+# nothing else (ADR 0052; read from `src/Windows/Win32/UI/WindowsAndMessaging/mod.rs` in 0.62.2).
+# `CM_Get_Device_ID_List_SizeW`, `CM_Get_Device_ID_ListW`, `CM_Locate_DevNodeW`, the `CM_GETIDLIST_*` and
+# `CM_LOCATE_DEVNODE_PHANTOM` flags and the `CR_*` codes are under `Win32_Devices_DeviceAndDriverInstallation`;
+# `CM_Get_DevNode_PropertyW` there is gated on `Win32_Devices_Properties` as well, which also holds the
+# `DEVPKEY_Device_*` keys and `DEVPROP_TYPE_*`; `DEVPROPKEY` is in `Win32_Foundation`, listed (ADR 0069; read
+# from `src/Windows/Win32/Devices/` in 0.62.2).
+# B.O.P.E (ADR 0127): `IWbemLocator`, `IWbemServices::ExecQuery`, `IWbemClassObject::Get` and `WbemLocator`
+# are under `Win32_System_Wmi`; the `VARIANT` `Get` fills and `VariantClear` under `Win32_System_Variant`, which
+# gates them on `Win32_System_Ole` as well; `RPC_C_AUTHN_WINNT` and `RPC_C_AUTHZ_NONE` under `Win32_System_Rpc`
+# (read from the `windows` 0.62.2 sources).
+# B.O.P.E (ADR 0130): `OpenSCManagerW`, `OpenServiceW`, `QueryServiceStatusEx`, `QueryServiceConfigW` and
+# `CloseServiceHandle` are under `Win32_System_Services` (read from the same sources).
+windows = { workspace = true, features = [
+  "Wdk_System_SystemInformation",
+  "Win32_Devices_DeviceAndDriverInstallation",
+  "Win32_Devices_Properties",
+  "Win32_Foundation",
+  "Win32_Security",
+  "Win32_Security_Cryptography",
+  "Win32_Security_Cryptography_Catalog",
+  "Win32_Security_Cryptography_Sip",
+  "Win32_Security_WinTrust",
+  "Win32_Storage_FileSystem",
+  "Win32_System_Diagnostics_ToolHelp",
+  "Win32_System_Com",
+  "Win32_System_EventLog",
+  "Win32_System_Memory",
+  "Win32_System_ProcessStatus",
+  "Win32_System_IO",
+  "Win32_System_Ioctl",
+  "Win32_System_Ole",
+  "Win32_System_Registry",
+  "Win32_System_Rpc",
+  "Win32_System_Services",
+  "Win32_System_SystemInformation",
+  "Win32_System_Threading",
+  "Win32_System_Variant",
+  "Win32_System_Wmi",
+  "Win32_System_TpmBaseServices",
+  "Win32_System_WindowsProgramming",
+  "Win32_UI_Shell",
+  "Win32_UI_WindowsAndMessaging",
+] }
+
+[dev-dependencies]
+bope-parsers.workspace = true
+
+[lints]
+workspace = true

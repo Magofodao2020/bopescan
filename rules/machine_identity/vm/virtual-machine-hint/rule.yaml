@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: 4a370a6f-4027-45ed-9704-8bbd1355e41f
+title: "This Windows appears to run inside a virtual machine"
+description: >-
+  The firmware strings name a hypervisor vendor (VMware, VirtualBox, QEMU, Xen, Parallels, Hyper-V's
+  "Virtual Machine"), or virtual-machine guest drivers are registered. A check run inside a virtual
+  machine examines that machine, not the PC the player may be playing on. SMBIOS strings can be set
+  to anything, so a physical PC can also hide or fake this.
+status: experimental
+collector: machine_identity
+strength: posture
+match:
+  vm_hint: true
+retention: >-
+  The firmware strings Windows read at its last start.
+unmeasured_when: [not_windows]
+falsepositives:
+  - "Players who run Windows in a virtual machine for unrelated reasons, or cloud gaming PCs"
+author: B.O.P.E Scanner contributors
+date: 2026-10-15
+tags: [vm, firmware]
+level: warn
+category: firmware_boot

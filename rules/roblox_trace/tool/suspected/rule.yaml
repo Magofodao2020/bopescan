@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: 7037504d-c285-4c91-99a9-3c11d3dbe8c5
+title: "A Roblox executor or injector name is seen, with nothing showing it ran"
+description: >-
+  A file, folder, shortcut, inventory entry or journal record carries the name of a Roblox executor
+  or injector in a Roblox context, and nothing in this scan shows it ran or touched the Roblox
+  player. A name alone is a reason to ask, not a finding.
+status: experimental
+collector: roblox_trace
+strength: presence
+match:
+  scope: "tool"
+  status: "suspected"
+retention: >-
+  Whatever the sources read in this scan still hold; the sources table says which could not be read.
+falsepositives:
+  - "A name shared with unrelated software, or a file named this way on purpose; a legitimate tool renamed to match"
+  - "Files kept from the past, before the account or PC was used for play"
+author: B.O.P.E Scanner contributors
+date: 2026-10-15
+tags: [roblox, correlation]
+level: warn
+category: roblox_tools

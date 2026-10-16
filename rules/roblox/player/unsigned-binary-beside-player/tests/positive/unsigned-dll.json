@@ -1,0 +1,15 @@
+{
+  "description": "Synthetic positive case for roblox/player/unsigned-binary-beside-player: unsigned-dll.",
+  "observations": [
+    {
+      "collector": "roblox",
+      "fields": {
+        "location": "version_binary",
+        "name": "helper.dll",
+        "path": "C:\\Users\\fixtureuser\\AppData\\Local\\Roblox\\Versions\\version-0123456789abcdef\\helper.dll",
+        "signature": "no_embedded_signature"
+      }
+    }
+  ],
+  "expect_matches": 1
+}

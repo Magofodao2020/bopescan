@@ -1,0 +1,19 @@
+{
+  "description": "Synthetic positive case for amcache/file/executor-named-program-inventoried: solara.",
+  "observations": [
+    {
+      "collector": "amcache",
+      "fields": {
+        "scope": "file",
+        "name": "solara.exe",
+        "path": "c:\\users\\fixtureuser\\downloads\\solara\\solara.exe",
+        "tool_id": "solara",
+        "tool_kind": "executor",
+        "match_kind": "ambiguous_alias",
+        "key_written": "2026-10-14T20:00:00Z",
+        "location_kind": "user_downloads"
+      }
+    }
+  ],
+  "expect_matches": 1
+}

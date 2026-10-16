@@ -1,0 +1,15 @@
+{
+  "description": "Synthetic positive case for installed_programs/trace-cleaner/installed: x.",
+  "observations": [
+    {
+      "collector": "installed_programs",
+      "fields": {
+        "hive": "hklm",
+        "uninstall_key": "X",
+        "name": "X",
+        "category": "trace_cleaner"
+      }
+    }
+  ],
+  "expect_matches": 1
+}

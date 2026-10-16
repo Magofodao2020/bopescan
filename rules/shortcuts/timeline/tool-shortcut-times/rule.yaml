@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: b607be39-cc19-418a-b0fb-6dd106db32aa
+title: "Times saved in shortcuts to Roblox tools"
+description: >-
+  Puts on the timeline the target times a shortcut to a Roblox tool saved, and the shortcut's own
+  times.
+status: experimental
+role: timeline
+collector: shortcuts
+strength: context
+match:
+  "tool_id|exists": true
+retention: >-
+  As long as the shortcut file is kept.
+falsepositives:
+  - "A shortcut's target times are from when it was saved, not from when the program last ran"
+author: B.O.P.E Scanner contributors
+date: 2026-10-15
+tags: [timeline, roblox]
+category: execution

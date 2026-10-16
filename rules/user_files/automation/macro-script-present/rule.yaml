@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: ca5715c2-c906-451c-a8ac-e13279418d3c
+title: "A macro script is in Downloads, Desktop or Documents"
+description: >-
+  An AutoHotkey (.ahk, .ah2), AutoIt (.au3) or recorded-macro (.rec, .mcr) file is in Downloads,
+  Desktop or Documents. These tools automate keyboard and mouse input. Only the name and times are
+  read, never the file.
+status: experimental
+collector: user_files
+strength: context
+match:
+  kind: "automation_script"
+  extension: ["ahk", "ah2", "au3", "rec", "mcr"]
+retention: >-
+  The files as they are at scan time.
+unmeasured_when: [not_windows]
+falsepositives:
+  - "Productivity hotkeys, keyboard layout fixes and accessibility scripts, which are the common use of AutoHotkey"
+author: B.O.P.E Scanner contributors
+date: 2026-10-15
+tags: [macro]
+level: info
+category: macros_peripherals

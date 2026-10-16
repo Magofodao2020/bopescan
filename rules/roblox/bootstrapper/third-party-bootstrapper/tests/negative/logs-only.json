@@ -1,0 +1,13 @@
+{
+  "description": "Synthetic negative case for roblox/bootstrapper/third-party-bootstrapper: logs-only.",
+  "observations": [
+    {
+      "collector": "roblox",
+      "fields": {
+        "location": "logs",
+        "path": "C:\\Users\\fixtureuser\\AppData\\Local\\Roblox\\logs",
+        "files": 2
+      }
+    }
+  ]
+}

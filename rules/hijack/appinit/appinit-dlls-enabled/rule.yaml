@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: 939e1a62-9d1f-4b25-99a7-289b62e16320
+title: "AppInit_DLLs is set and turned on"
+description: >-
+  Windows is told to load the listed DLL into every process that loads user32.dll — almost every
+  program with a window. Microsoft discourages this mechanism and it is off when Secure Boot is on;
+  the row shows whether it is turned on and which DLL it names.
+status: experimental
+collector: hijack
+strength: tamper
+match:
+  mechanism: "appinit_dlls"
+  enabled: true
+retention: >-
+  The setting as it is at scan time.
+unmeasured_when: [not_windows]
+falsepositives:
+  - "Old accessibility, input-method or display tools that still use this mechanism"
+references:
+  - https://learn.microsoft.com/en-us/windows/win32/dlls/secure-boot-and-appinit-dlls
+author: B.O.P.E Scanner contributors
+date: 2026-10-15
+tags: [persistence, injection]
+level: warn
+category: persistence

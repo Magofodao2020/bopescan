@@ -1,0 +1,18 @@
+{
+  "description": "Synthetic negative case for evtx/service/service-installed: 7036.",
+  "observations": [
+    {
+      "collector": "evtx",
+      "fields": {
+        "log": "System.evtx",
+        "channel": "System",
+        "provider": "Service Control Manager",
+        "event_id": 7036,
+        "level": 4,
+        "count": 200,
+        "first_seen": "2026-10-14T10:00:00Z",
+        "last_seen": "2026-10-15T09:00:00Z"
+      }
+    }
+  ]
+}

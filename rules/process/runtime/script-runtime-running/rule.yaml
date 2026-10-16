@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: 6c338af4-c3b9-4cc9-aa2c-b0204af85495
+title: "A script runtime is running during the check"
+description: >-
+  Node.js, Python, Deno, Bun or Windows Script Host is running at scan time. Automation scripts run
+  on these, and so do development servers, Discord bots and many desktop tools. Command lines are
+  not read.
+status: experimental
+collector: process
+strength: context
+match:
+  name: ["node.exe", "python.exe", "pythonw.exe", "deno.exe", "bun.exe", "wscript.exe", "cscript.exe"]
+retention: >-
+  Processes running at the moment of the scan.
+unmeasured_when: [not_windows]
+falsepositives:
+  - "Development work, bots, local servers and tools built on these runtimes"
+author: B.O.P.E Scanner contributors
+date: 2026-10-15
+tags: [process, script]
+level: info
+category: browser_scripts

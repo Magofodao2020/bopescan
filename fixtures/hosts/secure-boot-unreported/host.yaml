@@ -1,0 +1,18 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Synthetic fixture host — see ../PROVENANCE.md.
+platform: windows
+os_build: "19045"
+elevated: true
+registry:
+  'HKLM\SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity':
+    Enabled: 1
+code_integrity:
+  enabled: true
+  test_signing: false
+tpm:
+  present: true
+  spec_version: "2.0"
+firmware:
+  # Legacy BIOS boot: there are no firmware variables to read (ADR 0038).
+  secure_boot: not_uefi

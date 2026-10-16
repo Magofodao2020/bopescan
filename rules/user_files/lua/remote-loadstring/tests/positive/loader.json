@@ -1,0 +1,20 @@
+{
+  "description": "Synthetic positive case for user_files/lua/remote-loadstring: loader.",
+  "observations": [
+    {
+      "collector": "user_files",
+      "fields": {
+        "kind": "lua_script",
+        "folder": "desktop",
+        "name": "load.lua",
+        "path": "C:\\Users\\fixtureuser\\Desktop\\load.lua",
+        "location_kind": "user_desktop",
+        "extension": "lua",
+        "distinct_markers": 1,
+        "markers": "game:HttpGet",
+        "remote_loadstring": true
+      }
+    }
+  ],
+  "expect_matches": 1
+}

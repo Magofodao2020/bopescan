@@ -1,0 +1,18 @@
+{
+  "description": "Synthetic positive case for executor_footprint/binary/unsigned-binary-in-executor-folder: unsigned.",
+  "observations": [
+    {
+      "collector": "executor_footprint",
+      "fields": {
+        "scope": "binary",
+        "name": "tool.exe",
+        "path": "C:\\Users\\fixtureuser\\Downloads\\tool\\tool.exe",
+        "location_kind": "user_downloads",
+        "extension": "exe",
+        "signature": "no_embedded_signature",
+        "sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+      }
+    }
+  ],
+  "expect_matches": 1
+}

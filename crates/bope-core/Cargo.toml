@@ -1,0 +1,36 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+
+[package]
+name = "bope-core"
+description = "aeterna-rongroi core: data model, rules, evidence engine and views"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[features]
+# Loading rules from a directory. Only xtask enables this; shipped binaries use the embedded bundle.
+source-tree = []
+
+[dependencies]
+# jiff: an ordinal comparison of timestamps parses both sides rather than comparing their text
+# (ADR 0029). The collectors emit `jiff::Timestamp::to_string`, which trims trailing zeros from the
+# fraction, so `…:00.5Z` and `…:00Z` are different shapes and a lexical compare puts the later
+# instant first. Parsing is the whole of why this is here; nothing in this crate reads the clock.
+jiff.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+serde-saphyr.workspace = true
+sha2.workspace = true
+thiserror.workspace = true
+uuid.workspace = true
+
+[build-dependencies]
+serde_json.workspace = true
+
+[lints]
+workspace = true

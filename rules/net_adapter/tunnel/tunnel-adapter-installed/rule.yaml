@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: 4e0c9a27-0922-4831-84da-0c2bebf93ea6
+title: "A VPN or tunnel network driver is installed"
+description: >-
+  A network adapter whose driver description names a tunnel or VPN driver (TAP, TUN, Wintun,
+  WireGuard, OpenVPN, ZeroTier, Hamachi, Radmin) is installed. Installed is not connected: Windows
+  keeps the entry after the software is removed.
+status: experimental
+collector: net_adapter
+strength: context
+match:
+  place: "adapter"
+  tunnel_like: true
+retention: >-
+  The configuration at scan time.
+unmeasured_when: [not_windows]
+falsepositives:
+  - "Work and school VPNs, privacy VPNs, development proxies, virtual machines and LAN-gaming tools"
+author: B.O.P.E Scanner contributors
+date: 2026-10-15
+tags: [network]
+level: info
+category: network

@@ -1,0 +1,20 @@
+{
+  "description": "Synthetic positive case for mft/entry/executor-named-record-not-in-use: fluxus.",
+  "observations": [
+    {
+      "collector": "mft",
+      "fields": {
+        "scope": "entry",
+        "in_use": false,
+        "directory": false,
+        "name": "Fluxus.exe",
+        "path": "C:\\Users\\fixtureuser\\Downloads\\Fluxus\\Fluxus.exe",
+        "tool_id": "fluxus",
+        "tool_kind": "executor",
+        "match_kind": "known_tool",
+        "si_modified": "2026-10-14T19:58:00Z"
+      }
+    }
+  ],
+  "expect_matches": 1
+}

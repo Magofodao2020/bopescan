@@ -1,0 +1,20 @@
+{
+  "description": "Synthetic positive case for roblox_files/file/unsigned-executor-named-program: unsigned.",
+  "observations": [
+    {
+      "collector": "roblox_files",
+      "fields": {
+        "scope": "file",
+        "place": "local_appdata",
+        "name": "injector.dll",
+        "path": "C:\\Users\\fixtureuser\\AppData\\Local\\Roblox\\injector.dll",
+        "tool_id": "dll_injector",
+        "tool_kind": "injector",
+        "match_kind": "known_tool",
+        "roblox_context": true,
+        "signature": "no_embedded_signature"
+      }
+    }
+  ],
+  "expect_matches": 1
+}

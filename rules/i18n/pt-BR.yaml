@@ -1,0 +1,2206 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+# Texto das regras em português do Brasil, por id. O que faltar volta para o inglês do rule.yaml.
+
+d5e16389-ebfc-4885-adf7-f24e6bcd7b0c:
+  title: "RobloxPlayerBeta.exe sem assinatura embutida verificável aqui"
+  description: >-
+    O player do Roblox em uma pasta de versão não tem assinatura Authenticode embutida, tem uma que
+    não confere, ou uma que o Windows não conseguiu verificar sem internet; a linha diz qual. O
+    player oficial é assinado pela Roblox Corporation. Isso não diz que o arquivo foi alterado, o
+    que ele faz, nem que foi executado.
+  retention: >-
+    O arquivo como está no momento da verificação. Uma atualização do Roblox substitui a pasta de
+    versão.
+  falsepositives:
+    - "Um PC cujo repositório de certificados não tem o certificado raiz, que o Windows normalmente baixa da internet na primeira vez; esta verificação nunca acessa a internet"
+    - "Arquivo do player danificado por atualização interrompida, problema de disco ou antivírus que o colocou parcialmente em quarentena"
+
+9888b00d-53c9-47ff-b719-2ed7c44b8fe1:
+  title: "Arquivo com nome de DLL do sistema ao lado do player do Roblox"
+  description: >-
+    Uma DLL com nome de biblioteca do Windows (version.dll, dxgi.dll, winmm.dll e similares) está
+    diretamente numa pasta de versão do Roblox. O Windows procura primeiro na pasta do próprio
+    programa, então um arquivo ali com esse nome é carregado no lugar da biblioteca real: a técnica
+    de "proxy DLL". O player oficial não traz esses arquivos. Isso não diz o que a DLL faz nem que o
+    player a carregou.
+  retention: >-
+    A pasta de versão como está no momento da verificação.
+  falsepositives:
+    - "Ferramentas de pós-processamento gráfico como ReShade, que se instalam como dxgi.dll ou d3d11.dll ao lado do jogo"
+    - "Arquivo copiado ali manualmente ao tentar resolver um travamento"
+
+1a665dfa-9a53-4dcb-a9ec-942ac07d57e6:
+  title: "Programa ou DLL sem assinatura ao lado do player do Roblox"
+  description: >-
+    Um arquivo .dll, .exe ou .asi diretamente numa pasta de versão do Roblox não tem assinatura
+    embutida, ou tem uma que não confere. O Roblox assina os binários que distribui; um arquivo sem
+    assinatura ali provavelmente foi colocado por outra coisa. Não diz o que o arquivo faz nem que
+    foi carregado.
+  retention: >-
+    A pasta de versão como está no momento da verificação.
+  falsepositives:
+    - "Binário do Roblox assinado via catálogo do Windows em vez de assinatura embutida (não observado no Roblox)"
+    - "Ferramentas gráficas ou de overlay que colocam uma DLL na pasta do jogo"
+
+50882b33-a1aa-4e8c-bf59-7f4175c9b00f:
+  title: "Configurações do cliente Roblox (FastFlags) alteradas"
+  description: >-
+    Um arquivo ClientAppSettings.json numa pasta de versão do Roblox define uma ou mais
+    configurações do motor ("FastFlags"). Bootstrappers como o Bloxstrap escrevem esse arquivo para
+    mudar gráficos, FPS e iluminação, e o Roblox só aceita uma lista permitida de flags. Só a
+    quantidade é lida, nunca as flags ou valores.
+  retention: >-
+    O arquivo como está no momento da verificação.
+  falsepositives:
+    - "Bloxstrap, Fishstrap e launchers semelhantes, cujas telas de configuração escrevem esse arquivo"
+    - "Guias de desbloqueio de FPS que mandam criar o arquivo manualmente"
+
+e315d48a-2cf4-4e84-8a0b-4fd9ccfac04e:
+  title: "Bootstrapper de terceiros do Roblox instalado"
+  description: >-
+    Bloxstrap, Fishstrap ou Voidstrap tem uma pasta em %LOCALAPPDATA%. São launchers de código
+    aberto que instalam e iniciam o player oficial do Roblox com configurações extras; não são
+    cheats. Mostrado como contexto.
+  retention: >-
+    A pasta como está no momento da verificação.
+  falsepositives:
+    - "Qualquer jogador que prefira esses launchers pelas configurações, presença no Discord ou desbloqueio de FPS"
+
+d01b990f-c1bd-45db-810a-41a2e057aab8:
+  title: "Player do Roblox em execução com módulo carregado de pasta do usuário"
+  description: >-
+    Uma DLL carregada no player do Roblox em execução vem de Temp, Downloads, Área de Trabalho,
+    Documentos, AppData\Roaming, perfil Público, Lixeira ou outro lugar do perfil — pastas onde
+    qualquer programa pode escrever. Overlays e drivers normalmente carregam de Program Files,
+    AppData\Local ou Windows. Mostra que o módulo estava carregado no momento; não diz o que ele
+    faz. Os módulos só podem ser listados quando o anticheat do Roblox permite; caso contrário a
+    linha fica como não verificada.
+  retention: >-
+    Os módulos carregados no momento da verificação. Um módulo descarregado antes não aparece.
+  falsepositives:
+    - "Overlay, gravador ou ferramenta de entrada instalada por usuário fora de AppData\\Local"
+    - "Extensão de shell ou ferramenta de acessibilidade carregada em todo processo a partir de pasta do usuário"
+
+4a3bec67-abe3-4fb4-88f0-13f365ee2d8d:
+  title: "Player do Roblox com módulo sem assinatura de fora da sua pasta"
+  description: >-
+    Uma DLL carregada no player do Roblox, fora do Windows e fora da pasta de versão do player, não
+    tem assinatura embutida ou tem uma que não confere. A maioria dos overlays, capturadores e
+    drivers que entram em jogos é assinada. Não diz o que o módulo faz.
+  retention: >-
+    Os módulos carregados no momento da verificação.
+  falsepositives:
+    - "Overlays pequenos ou de código aberto, contadores de FPS e ferramentas de entrada sem assinatura"
+    - "Módulo assinado via catálogo do Windows, que esta verificação não lê"
+
+da5a1b8d-6278-432a-9172-81b365f22e1b:
+  title: "Player do Roblox com memória executável privada"
+  description: >-
+    Uma varredura do espaço de endereços do player encontrou memória privada executável. Código
+    mapeado manualmente e shellcode têm essa aparência — e também o próprio anticheat do Roblox, que
+    aloca e decifra código em tempo de execução, além de compiladores JIT e muitos overlays.
+    Mostrado só como contexto, nunca como achado sozinho. Nenhum conteúdo de memória é lido.
+  retention: >-
+    O espaço de endereços no momento da verificação.
+  falsepositives:
+    - "O anticheat do Roblox (Hyperion), que produz exatamente isso"
+    - "Overlays e capturadores que colocam trampolins de hook em processos de jogo"
+
+719dca43-ca1f-4a18-b9c2-d5bd2a13b6a0:
+  title: "Programa sem assinatura em execução a partir de Temp, Downloads, Área de Trabalho ou Lixeira"
+  description: >-
+    Um processo em execução foi iniciado de Temp, Downloads, Área de Trabalho, perfil Público ou
+    Lixeira, e o arquivo não tem assinatura embutida ou tem uma que não confere. Loaders e injetores
+    costumam ser executados assim; ferramentas portáteis e instaladores recém-baixados também.
+  retention: >-
+    Processos em execução no momento da verificação.
+  falsepositives:
+    - "Ferramentas portáteis, mods e utilitários executados direto de Downloads ou da Área de Trabalho"
+    - "Um instalador ainda rodando a partir de Downloads"
+
+37172247-176e-4b49-a26c-b2781ba64696:
+  title: "Pasta organizada como um executor de scripts do Roblox"
+  description: >-
+    Uma pasta em Área de Trabalho, Downloads, Documentos, AppData ou Temp tem as subpastas
+    "autoexec" e "workspace" — a estrutura que executores de script do Roblox criam ao lado de si
+    para scripts executados automaticamente e arquivos escritos por scripts. Mostra que a pasta
+    existe, não que o executor foi executado.
+  retention: >-
+    As pastas como estão no momento da verificação, até dois níveis abaixo de cada local examinado.
+  falsepositives:
+    - "Executor baixado e nunca aberto, ou guardado para estudo"
+    - "Desenvolvedores de script hubs e pesquisadores de anticheat que mantêm essas pastas de propósito"
+
+865aa527-ba58-46bf-8c5e-305f15cecf99:
+  title: "Script em autoexec chama funções que só existem em executores"
+  description: >-
+    Um script numa pasta autoexec de executor chama duas ou mais funções que só existem em
+    executores de script do Roblox (getgenv, hookfunction, getrawmetatable, fireclickdetector,
+    game:HttpGet e similares). Código normal de jogo Roblox não consegue chamá-las. Só se guarda
+    quais funções aparecem, nunca o script. Não mostra que o script foi executado.
+  retention: >-
+    Os scripts como estão no momento da verificação.
+  falsepositives:
+    - "Scripts baixados e guardados sem uso"
+    - "Desenvolvedores e pesquisadores de anticheat que guardam scripts de exploit como amostra"
+
+1182fdb3-a9bc-40d7-b42c-793498ea2a49:
+  title: "Programa ou DLL sem assinatura numa pasta de executor"
+  description: >-
+    Um .exe ou .dll diretamente numa pasta organizada como executor de scripts do Roblox não tem
+    assinatura embutida verificável aqui. O hash é mostrado para comparação com arquivos conhecidos.
+  retention: >-
+    A pasta como está no momento da verificação.
+  falsepositives:
+    - "Ferramentas sem assinatura guardadas numa pasta que por acaso tem essas subpastas"
+
+b127ba49-3637-47b3-b5c7-614b6a57a29a:
+  title: "Pasta com nome de executor de Roblox conhecido publicamente"
+  description: >-
+    Uma pasta num dos locais examinados tem exatamente o nome de um executor de scripts do Roblox
+    discutido publicamente (Solara, Xeno, Celery, KRNL, Fluxus e outros). Vários desses nomes são
+    palavras comuns e um nome de pasta é o que alguém digitou, então isto é só contexto: veja o que
+    a pasta contém.
+  retention: >-
+    As pastas como estão no momento da verificação.
+  falsepositives:
+    - "Pasta com o mesmo nome por motivo não relacionado: save de jogo, projeto, pasta de músicas"
+
+0c4c4fb6-5563-4bb7-89dc-42c73ca13347:
+  title: "Script Lua em Downloads, Área de Trabalho ou Documentos chama funções exclusivas de executor"
+  description: >-
+    Um arquivo .lua ou .luau em Downloads, Área de Trabalho ou Documentos chama duas ou mais funções
+    que só existem em executores de script do Roblox. Código normal de jogo e projetos do Roblox
+    Studio não conseguem chamá-las. Só se guarda quais funções aparecem. Não mostra que o script foi
+    executado.
+  retention: >-
+    Os arquivos como estão no momento da verificação, até um nível abaixo de cada pasta.
+  falsepositives:
+    - "Scripts baixados e nunca usados"
+    - "Amostras guardadas por pesquisadores de anticheat"
+
+1488df5e-64af-4447-94c8-b13c81bb217f:
+  title: "Script Lua baixa e executa outro script com game:HttpGet"
+  description: >-
+    Um arquivo .lua ou .luau contém loadstring(game:HttpGet(...)) numa linha — o formato que loaders
+    de executor usam para baixar e rodar um script remoto. game:HttpGet não é API do Roblox; só
+    executores o fornecem.
+  retention: >-
+    Os arquivos como estão no momento da verificação.
+  falsepositives:
+    - "Script loader salvo de fórum ou vídeo e nunca executado"
+
+f8eb887a-cd84-4fdb-87fa-cd6bf548a847:
+  title: "Programa sem assinatura baixado da internet numa pasta do usuário"
+  description: >-
+    Um programa ou DLL em Downloads, Área de Trabalho ou Documentos tem a Marca da Web do Windows
+    (zona Internet) e não tem assinatura embutida verificável. Mostrado com o hash e, se o jogador
+    concordou, o host de origem. Muitos downloads comuns não têm assinatura.
+  retention: >-
+    Os arquivos como estão no momento da verificação.
+  falsepositives:
+    - "Mods, jogos independentes, ferramentas de código aberto e utilitários, muitas vezes sem assinatura"
+
+ca5715c2-c906-451c-a8ac-e13279418d3c:
+  title: "Script de macro em Downloads, Área de Trabalho ou Documentos"
+  description: >-
+    Um arquivo do AutoHotkey (.ahk, .ah2), AutoIt (.au3) ou macro gravada (.rec, .mcr) está em
+    Downloads, Área de Trabalho ou Documentos. Essas ferramentas automatizam teclado e mouse. Só o
+    nome e os horários são lidos, nunca o arquivo.
+  retention: >-
+    Os arquivos como estão no momento da verificação.
+  falsepositives:
+    - "Atalhos de produtividade, correções de layout de teclado e scripts de acessibilidade, o uso mais comum do AutoHotkey"
+
+1569d65c-db37-4f1f-a668-e2e459315d98:
+  title: "Programa em Temp ou na Lixeira: o Explorer contou uma execução"
+  description: >-
+    Para um arquivo numa pasta Temp ou na Lixeira, o Explorer contou uma execução. Programas
+    raramente rodam da Lixeira, e loaders costumam se descompactar em Temp antes de rodar;
+    instaladores e atualizadores também rodam de Temp. Contexto para a linha do tempo, nunca um
+    achado sozinho.
+  retention: >-
+    Entradas desde a criação da conta ou desde que um limpador as removeu; nada é escrito com
+    "Rastrear inicializações de apps" desligado.
+  falsepositives:
+    - "Instaladores, atualizadores e arquivos autoextraíveis, que se descompactam em Temp e rodam de lá"
+
+71839ff2-255a-4df3-8014-de800fd4ffa1:
+  title: "Programa em Temp ou na Lixeira: o mecanismo de compatibilidade registrou o arquivo (não prova execução)"
+  description: >-
+    Para um arquivo numa pasta Temp ou na Lixeira, o mecanismo de compatibilidade registrou o
+    arquivo (não prova execução). Programas raramente rodam da Lixeira, e loaders costumam se
+    descompactar em Temp antes de rodar; instaladores e atualizadores também rodam de Temp. Contexto
+    para a linha do tempo, nunca um achado sozinho.
+  retention: >-
+    Até 1 024 entradas, gravadas no desligamento; arquivos vistos desde a última reinicialização
+    geralmente faltam.
+  falsepositives:
+    - "Instaladores, atualizadores e arquivos autoextraíveis, que se descompactam em Temp e rodam de lá"
+
+600821fa-4ec6-44b1-bb39-a324585c169f:
+  title: "Horários de programa cujo nome começa como o de um executor público de Roblox"
+  description: >-
+    Coloca na linha do tempo os horários que esta fonte registra para um programa cujo nome de
+    arquivo começa com o nome de um executor de Roblox discutido publicamente. Nome de arquivo não é
+    identidade: qualquer um pode dar qualquer nome a um arquivo.
+  retention: >-
+    O que esta fonte ainda guarda.
+  falsepositives:
+    - "Arquivo renomeado ou nomeado assim por motivo não relacionado; um nome não identifica um programa, e um horário ausente não é evidência de nada"
+
+751f3ec7-4cff-4cd7-81f1-5a71150b3681:
+  title: "Horários de programa cujo nome começa como o de um executor público de Roblox"
+  description: >-
+    Coloca na linha do tempo os horários que esta fonte registra para um programa cujo nome de
+    arquivo começa com o nome de um executor de Roblox discutido publicamente. Nome de arquivo não é
+    identidade: qualquer um pode dar qualquer nome a um arquivo.
+  retention: >-
+    O que esta fonte ainda guarda.
+  falsepositives:
+    - "Arquivo renomeado ou nomeado assim por motivo não relacionado; um nome não identifica um programa, e um horário ausente não é evidência de nada"
+
+a6944ed9-500f-40b4-aadb-3d53a3825552:
+  title: "Horários de programa cujo nome começa como o de um executor público de Roblox"
+  description: >-
+    Coloca na linha do tempo os horários que esta fonte registra para um programa cujo nome de
+    arquivo começa com o nome de um executor de Roblox discutido publicamente. Nome de arquivo não é
+    identidade: qualquer um pode dar qualquer nome a um arquivo.
+  retention: >-
+    O que esta fonte ainda guarda.
+  falsepositives:
+    - "Arquivo renomeado ou nomeado assim por motivo não relacionado; um nome não identifica um programa, e um horário ausente não é evidência de nada"
+
+a10c08a6-2f00-40e2-838b-a874db8f7722:
+  title: "Programa aberto pelo Explorer se descreve como injetor, executor ou exploit"
+  description: >-
+    O nome de produto que o Explorer guardou do recurso de versão de um programa contém "Injector",
+    "Executor" ou "Exploit". Esse nome vem do próprio arquivo, então um arquivo renomeado o mantém;
+    também é o que o autor escolheu. Palavra genérica é contexto, nunca prova.
+  retention: >-
+    Entradas desde a criação da conta ou desde que um limpador as removeu; nenhum horário é
+    guardado.
+  falsepositives:
+    - "Injetores legítimos usados para mods de jogos single-player, depuração ou acessibilidade"
+    - "Ferramentas de teste de segurança cujos nomes usam essas palavras"
+
+32d96608-ac3e-4571-ac9b-2f11763e6fdc:
+  title: "Windows configurado para iniciar outro programa no lugar do Roblox"
+  description: >-
+    Existe um valor "Debugger" em Image File Execution Options para um executável do Roblox, então o
+    Windows inicia o programa indicado no lugar dele, repassando a linha de comando do Roblox.
+    Depuradores usam isso; também programas que querem rodar antes ou em volta de um jogo. Só o
+    programa é mostrado, nunca os argumentos.
+  retention: >-
+    A configuração como está no momento da verificação.
+  falsepositives:
+    - "Desenvolvedor depurando o cliente do Roblox com um depurador configurado assim"
+
+e2c3db41-ea07-4a4d-a416-7202b2d01cae:
+  title: "Programa em pasta do usuário configurado para iniciar no lugar de, ou depois de, outro programa"
+  description: >-
+    Um "Debugger" de Image File Execution Options ou um "MonitorProcess" de SilentProcessExit aponta
+    para um programa numa pasta onde qualquer usuário escreve. O Windows então o inicia no lugar do
+    alvo, ou quando o alvo roda. Malware usa isso para persistência; algumas ferramentas
+    configuradas pela pessoa também.
+  retention: >-
+    A configuração como está no momento da verificação.
+  falsepositives:
+    - "Process Explorer ou outro substituto do Gerenciador de Tarefas guardado numa pasta do usuário"
+    - "Ferramentas de depuração configuradas por um desenvolvedor"
+
+84c8f9d7-14cb-4481-9c31-5d37a11720eb:
+  title: "Depurador configurado em Image File Execution Options"
+  description: >-
+    O Windows está configurado para iniciar outro programa no lugar do indicado na linha. Mostrado
+    como contexto; o caso mais comum é o Process Explorer substituindo o Gerenciador de Tarefas.
+  retention: >-
+    A configuração como está no momento da verificação.
+  falsepositives:
+    - "Opção \"Replace Task Manager\" do Process Explorer"
+    - "Depuradores configurados por desenvolvedores"
+
+939e1a62-9d1f-4b25-99a7-289b62e16320:
+  title: "AppInit_DLLs configurado e ativado"
+  description: >-
+    O Windows está configurado para carregar a DLL listada em todo processo que carrega user32.dll —
+    quase todo programa com janela. A Microsoft desaconselha esse mecanismo, e ele fica desativado
+    com Secure Boot ligado; a linha mostra se está ativado e qual DLL indica.
+  retention: >-
+    A configuração como está no momento da verificação.
+  falsepositives:
+    - "Ferramentas antigas de acessibilidade, método de entrada ou vídeo que ainda usam esse mecanismo"
+
+0e329d8d-b915-45ac-8cfb-d2daef40f901:
+  title: "Winlogon inicia algo diferente do shell ou Userinit do Windows"
+  description: >-
+    O valor Shell ou Userinit do Winlogon aponta para um programa que não é o explorer.exe ou
+    userinit.exe do Windows, então ele inicia a cada logon. Só o programa é mostrado.
+  retention: >-
+    A configuração como está no momento da verificação.
+  falsepositives:
+    - "Software de quiosque ou substituto de shell configurado de propósito"
+    - "Algumas ferramentas de controle parental e gerenciamento"
+
+3322da9a-b8ad-4462-8d9e-7acb55a97f5e:
+  title: "DLL configurada para carregar via AppCertDlls ou Application Verifier"
+  description: >-
+    O Windows está configurado para carregar a DLL indicada em processos que criam outros processos
+    (AppCertDlls), ou no programa-alvo via Application Verifier. Ambos são raros fora de
+    desenvolvimento e testes.
+  retention: >-
+    A configuração como está no momento da verificação.
+  falsepositives:
+    - "Sessões do Application Verifier deixadas configuradas por desenvolvedor"
+    - "Alguns produtos de segurança"
+
+bb11792b-bbdd-48c6-ba23-667a118b4308:
+  title: "Ferramenta de edição de memória ou inspeção de processos instalada"
+  description: >-
+    A lista de programas instalados do Windows tem um cujo nome o coloca no grupo "memory_tool". A
+    linha mostra nome, editor, versão e data de instalação. Estar instalado diz o que o software
+    pode fazer, não para que foi usado; uma cópia desinstalada ou portátil não deixa entrada aqui.
+  retention: >-
+    Programas cuja entrada de desinstalação ainda está no registro no momento da verificação.
+  falsepositives:
+    - "Mods de jogos single-player, desenvolvimento de jogos e estudo de engenharia reversa"
+    - "Administradores de sistema e desenvolvedores que usam Process Hacker ou System Informer"
+
+926dfea8-5be5-417c-b5f3-6feb2a6f0761:
+  title: "Ferramenta de macro ou auto-clicker instalada"
+  description: >-
+    A lista de programas instalados do Windows tem um cujo nome o coloca no grupo "macro_tool". A
+    linha mostra nome, editor, versão e data de instalação. Estar instalado diz o que o software
+    pode fazer, não para que foi usado; uma cópia desinstalada ou portátil não deixa entrada aqui.
+  retention: >-
+    Programas cuja entrada de desinstalação ainda está no registro no momento da verificação.
+  falsepositives:
+    - "Automação de produtividade e acessibilidade, o uso comum do AutoHotkey e AutoIt"
+
+77316dfc-9588-441f-8c89-0c0ceeddb73c:
+  title: "Software de mouse ou teclado que pode guardar macros instalado"
+  description: >-
+    A lista de programas instalados do Windows tem um cujo nome o coloca no grupo
+    "peripheral_suite". A linha mostra nome, editor, versão e data de instalação. Estar instalado
+    diz o que o software pode fazer, não para que foi usado; uma cópia desinstalada ou portátil não
+    deixa entrada aqui.
+  retention: >-
+    Programas cuja entrada de desinstalação ainda está no registro no momento da verificação.
+  falsepositives:
+    - "Qualquer pessoa que tenha mouse ou teclado da marca; macros são um recurso entre iluminação e DPI"
+
+62242277-a132-48b2-b457-83c1b433c61c:
+  title: "Limpador capaz de apagar rastros de uso instalado"
+  description: >-
+    A lista de programas instalados do Windows tem um cujo nome o coloca no grupo "trace_cleaner". A
+    linha mostra nome, editor, versão e data de instalação. Estar instalado diz o que o software
+    pode fazer, não para que foi usado; uma cópia desinstalada ou portátil não deixa entrada aqui.
+  retention: >-
+    Programas cuja entrada de desinstalação ainda está no registro no momento da verificação.
+  falsepositives:
+    - "Limpeza de disco comum e higiene de privacidade"
+
+edd66aa7-ee7e-4c79-89b3-201ccda5c4b1:
+  title: "Software de VPN ou proxy instalado"
+  description: >-
+    A lista de programas instalados do Windows tem um cujo nome o coloca no grupo "vpn_proxy". A
+    linha mostra nome, editor, versão e data de instalação. Estar instalado diz o que o software
+    pode fazer, não para que foi usado; uma cópia desinstalada ou portátil não deixa entrada aqui.
+  retention: >-
+    Programas cuja entrada de desinstalação ainda está no registro no momento da verificação.
+  falsepositives:
+    - "Privacidade, VPN de trabalho, redes escolares e jogar em servidores de outras regiões"
+
+4ac0ac60-f04d-4da3-8c8c-3ede5dc4157d:
+  title: "Software de máquina virtual ou emulador Android instalado"
+  description: >-
+    A lista de programas instalados do Windows tem um cujo nome o coloca no grupo "virtual_machine".
+    A linha mostra nome, editor, versão e data de instalação. Estar instalado diz o que o software
+    pode fazer, não para que foi usado; uma cópia desinstalada ou portátil não deixa entrada aqui.
+  retention: >-
+    Programas cuja entrada de desinstalação ainda está no registro no momento da verificação.
+  falsepositives:
+    - "Desenvolvimento, testes, trabalhos escolares e jogos mobile"
+
+d2436b4d-95ef-4cd7-b71b-18613bdd4a76:
+  title: "Interpretador de macro em execução durante a verificação"
+  description: >-
+    AutoHotkey, AutoIt ou TinyTask está em execução, com seu nome de arquivo usual. Eles rodam
+    scripts que enviam entrada de teclado e mouse. Uma cópia renomeada não é vista pelo nome, e um
+    script comum de atalhos usa o mesmo interpretador.
+  retention: >-
+    Processos em execução no momento da verificação.
+  falsepositives:
+    - "Atalhos de produtividade, expansão de texto e scripts de acessibilidade rodando em segundo plano"
+
+003a01bc-baff-4536-bee2-034a19a3eee4:
+  title: "Editor de memória, depurador ou inspetor de processos em execução durante a verificação"
+  description: >-
+    Cheat Engine, Process Hacker, System Informer ou x64dbg está em execução com seu nome de arquivo
+    usual. Eles podem ler e alterar a memória de outros programas. Uma cópia renomeada não é vista
+    pelo nome.
+  retention: >-
+    Processos em execução no momento da verificação.
+  falsepositives:
+    - "Desenvolvedores e modders usando essas ferramentas para outro trabalho"
+    - "System Informer aberto para acompanhar o sistema"
+
+6c338af4-c3b9-4cc9-aa2c-b0204af85495:
+  title: "Runtime de script em execução durante a verificação"
+  description: >-
+    Node.js, Python, Deno, Bun ou Windows Script Host está em execução. Scripts de automação rodam
+    neles, assim como servidores de desenvolvimento, bots de Discord e muitas ferramentas. Linhas de
+    comando não são lidas.
+  retention: >-
+    Processos em execução no momento da verificação.
+  falsepositives:
+    - "Trabalho de desenvolvimento, bots, servidores locais e ferramentas feitas nesses runtimes"
+
+3daec665-7482-4667-a268-3be496783a83:
+  title: "Placa microcontroladora já atuou como teclado ou mouse neste PC"
+  description: >-
+    A lista de dispositivos do Windows tem um teclado, mouse ou outro dispositivo de entrada cujo
+    vendor id pertence a um fabricante de placas microcontroladoras (Arduino, SparkFun, Adafruit,
+    Raspberry Pi, o id compartilhado do Teensy e outros), conectado agora ou lembrado. Dispositivos
+    de automação de entrada e "Bad USB" são feitos com essas placas. A linha mostra se está
+    conectado e os horários de instalação, chegada e remoção. O Windows não registra o que um
+    teclado digitou, e uma placa pode alegar qualquer vendor id.
+  retention: >-
+    Dispositivos que o Windows ainda lembra; um removido com ferramenta de limpeza ou antes de
+    reinstalação não aparece.
+  falsepositives:
+    - "Teclados mecânicos montados à mão, macro pads e painéis de simulador de voo, comumente feitos com Arduino Pro Micro ou RP2040"
+    - "Projetos de eletrônica que atuam como teclado ou controle"
+
+e4ae1194-c460-4e8a-81e3-112e94381f23:
+  title: "Placa microcontroladora ou adaptador USB-serial já conectado"
+  description: >-
+    O Windows lembra um dispositivo USB cujo vendor id pertence a um fabricante de placas
+    microcontroladoras ou dos chips USB-serial usados em placas clone. Contexto para a linha de
+    dispositivo de entrada; sozinho, é um projeto de eletrônica, uma impressora 3D ou um cabo de
+    gravação.
+  retention: >-
+    Dispositivos que o Windows ainda lembra.
+  falsepositives:
+    - "Impressoras 3D, cabos de gravação, eletrônica amadora e programação de microcontroladores"
+
+1d8680d3-8cf6-455b-82ef-f905009e6d47:
+  title: "Extensão de navegador pode rodar scripts do usuário"
+  description: >-
+    Uma extensão tem a permissão userScripts (Tampermonkey, Violentmonkey e similares), então pode
+    rodar JavaScript que o usuário instala nas páginas. Os scripts não são lidos.
+  retention: >-
+    Extensões instaladas em cada perfil de navegador no momento da verificação.
+  falsepositives:
+    - "Userscripts para ajustes de sites, temas escuros e acessibilidade, o uso comum desses gerenciadores"
+
+023f1d59-2377-4212-bb42-d293d1e5de44:
+  title: "Extensão de navegador pode ler ou alterar o site do Roblox"
+  description: >-
+    As permissões de host ou content scripts de uma extensão citam roblox.com. Muitas extensões do
+    site do Roblox (temas, ajuda de trocas, busca de servidores) precisam disso; diz respeito ao
+    site, não ao cliente do jogo.
+  retention: >-
+    Extensões instaladas em cada perfil de navegador no momento da verificação.
+  falsepositives:
+    - "Extensões de personalização, trocas e busca de servidores do site do Roblox"
+
+b125fe47-1ce6-4239-bad4-b4d67b98ebde:
+  title: "Extensão com controle do DevTools pode alcançar o site do Roblox"
+  description: >-
+    Uma extensão tem a permissão debugger, que permite controlar páginas pelo protocolo do DevTools,
+    e alcança roblox.com. Essa combinação pode alterar o comportamento do site muito além de um
+    content script.
+  retention: >-
+    Extensões instaladas em cada perfil de navegador no momento da verificação.
+  falsepositives:
+    - "Extensões de desenvolvimento web, testes automatizados e acessibilidade que precisam do DevTools"
+
+4e0c9a27-0922-4831-84da-0c2bebf93ea6:
+  title: "Driver de rede VPN ou túnel instalado"
+  description: >-
+    Um adaptador de rede cuja descrição de driver cita túnel ou VPN (TAP, TUN, Wintun, WireGuard,
+    OpenVPN, ZeroTier, Hamachi, Radmin) está instalado. Instalado não é conectado: o Windows mantém
+    a entrada mesmo após remover o software.
+  retention: >-
+    A configuração no momento da verificação.
+  falsepositives:
+    - "VPNs de trabalho e escola, VPNs de privacidade, proxies de desenvolvimento, máquinas virtuais e ferramentas de jogo em LAN"
+
+01293bed-96b3-4de6-b12c-a0ffb28a4603:
+  title: "Proxy WinHTTP configurado para a máquina toda"
+  description: >-
+    O netsh winhttp guardou um proxy, usado por serviços do Windows e alguns programas. O endereço
+    do proxy não é lido.
+  retention: >-
+    A configuração no momento da verificação.
+  falsepositives:
+    - "VPNs de trabalho e escola, VPNs de privacidade, proxies de desenvolvimento, máquinas virtuais e ferramentas de jogo em LAN"
+
+3709cca0-3371-49e6-b687-9eb46b21977e:
+  title: "Variável de ambiente de proxy definida"
+  description: >-
+    HTTP_PROXY, HTTPS_PROXY, ALL_PROXY ou NO_PROXY está definida para esta conta. Ferramentas de
+    linha de comando e runtimes de script seguem essas variáveis. O valor não é lido.
+  retention: >-
+    A configuração no momento da verificação.
+  falsepositives:
+    - "VPNs de trabalho e escola, VPNs de privacidade, proxies de desenvolvimento, máquinas virtuais e ferramentas de jogo em LAN"
+
+4a370a6f-4027-45ed-9704-8bbd1355e41f:
+  title: "Este Windows parece rodar dentro de uma máquina virtual"
+  description: >-
+    As strings de firmware citam um fabricante de hipervisor (VMware, VirtualBox, QEMU, Xen,
+    Parallels, "Virtual Machine" do Hyper-V), ou drivers de convidado de VM estão registrados. Uma
+    verificação dentro de VM examina essa VM, não o PC em que o jogador pode estar jogando. Strings
+    SMBIOS podem ser alteradas, então um PC físico também pode ocultar ou falsificar isso.
+  retention: >-
+    As strings de firmware que o Windows leu na última inicialização.
+  falsepositives:
+    - "Jogadores que usam Windows em VM por outros motivos, ou PCs de cloud gaming"
+
+d5f36166-0023-4b99-9334-333938feca9e:
+  title: "Windows iniciou por BIOS legado, não UEFI"
+  description: >-
+    O Windows informa que iniciou por BIOS legado (ou módulo de compatibilidade UEFI). O Secure Boot
+    exige UEFI, então não pode estar ativo. É uma configuração, não evidência de cheat.
+  retention: >-
+    Como o Windows iniciou desta vez.
+  falsepositives:
+    - "PCs antigos e instalações feitas antes de mudar o firmware para UEFI"
+
+dbdc66d4-53ee-46cc-9f9f-ff13f5632917:
+  title: "Log de Segurança registra alteração do horário do sistema"
+  description: >-
+    O log de Segurança contém o evento 4616, "O horário do sistema foi alterado", com a quantidade e
+    a primeira e última ocorrência. A sincronização de horário do próprio Windows também o escreve,
+    e esta ferramenta não lê quem fez a alteração, então é contexto para interpretar os outros
+    horários do relatório.
+  retention: >-
+    Só o que o log de Segurança ainda guarda; ele mantém uma janela limitada.
+  falsepositives:
+    - "Sincronização do serviço de Horário do Windows, horário de verão e reset da bateria CMOS"
+
+3788a085-39d3-40ec-95e8-55a95df0868c:
+  title: "Log do Sistema registra instalação de serviço ou driver"
+  description: >-
+    O log do Sistema contém o evento 7045, "Um serviço foi instalado no sistema", com quantidade e
+    primeira e última ocorrência. Drivers de kernel são instalados do mesmo jeito, então isto coloca
+    instalações de drivers e serviços na linha do tempo. Qual serviço não é lido.
+  retention: >-
+    Só o que o log do Sistema ainda guarda.
+  falsepositives:
+    - "Toda atualização de driver, anticheat de jogos, antivírus e muitos instaladores comuns"
+
+e7a540ea-3155-4cac-acc0-195890b35302:
+  title: "Plug and Play registrou dispositivos sendo configurados ou iniciados"
+  description: >-
+    O log de configuração Kernel-PnP contém eventos 400 ou 410, escritos quando um dispositivo é
+    configurado ou iniciado, com primeira e última ocorrência. Mostrado junto aos horários de USB
+    para entender quando dispositivos foram conectados.
+  retention: >-
+    Só o que o log Kernel-PnP ainda guarda.
+  falsepositives:
+    - "Todo dispositivo USB conectado e toda inicialização do Windows"
+
+73592699-8fc5-468d-a22d-17ccb6898b15:
+  title: "Ferramenta de executor/injetor do Roblox corroborada por fontes independentes"
+  description: >-
+    A correlação de todas as fontes lidas encontrou um executor de scripts ou injetor de DLL do
+    Roblox, pelo nome em contexto Roblox, em duas ou mais famílias de fontes independentes, com ao
+    menos uma mostrando execução (Prefetch, BAM, PCA, UserAssist, FeatureUsage, processo em
+    execução), estrutura de pasta de executor, scripts exclusivos de executor ou módulo no player do
+    Roblox. A linha mostra as famílias, as classes de evidência e os horários. Nomes podem ser
+    copiados e arquivos renomeados; horários próximos não provam causa.
+  retention: >-
+    O que as fontes lidas nesta verificação ainda guardam; a tabela de fontes diz quais não puderam
+    ser lidas.
+  falsepositives:
+    - "Nome compartilhado com software não relacionado, ou arquivo nomeado assim de propósito; ferramenta legítima renomeada"
+    - "Arquivos guardados do passado, antes de a conta ou o PC ser usado para jogar"
+
+8771df3a-d8eb-4e26-90d3-ea6fb112ba83:
+  title: "Executor/injetor do Roblox detectado por uma família de fontes"
+  description: >-
+    Uma família de fontes mostra um executor de scripts ou injetor do Roblox, nomeado em contexto
+    Roblox, com execução, estrutura de executor, scripts exclusivos de executor ou módulo no player
+    do Roblox. Nenhuma segunda família independente o viu. A linha diz qual fonte e classe.
+  retention: >-
+    O que as fontes lidas nesta verificação ainda guardam; a tabela de fontes diz quais não puderam
+    ser lidas.
+  falsepositives:
+    - "Nome compartilhado com software não relacionado, ou arquivo nomeado assim de propósito; ferramenta legítima renomeada"
+    - "Arquivos guardados do passado, antes de a conta ou o PC ser usado para jogar"
+
+7037504d-c285-4c91-99a9-3c11d3dbe8c5:
+  title: "Nome de executor/injetor do Roblox visto, sem nada mostrando execução"
+  description: >-
+    Um arquivo, pasta, atalho, entrada de inventário ou registro do journal tem o nome de um
+    executor ou injetor do Roblox em contexto Roblox, e nada nesta verificação mostra que ele rodou
+    ou tocou o player. Um nome sozinho é motivo para perguntar, não um achado.
+  retention: >-
+    O que as fontes lidas nesta verificação ainda guardam; a tabela de fontes diz quais não puderam
+    ser lidas.
+  falsepositives:
+    - "Nome compartilhado com software não relacionado, ou arquivo nomeado assim de propósito; ferramenta legítima renomeada"
+    - "Arquivos guardados do passado, antes de a conta ou o PC ser usado para jogar"
+
+d197a1c8-51da-41a7-9728-5daeb2ad622d:
+  title: "Launcher, FPS unlocker ou utilitário do Roblox presente ou usado"
+  description: >-
+    Bloxstrap ou um de seus forks, o FPS unlocker, o Roblox Account Manager ou o mod manager do
+    Studio deixou rastros aqui. São usados abertamente por muitos jogadores e não são cheats. A
+    linha diz quais fontes o viram e se ele rodou. O que foi alterado com ele está nas linhas de
+    FastFlags.
+  retention: >-
+    O que as fontes lidas ainda guardam.
+  falsepositives:
+    - "Essas ferramentas são legítimas; a linha é contexto"
+
+04792358-2883-4e4c-92e1-7b7f0a5ff5b7:
+  title: "Nome corresponde ao catálogo de ferramentas Roblox sem contexto"
+  description: >-
+    Um termo genérico (executor, injector, FastFlag, ClientSettings), um nome parcial (strap, trap)
+    ou um nome de executor que é palavra comum (Wave, Delta, Solara, Synapse) aparece sem nada que o
+    ligue ao Roblox, ou uma ferramenta de FastFlag está presente. Listado para ser olhado, nunca
+    pesado sozinho.
+  retention: >-
+    O que as fontes lidas ainda guardam.
+  falsepositives:
+    - "Software comum cujo nome contém essas letras, como Razer Synapse ou um editor de áudio"
+
+8c20b430-e3c5-4bfb-b5c6-e1048351066d:
+  title: "Fonte histórica aponta arquivo de executor/injetor do Roblox que não está mais no caminho"
+  description: >-
+    BAM, Amcache, ShimCache, UserAssist ou um atalho registra o caminho de um arquivo com nome de
+    executor ou injetor do Roblox, e nada está nesse caminho hoje. Pode ter sido movido, renomeado,
+    excluído ou estar em um disco desconectado; isto não diz qual.
+  retention: >-
+    A retenção de cada fonte histórica; o sistema de arquivos como está na verificação.
+  falsepositives:
+    - "O arquivo foi movido ou renomeado, ou está em um disco removível não conectado"
+
+7bb54914-266d-4f79-9103-a31a457e1a8d:
+  title: "Arquivo com nome de executor/injetor do Roblox foi excluído"
+  description: >-
+    A Lixeira guarda um item excluído, ou o change journal NTFS guarda um registro de exclusão, de
+    um arquivo cujo nome corresponde a um executor ou injetor do Roblox. Excluir arquivos é comum; a
+    linha é motivo para perguntar o que era.
+  retention: >-
+    A Lixeira até ser esvaziada; o change journal até seus registros mais antigos serem
+    sobrescritos.
+  falsepositives:
+    - "Apagar um download que se decidiu não usar"
+
+6bf3e51e-b16d-4d6e-a208-00be42ff698d:
+  title: "Horários de rastros de ferramentas Roblox"
+  description: >-
+    Coloca na linha do tempo cada horário que uma fonte registrou para um rastro de ferramenta
+    Roblox visto em contexto Roblox: quando um programa rodou, uma entrada foi escrita, um arquivo
+    foi excluído ou um atalho salvo.
+  retention: >-
+    O que cada fonte ainda guarda.
+  falsepositives:
+    - "Um horário próximo de outro não mostra causa"
+
+b77bd209-8711-4277-82a9-ae7c6b349a62:
+  title: "Arquivo .zip contém a estrutura de pastas de um executor do Roblox"
+  description: >-
+    Um .zip em Downloads, Área de Trabalho, Temp ou outro local lido tem pastas autoexec e workspace
+    lado a lado, a estrutura usada por executores de scripts do Roblox. Só o índice do arquivo foi
+    lido; nada foi extraído.
+  retention: >-
+    O arquivo como está na verificação.
+  falsepositives:
+    - "Arquivo com scripts para o Roblox Studio ou desenvolvimento de jogo guardados com esses nomes de pasta"
+
+51cd80d4-0a55-4900-9eee-6ad30958c99e:
+  title: "Item com nome de executor/injetor do Roblox está na Lixeira"
+  description: >-
+    A Lixeira desta conta tem um item cujo nome original corresponde a um executor ou injetor do
+    Roblox. A linha diz onde ele estava, quando foi excluído e se o conteúdo ainda está na Lixeira.
+  retention: >-
+    Até a Lixeira ser esvaziada.
+  falsepositives:
+    - "Download excluído sem uso; arquivo não relacionado com o mesmo nome"
+
+40a072f5-89ee-408d-be3c-41d631978b1e:
+  title: "Programa sem assinatura com nome de executor/injetor do Roblox, em contexto Roblox"
+  description: >-
+    Um programa (.exe ou .dll) cujo nome corresponde a um executor ou injetor do Roblox, num caminho
+    que cita o Roblox ou um launcher do Roblox, não tem assinatura embutida que confira aqui.
+  retention: >-
+    O arquivo como está na verificação.
+  falsepositives:
+    - "Ferramenta não relacionada sem assinatura que tem o mesmo nome"
+
+b497f8ad-b10f-49fb-8f5f-3f7b41aa09ca:
+  title: "Atalho aponta para executor/injetor do Roblox que não está mais no caminho"
+  description: >-
+    Um atalho na Área de Trabalho, no menu Iniciar, na barra de tarefas ou em Recentes cita um
+    executor ou injetor do Roblox, e nada está no destino hoje. O atalho guarda os horários do
+    destino de quando foi salvo.
+  retention: >-
+    Enquanto o arquivo de atalho existir; Recentes apara a própria lista.
+  falsepositives:
+    - "O programa foi movido ou desinstalado há muito tempo; o destino está em disco desconectado"
+
+b607be39-cc19-418a-b0fb-6dd106db32aa:
+  title: "Horários gravados em atalhos para ferramentas Roblox"
+  description: >-
+    Coloca na linha do tempo os horários do destino que um atalho para ferramenta Roblox gravou, e
+    os horários do próprio atalho.
+  retention: >-
+    Enquanto o arquivo de atalho existir.
+  falsepositives:
+    - "Os horários do destino são de quando o atalho foi salvo, não de quando o programa rodou"
+
+cdb38cd6-af91-4636-a4b1-95c8aa54800c:
+  title: "Inventário de programas do Windows (Amcache) lista programa com nome de executor/injetor do Roblox"
+  description: >-
+    O Amcache.hve, lido de uma shadow copy existente, tem entrada de inventário para um programa
+    cujo nome corresponde a um executor ou injetor do Roblox, com caminho, SHA-1 e o horário em que
+    a entrada foi escrita. Entrada de inventário não prova que o programa rodou.
+  retention: >-
+    O Amcache guarda entradas por meses; uma shadow copy é tão antiga quanto o snapshot.
+  falsepositives:
+    - "Arquivo inventariado após um download nunca aberto; programa não relacionado com o mesmo nome"
+
+d5560346-9ad6-4b02-ad7b-692097d5bf8a:
+  title: "Horários em que o Amcache escreveu entradas de ferramentas Roblox"
+  description: >-
+    Coloca na linha do tempo quando o inventário de programas do Windows escreveu a entrada de um
+    programa cujo nome corresponde ao catálogo de ferramentas Roblox.
+  retention: >-
+    O Amcache guarda entradas por meses.
+  falsepositives:
+    - "O horário é de quando a entrada foi escrita, não de execução"
+
+4686e7ad-1ff0-4d42-8ec2-883222bcd7da:
+  title: "O change journal registra a exclusão de arquivo com nome de executor/injetor do Roblox"
+  description: >-
+    O change journal NTFS da unidade do sistema tem um registro de exclusão de arquivo cujo nome
+    corresponde a um executor ou injetor do Roblox. O journal cita o arquivo, não a pasta; o mesmo
+    nome pode ser de arquivos não relacionados. Programas comuns excluem os próprios temporários.
+  retention: >-
+    O change journal guarda um número limitado de registros recentes, muitas vezes de dias a
+    semanas.
+  falsepositives:
+    - "Instalador ou atualizador excluindo o próprio arquivo temporário com esse nome"
+
+8ea0ab9d-21dd-4f8a-8bec-08336f5088cb:
+  title: "Horários do change journal para arquivos com nome de ferramentas Roblox"
+  description: >-
+    Coloca na linha do tempo o primeiro e o último registro do change journal de cada nome de
+    arquivo que corresponde ao catálogo de ferramentas Roblox.
+  retention: >-
+    O change journal guarda um número limitado de registros recentes.
+  falsepositives:
+    - "Um nome não identifica um arquivo"
+
+ef38eab7-9baf-4ce0-9882-1614a4aed672:
+  title: "O ClientAppSettings.json lido pelo player do Roblox define FastFlags de rede ou física"
+  description: >-
+    O arquivo de FastFlags da pasta de versão mais recente com o player define flags cujos nomes
+    tratam de física, replicação, pacotes ou envio pela rede. Valores editados dessas flags já foram
+    usados para dessincronizar o personagem do servidor. A linha lista os nomes, nunca os valores.
+    Clientes recentes do Roblox ignoram flags fora de uma lista de permissões, então uma flag no
+    arquivo pode não ter efeito; nada aqui compara o arquivo com uma referência confiável, porque
+    não há uma.
+  retention: >-
+    O arquivo como está na verificação; uma atualização do Roblox cria nova pasta de versão.
+  falsepositives:
+    - "Flags copiadas de um guia de desempenho sem saber o que fazem"
+    - "Flags que um bootstrapper escreveu para uma opção não relacionada cujo nome cita a rede"
+
+b456ead3-43f6-498d-9471-77aa9b576501:
+  title: "Launcher ou ferramenta de FastFlags guarda FastFlags de rede ou física"
+  description: >-
+    O arquivo de configurações de um bootstrapper ou ferramenta de FastFlags define flags cujos
+    nomes tratam de física ou envio pela rede. Elas só são aplicadas quando o Roblox é iniciado por
+    essa ferramenta; se isso aconteceu é lido no arquivo da pasta de versão e no histórico de
+    execução.
+  retention: >-
+    O arquivo como está na verificação.
+  falsepositives:
+    - "Configurações guardadas mas nunca usadas para iniciar o Roblox"
+
+884dbc2d-24c2-4564-8bcc-3130ecd302d8:
+  title: "O player do Roblox lê um arquivo de FastFlags personalizado"
+  description: >-
+    A pasta de versão mais recente com o player tem um ClientAppSettings.json que define FastFlags.
+    A maioria das flags editadas muda gráficos ou o limite de FPS; a linha as conta por tipo.
+  retention: >-
+    O arquivo como está na verificação.
+  falsepositives:
+    - "Bloxstrap e seus forks escrevem este arquivo para as próprias opções de gráficos e FPS"
+
+2eb52c4a-3641-4089-9268-6227fa91fdc0:
+  title: "Horários dos arquivos de FastFlags do Roblox"
+  description: >-
+    Coloca na linha do tempo quando cada arquivo de FastFlags foi criado e escrito pela última vez,
+    ao lado das execuções do Roblox e dos rastros de ferramentas.
+  retention: >-
+    O arquivo como está na verificação.
+  falsepositives:
+    - "Um launcher reescreve o arquivo a cada início"
+
+
+# Títulos em português das regras herdadas do aeterna-rongroi (B.O.P.E); o restante do texto
+# continua em inglês até ser traduzido.
+72820eaf-1469-4ea7-bb0f-17f145d26dfc:
+  title: "Programa que inicia sozinho sem assinatura válida e fora das pastas Windows e Program Files"
+  description: >-
+    O Windows está configurado para iniciar este programa sozinho — como serviço que inicia com o PC
+    ou por um gatilho, como valor Run ou RunOnce no logon, ou como tarefa agendada ativa com gatilho —
+    e o arquivo dele está fora da pasta do Windows e de Program Files e não tem assinatura embutida
+    em que o Windows confie: nenhuma, ou uma que não confere. A linha mostra onde a entrada está
+    registrada, o caminho do arquivo, o SHA-256 e o resultado da verificação da assinatura. Um
+    arquivo assinado por um catálogo do Windows aparece aqui como sem assinatura embutida, porque
+    este programa não lê catálogos. Arquivos dentro da pasta do Windows não são verificados, e um
+    programa que inicia de dentro de Program Files não aparece nesta regra. Os argumentos nunca são
+    lidos, então isto não diz o que o programa recebe para executar. Diz que um programa está
+    configurado para iniciar sem ser pedido; não diz o que ele faz, quem o instalou nem que ele já
+    foi executado.
+  retention: >-
+    Os serviços, valores Run e RunOnce e tarefas agendadas registrados no momento da verificação.
+    Uma entrada removida antes da verificação não é vista, e um arquivo alterado depois é lido como
+    está agora.
+  falsepositives:
+    - "Programas instalados por usuário em AppData — launchers, apps de chat e voz, clientes de sincronização em nuvem — e principalmente seus atualizadores e auxiliares"
+    - "Utilitários de periféricos, RGB, ventoinhas e overclock"
+    - "Wrappers de serviço e servidores instalados por gerenciador de pacotes, como o NSSM do Chocolatey ou um servidor web Apache"
+    - "Agentes de gerenciamento e provisionamento, como o próprio agente de um runner hospedado do GitHub"
+    - "Ferramentas de código aberto e compiladas pelo próprio usuário, que muitas vezes não são assinadas"
+    - "Um arquivo assinado por um catálogo do Windows, que esta verificação não lê"
+    - "Uma entrada Run desativada no Gerenciador de Tarefas, que este programa não consegue distinguir de uma ativa"
+bf213176-ed26-4c02-935e-99925abc7db7:
+  title: "Quando o BAM registrou um programa com nome do processo de jogo do FiveM"
+  description: >-
+    Coloca na linha do tempo o horário que o Background Activity Moderator (BAM) do Windows registrou
+    para um programa chamado FiveM_b<número>_GTAProcess.exe, o nome que o FiveM dá ao processo do
+    jogo que inicia, com a build do jogo no lugar de <número>. O registro guarda um nome, não qual
+    programa era, então isto mostra quando um programa com esse nome rodou segundo este registro, não
+    que o FiveM ou o GTA V rodou. Não é evidência de nada, e a falta de uma entrada não significa que
+    o jogo nunca rodou.
+  retention: >-
+    Só o que o BAM ainda guarda. O Windows remove entradas do BAM com mais de sete dias ao iniciar,
+    então uma execução mais antiga não deixa entrada aqui.
+  falsepositives:
+    - "Qualquer programa cujo nome comece com FiveM_b e termine com _GTAProcess.exe — o registro guarda um nome e nada que identifique o programa, então um programa renomeado nesse formato é registrado com esse nome"
+    - "Um programa com outro nome não é selecionado, seja ele qual for, então a falta de entrada não significa que nada rodou"
+    - "O Windows não manter o registro — entradas do BAM com mais de sete dias são removidas quando o Windows inicia"
+    - "O Windows manter o registro depois que os arquivos do programa foram removidos"
+19dc7372-391e-4874-9c94-92ee6170f2df:
+  title: "Quando o BAM registrou um programa com nome de FiveM ou GTA V"
+  description: >-
+    Coloca na linha do tempo o horário que o Background Activity Moderator (BAM) do Windows registrou
+    para um programa chamado FiveM.exe, GTA5.exe, GTA5_Enhanced.exe ou PlayGTAV.exe, os nomes que o
+    FiveM e o GTA V dão aos seus executáveis. O registro guarda um nome, não qual programa era, então
+    isto mostra quando um programa com esse nome rodou segundo este registro, não que o FiveM ou o
+    GTA V rodou. Não é evidência de nada, e a falta de uma entrada não significa que o jogo nunca
+    rodou.
+  retention: >-
+    Só o que o BAM ainda guarda. O Windows remove entradas do BAM com mais de sete dias ao iniciar,
+    então uma execução mais antiga não deixa entrada aqui.
+  falsepositives:
+    - "Qualquer programa com um desses nomes — o registro guarda um nome e nada que identifique o programa, então um programa renomeado para um deles é registrado com esse nome"
+    - "Um programa com outro nome não é selecionado, seja ele qual for, então a falta de entrada não significa que nada rodou"
+    - "O Windows não manter o registro — entradas do BAM com mais de sete dias são removidas quando o Windows inicia"
+    - "O Windows manter o registro depois que os arquivos do programa foram removidos"
+d7191cf3-ce56-480b-8501-66a198f83e08:
+  title: "Uma exclusão do Microsoft Defender cobre uma pasta do FiveM"
+  description: >-
+    O Microsoft Defender está configurado para não verificar uma pasta ou um programa que é uma das
+    pastas do FiveM, uma pasta acima dela — incluindo uma unidade inteira — ou algo dentro dela. As
+    pastas do FiveM são as do FiveM para GTA V Legacy e Enhanced no AppData local e roaming da conta
+    do Windows, existam ou não neste PC. A linha mostra a exclusão como o Defender a guarda e se ela
+    foi definida nas configurações do próprio Defender ou por uma política. Uma exclusão com curinga
+    não é comparada, e a pasta do próprio jogo ainda não é comparada. Isto diz que o Defender foi
+    instruído a não verificar onde o FiveM guarda seus arquivos; não diz o que foi colocado lá, quem
+    definiu a exclusão nem quando.
+  retention: >-
+    As exclusões do Defender como estavam no momento da verificação. Uma exclusão removida antes da
+    verificação não é vista.
+  falsepositives:
+    - "Guias de desempenho e FPS que mandam excluir a pasta do jogo ou do FiveM da verificação para reduzir travadas"
+    - "Instaladores e launchers de jogos e mods que adicionam sua própria exclusão"
+    - "Desenvolvedores e máquinas de compilação que excluem uma unidade inteira para compilar mais rápido, como a imagem de runner hospedado do GitHub exclui as unidades C e D"
+    - "Outro produto de segurança, ou um administrador, gerenciando as configurações do Defender"
+98f6e2b8-6d23-4202-bc7f-06587ebdd2f3:
+  title: "Um driver registrado está na lista de drivers vulneráveis do LOLDrivers"
+  description: >-
+    Um serviço de driver registrado neste PC aponta para um arquivo cujo SHA-256 o LOLDrivers lista
+    como driver vulnerável verificado: um driver assinado com uma fraqueza conhecida que um programa
+    rodando como administrador pode usar para chegar ao kernel do Windows; a entrada do LOLDrivers diz
+    o que este permite. O Windows carrega um driver assinado a menos que a lista de bloqueio de
+    drivers vulneráveis da Microsoft o cite, e este programa não lê se essa lista está ativa. A linha
+    mostra o SHA-256 do arquivo; procure esse hash em
+    rules/driver_service/vulnerable-driver/loldrivers-listed/loldrivers-vulnerable-drivers.csv no
+    repositório deste programa para ver o id da entrada do LOLDrivers e o nome do arquivo. Isto diz
+    que o driver está registrado, não que está carregado, que algo o usou ou por que está instalado,
+    e utilitários comuns de hardware instalam drivers assim.
+  retention: >-
+    Os serviços de driver registrados no momento da verificação. Um driver registrado e removido
+    antes da verificação não é visto.
+  falsepositives:
+    - "Utilitários de overclock, controle de ventoinhas e RGB e monitoramento de hardware, que instalam drivers desse tipo; a entrada RTCore64.sys do LOLDrivers é o driver do MSI Afterburner"
+    - "Um serviço de driver que ficou registrado depois que o programa foi desinstalado, com o arquivo ainda no disco"
+429f8bc3-3c7d-4924-87f7-7cccefa1a185:
+  title: "O Microsoft Defender registrou que a proteção em tempo real foi desligada"
+  description: >-
+    O log do Microsoft Defender guarda um registro de que a proteção em tempo real — a parte que
+    verifica arquivos quando são abertos — foi desligada, com a primeira e a última vez que isso
+    aconteceu. Não diz quem a desligou nem por quê, se foi religada, nem se está ligada agora: um log
+    registra uma mudança, não um estado. Um registro gravado antes de o PC ser entregue parece igual a
+    um gravado ontem, então leia os horários.
+  retention: >-
+    Só os desligamentos que ainda estão no log do Defender como ele está. Ele guarda até 16 MiB por
+    padrão e sobrescreve os registros mais antigos, e um log limpo não guarda nenhum. Se o log do
+    Defender não existe — Defender removido da imagem ou arquivo apagado — esta linha também diz não
+    encontrado, porque esta verificação não sabe quais logs um PC deveria ter; as regras sobre o
+    serviço e a pasta de plataforma do Defender respondem isso.
+  falsepositives:
+    - "O fabricante do PC, uma loja ou uma imagem do Windows desligando a proteção em tempo real antes de o PC ser entregue — medido em duas imagens de runner hospedado do GitHub, cada uma com um registro assim de antes de alguém usá-la"
+    - "O dono desligando por um tempo para instalar ou rodar algo que o Defender marcou, muitas vezes um mod de jogo, um trainer ou uma ferramenta compartilhada num fórum, conselho comum justamente para esses programas"
+    - "Instalar outro antivírus. Não está estabelecido se o Defender registra isso quando sai de cena, então é uma possibilidade, não uma causa conhecida"
+    - "Uma atualização da plataforma do Defender, ou uma ferramenta de gerenciamento ou política de grupo de empresa ou escola"
+    - "Diagnosticar um PC lento ou um jogo que trava, cujo conselho em fóruns muitas vezes começa desativando a verificação em tempo real"
+f4c99b57-02c8-4e53-82d0-dba8bdc13dda:
+  title: "Um arquivo de log de eventos foi apagado"
+  description: >-
+    O log System guarda um registro dizendo que um arquivo de log de eventos foi limpo, com o horário.
+    O Windows cita o log limpo dentro desse registro, e esta ferramenta não lê o conteúdo dos
+    registros, então não sabe qual das várias centenas de logs do PC foi, e a maioria não guarda nada
+    que interesse a um revisor. A contagem mostrada com esta linha é quantos registros assim
+    sobrevivem, e uma contagem alta não é um achado pior: limpar todos os logs de uma vez, em um
+    segundo, é o que um clique de um "otimizador" faz, então um número grande é evidência dessa
+    explicação, não contra ela. A limpeza do log Security pode ser registrada aqui também, então esta
+    linha e "O log Security registra que foi limpo" podem ser uma ação, não duas.
+  retention: >-
+    Só as limpezas ainda registradas no log System como está hoje. O log guarda uma janela limitada e
+    sobrescreve os registros mais antigos, e limpar o log System remove esses registros junto com o
+    resto — então nada encontrado aqui não significa que nenhum log foi limpo.
+  falsepositives:
+    - "Scripts de \"otimização\", \"debloat\" e \"tweak\" para jogos. Vários populares limpam todos os logs do PC num clique, por isso a contagem chega às centenas, e o dono geralmente esqueceu que rodou um meses atrás"
+    - "Um PC pré-montado ou consertado. A etapa de criação de imagem de fábrica do próprio Windows apaga os logs de eventos, então quem limpou foi o fabricante, não o dono"
+    - "Instalar um software que redefine o log de eventos local na instalação — agentes de monitoramento e suporte costumam fazer isso"
+    - "O dono, uma loja ou um amigo clicando em \"Limpar Log\" no Visualizador de Eventos ao investigar um travamento, conselho comum de diagnóstico que pode ser feito guardando uma cópia"
+    - "Uma atualização de recursos ou reinstalação in-place do Windows, e scripts e tarefas agendadas de manutenção que arrumam logs periodicamente"
+ff967b28-984b-4de0-b361-58367ae0c2d5:
+  title: "O log de Segurança registra que foi apagado"
+  description: >-
+    O log Security guarda um registro dizendo que o log de auditoria de segurança foi limpo, com o
+    horário. O Windows grava esse registro sejam quais forem as configurações de auditoria, então é o
+    relato do próprio log sobre si mesmo. Não diz quem o limpou, por quê, nem o que o log tinha antes
+    — esta ferramenta lê o arquivo e não os detalhes do registro, e o que havia lá se foi. Limpar um
+    log é algo que muitas ferramentas e pessoas comuns fazem, e a lista ao lado desta linha não é
+    formalidade: leia-a. A limpeza do log Security também pode ser registrada uma segunda vez no log
+    System, então esta linha e "Um arquivo de log de eventos foi limpo" podem ser uma ação, não duas.
+  retention: >-
+    Só as limpezas ainda registradas no log Security como está hoje. O log guarda uma janela limitada
+    e sobrescreve os registros mais antigos, e uma limpeza posterior remove o registro de uma anterior
+    — então nada encontrado aqui não significa que nenhum log foi limpo.
+  falsepositives:
+    - "Scripts de \"otimização\", \"debloat\" e \"tweak\" para jogos. Vários populares limpam todos os logs do PC num clique, meses antes disto, e o dono geralmente esqueceu que rodou um"
+    - "Um PC pré-montado ou consertado. A etapa de criação de imagem de fábrica do próprio Windows apaga os logs de eventos, então quem limpou este log foi o fabricante, não o dono"
+    - "Instalar um software que redefine o log de eventos local na instalação — agentes de monitoramento e suporte costumam fazer isso"
+    - "O dono, uma loja ou um amigo clicando em \"Limpar Log\" no Visualizador de Eventos ao investigar um travamento, conselho comum de diagnóstico que pode ser feito guardando uma cópia"
+    - "Uma atualização de recursos ou reinstalação in-place do Windows, e scripts e tarefas agendadas de manutenção que arrumam logs periodicamente"
+9b318bfa-805d-4edd-81f1-602b57639a69:
+  title: "Um arquivo de log de eventos está marcado como somente leitura"
+  description: >-
+    Um arquivo na pasta de logs de eventos do Windows tem o atributo somente leitura. O serviço Event
+    Log grava esses arquivos ele mesmo, e na única máquina Windows 11 que este projeto mediu nenhum de
+    várias centenas tinha o atributo. Esta linha cita o log. Não diz quem definiu o atributo, quando ou
+    por quê, e não é evidência de que algo foi escondido.
+  retention: >-
+    O atributo como está no momento da verificação, nos arquivos de log ainda na pasta. Não diz nada
+    sobre quando foi definido nem sobre arquivos que foram removidos.
+  falsepositives:
+    - "Somente leitura escolhido nas Propriedades da pasta de logs ou de uma pasta acima, que o Windows aplica aos arquivos dentro"
+    - "Arquivos de log copiados ou restaurados na pasta por software de backup, imagem ou cópia que mantém atributos, como o robocopy do próprio Windows faz por padrão"
+87a53c8f-b0e4-477d-91e7-93b904ba965f:
+  title: "Um arquivo de log de eventos não é o arquivo em que o Windows grava o canal"
+  description: >-
+    Os registros deste arquivo de log pertencem a um canal que o serviço Event Log do Windows grava em
+    outro arquivo, citado ao lado desta linha. Portanto o Windows não está acrescentando a este
+    arquivo: é uma cópia, um arquivo morto ou um log cujo canal foi apontado para outro lugar depois
+    que estes registros foram gravados. Só o que o serviço declara sobre o canal é comparado com o
+    arquivo lido, e só para um log cujos registros pertencem todos a um canal. Esta linha não diz
+    quem pôs o arquivo ali, quando ou por quê, e não é evidência de que algo foi escondido.
+  retention: >-
+    Só arquivos de log ainda na pasta de logs do Windows, comparados com a configuração do Windows no
+    momento da verificação. Não diz nada sobre como um log estava configurado antes nem sobre arquivos
+    removidos.
+  falsepositives:
+    - "Um arquivo morto que o próprio Windows mantém quando um log está configurado para backup automático ao encher — ele fecha o arquivo cheio e o renomeia"
+    - "Um log salvo ou exportado para esta pasta com o Visualizador de Eventos ou o wevtutil, por exemplo para enviar a alguém"
+    - "Um administrador, uma Política de Grupo ou um software de gerenciamento mudando onde um log é guardado; o arquivo de antes da mudança fica com os registros gravados até então"
+    - "Um log copiado de outro PC, ou de um backup, para ser examinado"
+51bb1937-7ab2-48db-a2f2-78be82ba2fe8:
+  title: "Quando a Integridade de Código registrou que o Windows recusou carregar um arquivo"
+  description: >-
+    Coloca na linha do tempo a primeira e a última vez que o log do Code Integrity ainda guarda um
+    registro de o Windows se recusar a carregar um programa, uma DLL ou um driver cuja assinatura não
+    atendia ao exigido. Esta ferramenta não lê o conteúdo desses registros, então um horário aqui não
+    diz qual arquivo foi recusado, qual programa o pediu nem qual política o recusou. O Windows 11
+    recusa alguns arquivos por padrão, e um PC comum medido para isto tinha centenas desses
+    registros. Não é evidência de que algo foi injetado, bloqueado de propósito ou removido.
+  retention: >-
+    Só os registros que o log do Code Integrity ainda guarda. Ele mantém cerca de 1 MB por padrão e
+    sobrescreve os mais antigos quando enche — num PC comum medido, cerca de três semanas — e um log
+    limpo não guarda nenhum.
+  falsepositives:
+    - "A lista de bloqueio de drivers vulneráveis da Microsoft, ativa por padrão no Windows 11, recusando um driver antigo que utilitários de hardware, controle de RGB e ventoinhas, ferramentas de overclock e anticheats antigos instalam"
+    - "Memory integrity, Smart App Control ou modo S recusando um driver ou programa que não atende aos requisitos deles"
+    - "Um programa que pede ao Windows para carregar em si só código assinado pela Microsoft (Code Integrity Guard) recusando uma DLL que outro programa tenta colocar nele — overlays, gravadores de tela, ferramentas de entrada, antivírus e software de acessibilidade. Quais programas de um PC fazem isso não foi medido"
+    - "Uma assinatura revogada ou expirada num arquivo que o PC ainda tem"
+    - "Uma política de App Control instalada por empresa, escola ou fabricante do PC"
+    - "Nenhum horário aqui não significa que nada foi recusado antes do registro mais antigo do log"
+63269014-f728-424c-8e18-e36fe79030aa:
+  title: "Quando o Microsoft Defender registrou uma detecção"
+  description: >-
+    Coloca na linha do tempo a primeira e a última vez que o log do Microsoft Defender ainda guarda um
+    registro de que ele detectou malware ou software potencialmente indesejado, ou agiu sobre algo que
+    detectou. Esta ferramenta não lê o conteúdo desses registros, então um horário aqui não diz o que
+    foi detectado, onde, nem se chegou a ser executado, e o Defender registra os próprios erros com as
+    mesmas palavras. Não é evidência sobre o arquivo nem sobre a pessoa.
+  retention: >-
+    Só os registros que o log do Defender ainda guarda. Ele mantém até 16 MiB por padrão e sobrescreve
+    os mais antigos quando enche, e um log limpo não guarda nenhum.
+  falsepositives:
+    - "Software potencialmente indesejado que vem junto com programas gratuitos"
+    - "Trainers de jogos, ferramentas de mods, geradores de chaves e software crackeado, que antivírus marcam como indesejado ou ferramenta de hacking"
+    - "Um falso positivo num programa novo ou sem assinatura"
+    - "Um arquivo baixado e nunca executado"
+    - "Uma detecção num arquivo que o Defender removeu na hora"
+    - "Nenhum horário aqui não significa que o Defender não detectou nada antes do registro mais antigo do log, nem que outro antivírus não detectou"
+87b47713-1ed3-415e-bc07-9cd0b953d7c1:
+  title: "Registro mais antigo e mais novo de um log de eventos do Windows"
+  description: >-
+    Coloca na linha do tempo o horário do registro mais antigo e do mais novo que cada arquivo de log
+    de eventos do Windows ainda guarda. O intervalo entre eles é o que esse log pode mostrar; um
+    horário fora dele é um sobre o qual o log não diz nada. Um intervalo curto não é evidência de que
+    um log foi limpo.
+  retention: >-
+    Os arquivos de log como estão no momento da verificação. Cada log tem um limite de tamanho e
+    sobrescreve os registros mais antigos quando enche.
+  falsepositives:
+    - "Um log que chegou ao limite de tamanho e sobrescreveu os registros mais antigos, o que logs movimentados fazem em dias"
+    - "Uma instalação nova do Windows, ou uma restauração"
+    - "Um log limpo por um administrador, um instalador ou uma ferramenta de manutenção"
+5bd03528-fcfe-4e57-8a7f-3a2ec815a7af:
+  title: "Quando o PowerShell registrou um script block que considera suspeito"
+  description: >-
+    Coloca na linha do tempo a primeira e a última vez que o log operacional do Windows PowerShell
+    ainda guarda um bloco de script que o próprio PowerShell marcou como suspeito. O PowerShell faz
+    isso mesmo sem o registro de blocos de script ligado, para qualquer script que contenha uma de uma
+    lista fixa de palavras — entre elas as que um script usa para chamar o Windows, ler ou gravar a
+    memória de outro programa ou decodificar texto — e scripts comuns também as contêm. Esta
+    ferramenta não lê o bloco, então um horário aqui não diz qual era o script, quem o executou nem se
+    ele fez algo. Não é evidência sobre a pessoa.
+  retention: >-
+    Só os blocos que o log ainda guarda. Ele mantém 15 MiB por padrão e sobrescreve os registros mais
+    antigos quando enche; num PC com Windows 11 isso era cerca de um dia e meio. Um log limpo não
+    guarda nenhum.
+  falsepositives:
+    - "Scripts que mostram uma janela ou diálogo, instalam software ou administram o Windows, que usam as mesmas palavras"
+    - "Ferramentas de administração, desenvolvimento e jogos que rodam o PowerShell em segundo plano"
+    - "Um script que só contém uma das palavras como texto, como Bypass"
+    - "Nenhum horário aqui não significa que nenhum script rodou. O PowerShell não registra nada assim quando uma política desliga o registro de blocos de script, e o PowerShell 7 registra em outro log, que num PC medido não existia; scripts rodados antes do registro mais antigo do log não são vistos"
+    - "Uma política que desliga o registro de blocos de script, que as linhas de postura do PowerShell mostram: o PowerShell então não marca nada, e nenhum horário aqui não diz nada"
+2dc11b64-72a2-48f5-a273-985e906d5a9e:
+  title: "FiveM.exe tem assinatura válida, mas não com o certificado que esta regra conhece"
+  description: >-
+    O FiveM.exe, na pasta de programa do FiveM para GTA V Legacy ou do FiveM para GTA V Enhanced, tem
+    uma assinatura embutida válida, e o certificado que a fez não é o que esta regra espera. A linha
+    mostra o signatário e o SHA-256 do certificado. Esta regra conhece um certificado: aquele com que
+    o FiveM.exe das duas edições foi assinado quando medido em 2026-09-13 — "Rockstar Games, Inc.",
+    válido de 2026-07-21 a 2027-09-05. Editoras renovam certificados de assinatura de código,
+    normalmente a cada um a três anos, então um certificado diferente com o mesmo nome de signatário é
+    muito provavelmente um FiveM.exe mais antigo ou mais novo, não outro programa. Um nome de
+    signatário sozinho não prova nada em nenhum sentido, porque certificados roubados levam o nome da
+    empresa real. Isto não diz que o arquivo foi alterado nem que foi executado.
+  retention: >-
+    O arquivo como estava no momento da verificação. Não diz nada sobre o arquivo em momentos
+    anteriores, e uma atualização do FiveM pode substituí-lo.
+  falsepositives:
+    - "A editora renovou o certificado. Todo FiveM.exe assinado depois disso leva o certificado novo, e esta linha então aparece para todos que atualizaram até a regra ser atualizada. Um revisor que vê o mesmo nome de signatário em relatórios de muitos jogadores deve considerar que a linha não diz nada, conferir o certificado num FiveM.exe recém-instalado da Cfx.re numa máquina própria e avisar este projeto para a regra ser atualizada"
+    - "Um FiveM.exe que não atualiza desde antes de 2026-07-21, quando o certificado que esta regra conhece passou a valer. Uma assinatura feita antes disso usou um certificado anterior. O FiveM se atualiza sozinho, então provavelmente é um jogador que não abre o FiveM desde então"
+    - "Uma build beta ou de teste do cliente assinada com outro certificado. Nada foi medido sobre elas"
+148cbcdd-8d18-4af6-a541-71cc7f21b2eb:
+  title: "FiveM.exe não tem assinatura embutida que confira aqui"
+  description: >-
+    O FiveM.exe, na pasta de programa do FiveM para GTA V Legacy (%LOCALAPPDATA%\FiveM) ou do FiveM
+    para GTA V Enhanced (%LOCALAPPDATA%\FiveM for GTAV Enhanced), não tem assinatura embutida, tem uma
+    que não confere, ou uma que o Windows não conseguiu verificar sem internet; o arquivo mostrado diz
+    qual caso e qual edição. "Não conseguiu verificar sem internet" inclui uma cadeia de certificados
+    que termina num certificado raiz que este PC não tem como confiável, o que sem internet não se
+    distingue de uma raiz em que ninguém confia: uma assinatura autoassinada aparece assim também. Na
+    única máquina em que isto foi medido, o FiveM.exe das duas edições tinha assinatura embutida
+    válida. Isto não diz que o arquivo foi alterado, o que ele faz nem que foi executado. Uma
+    instalação sem FiveM.exe — ou sem FiveM — também é "não encontrado" aqui, e um FiveM.exe cuja
+    assinatura não pôde ser verificada de modo algum aparece em "A assinatura de um arquivo do FiveM
+    não pôde ser verificada".
+  retention: >-
+    O arquivo como estava no momento da verificação. Não diz nada sobre o arquivo em momentos
+    anteriores, e uma atualização do FiveM pode substituí-lo.
+  falsepositives:
+    - "Um PC cujo repositório de certificados do Windows ainda não tem o certificado raiz da cadeia. O Windows normalmente o baixa da internet na primeira vez, e esta verificação nunca fica online. Medido numa máquina de teste com uma raiz removida: assinaturas de outras editoras passaram a aparecer como unverifiable_offline — trouxessem ou não a raiz — e não como invalid. O que a assinatura do próprio FiveM.exe traz não foi medido"
+    - "FiveM.exe danificado por atualização interrompida, problema de disco ou software de segurança que o alterou ou o pôs parcialmente em quarentena"
+    - "Um cliente FiveM que um desenvolvedor compilou a partir do código-fonte publicado pela Cfx.re e colocou no lugar do instalado, que não tem assinatura da Rockstar Games"
+    - "Uma build beta ou de teste do cliente, se for distribuída sem assinatura ou assinada de outra forma. Nada foi medido sobre elas"
+53528a11-5af7-4e75-94bf-fca07eec6fcc:
+  title: "Um arquivo na pasta asi do FiveM para GTA V Enhanced tem assinatura embutida válida"
+  description: >-
+    A pasta %APPDATA%\FiveM for GTAV Enhanced\gta5enhanced\asi do FiveM para GTA V Enhanced tem um
+    arquivo com assinatura embutida que o Windows verificou, e a linha mostra o signatário e o SHA-256
+    do certificado. Não está estabelecido se o cliente Enhanced carrega algo desta pasta. Uma
+    assinatura válida diz quem assinou o arquivo e que ele não mudou desde então — não o que ele faz:
+    certificados já foram roubados de empresas reais e usados para assinar malware em nome delas, e a
+    revogação não é verificada. O nome do signatário é para o leitor pesquisar.
+  retention: >-
+    Só os arquivos na pasta no momento da verificação. Um arquivo removido antes não deixa nada aqui,
+    e esta verificação não sabe o que a pasta guardava antes.
+  falsepositives:
+    - "Overlays, ferramentas de captura e de desempenho de editoras estabelecidas que colocam um arquivo assinado aqui"
+    - "Builds assinadas de mods gráficos, colocadas aqui por um jogador"
+    - "Software assinado por um desenvolvedor individual, cujo certificado leva o nome da própria pessoa"
+0999422f-8709-4d85-80e3-39410a85ed6b:
+  title: "Um arquivo na pasta asi do FiveM para GTA V Enhanced não tem assinatura embutida que confira aqui"
+  description: >-
+    A pasta %APPDATA%\FiveM for GTAV Enhanced\gta5enhanced\asi do FiveM para GTA V Enhanced tem um
+    arquivo, e o Windows não encontrou assinatura embutida nele, encontrou uma que não confere, ou uma
+    que não conseguiu verificar sem internet; cada arquivo mostrado diz qual caso. "Não conseguiu
+    verificar sem internet" inclui uma cadeia de certificados que termina numa raiz que este PC não
+    tem como confiável, o que sem internet não se distingue de uma raiz em que ninguém confia: uma
+    assinatura autoassinada aparece assim também. Não está estabelecido se o cliente Enhanced carrega
+    algo desta pasta — ela existe numa instalação nova e tem o nome de plugins ASI, e nada mais se sabe
+    — então um arquivo aqui é um arquivo nessa pasta e nada além disso. A verificação não diz o que o
+    arquivo é ou faz, nem quem o colocou ali. Um arquivo com assinatura válida aparece em "Um arquivo
+    na pasta asi do FiveM para GTA V Enhanced tem assinatura embutida válida", e um cuja assinatura não
+    pôde ser verificada de modo algum em "A assinatura de um arquivo do FiveM não pôde ser verificada".
+  retention: >-
+    Só os arquivos na pasta no momento da verificação. Um arquivo removido antes não deixa nada aqui,
+    e esta verificação não sabe o que a pasta guardava antes.
+  falsepositives:
+    - "Mods gráficos e seus arquivos de configuração ou log, colocados aqui por um jogador seguindo um guia escrito para outro jogo ou para a pasta plugins do Legacy"
+    - "Arquivos de texto de qualquer tipo — um readme, um .ini, um log — que nunca têm assinatura embutida"
+    - "Ferramentas que instalam arquivos aqui para a edição Enhanced, assinados ou não pelos autores"
+    - "Uma assinatura que não confere porque o arquivo foi danificado, ou cujo certificado expirou sem carimbo de tempo"
+    - "Uma assinatura que este PC não conseguiu verificar sem internet, porque a cadeia precisa de algo que o Windows ainda não guardou, como o certificado raiz"
+d5531c55-1a65-4698-9f39-7cf79bbbb7ba:
+  title: "Um arquivo na pasta plugins do FiveM tem assinatura embutida válida"
+  description: >-
+    A pasta plugins do FiveM para GTA V Legacy (%LOCALAPPDATA%\FiveM\FiveM.app\plugins) tem um arquivo
+    com assinatura embutida que o Windows verificou, e a linha mostra o signatário e o SHA-256 do
+    certificado. Uma assinatura válida diz quem assinou o arquivo e que ele não mudou desde então — não
+    o que ele faz nem que ele deveria estar ali: certificados já foram roubados de empresas reais e
+    usados para assinar cheats e malware em nome delas, e a revogação não é verificada. O nome do
+    signatário é para o leitor pesquisar. É uma linha separada dos arquivos sem assinatura que confere,
+    porque o que um revisor pode fazer em seguida é diferente. Não diz se o arquivo chegou a ser
+    carregado.
+  retention: >-
+    Só os arquivos na pasta no momento da verificação. Um arquivo removido antes não deixa nada aqui,
+    e esta verificação não sabe o que a pasta guardava antes.
+  falsepositives:
+    - "Overlays, ferramentas de captura e de desempenho de editoras estabelecidas que instalam um plugin assinado aqui"
+    - "Builds assinadas de mods gráficos, instaladas aqui como descrevem os guias do fórum da Cfx.re"
+    - "Software assinado por um desenvolvedor individual, cujo certificado leva o nome da própria pessoa"
+061797d3-161d-4783-89e6-caf658973436:
+  title: "Um arquivo na pasta plugins do FiveM não tem assinatura embutida que confira aqui"
+  description: >-
+    A pasta plugins do FiveM para GTA V Legacy (%LOCALAPPDATA%\FiveM\FiveM.app\plugins) tem um arquivo,
+    e o Windows não encontrou assinatura embutida nele, encontrou uma que não confere, ou uma que não
+    conseguiu verificar sem internet; cada arquivo mostrado diz qual caso. "Não conseguiu verificar sem
+    internet" inclui uma cadeia de certificados que termina numa raiz que este PC não tem como
+    confiável, o que sem internet não se distingue de uma raiz em que ninguém confia: uma assinatura
+    autoassinada aparece assim também. Esta pasta é onde os próprios guias do fórum da Cfx.re mandam
+    colocar mods gráficos como o ReShade, então um arquivo aqui é tão frequentemente um deles, suas
+    configurações ou seu log quanto qualquer outra coisa. A verificação não diz o que o arquivo é ou
+    faz, se chegou a ser carregado, nem quem o colocou ali. Um arquivo com assinatura válida aparece em
+    "Um arquivo na pasta plugins do FiveM tem assinatura embutida válida", e um cuja assinatura não pôde
+    ser verificada de modo algum em "A assinatura de um arquivo do FiveM não pôde ser verificada" — não
+    aqui, então "não encontrado" nesta linha vale só para os arquivos cuja assinatura foi verificada.
+  retention: >-
+    Só os arquivos na pasta no momento da verificação. Um arquivo removido antes não deixa nada aqui,
+    e esta verificação não sabe o que a pasta guardava antes.
+  falsepositives:
+    - "Mods gráficos — dxgi.dll ou d3d11.dll do ReShade, ENB — instalados aqui como descrevem os guias do fórum da Cfx.re. Muitos não são assinados pelos autores"
+    - "Os arquivos de configuração, preset e log que esses mods guardam ao lado (ReShade.ini, um .ini de preset, ReShade.log). São texto, não programas, e arquivos de texto nunca têm assinatura embutida"
+    - "Overlays, contadores de FPS e ferramentas de desempenho ou gravação que instalam um plugin aqui"
+    - "Uma assinatura que não confere porque o arquivo foi danificado no download ou por problema de disco, ou porque o certificado expirou sem carimbo de tempo"
+    - "Uma assinatura que este PC não conseguiu verificar sem internet — a cadeia precisa de algo que o Windows ainda não guardou, como o certificado raiz, e esta verificação nunca vai à internet buscá-lo"
+282115fe-863d-4e2e-9cf5-4eaf8e7545e4:
+  title: "A assinatura de um arquivo do FiveM não pôde ser verificada"
+  description: >-
+    Um arquivo que este programa encontrou numa das pastas de plugins do FiveM, ou o próprio FiveM.exe,
+    foi listado, e perguntar ao Windows sobre a assinatura embutida nele não produziu resposta. O
+    caminho do arquivo é mostrado, e nada se sabe sobre a assinatura — nem que existe, nem que falta.
+    As outras regras sobre esses arquivos se baseiam na assinatura que o Windows informou, então um
+    arquivo cuja verificação falhou não corresponde a nenhuma; ele aparece aqui para não ficar de fora
+    do relatório. Não diz por que a verificação falhou, o que o arquivo é, nem que algo foi feito com
+    ele.
+  retention: >-
+    Só os arquivos presentes no momento da verificação, e só a tentativa feita nela. Uma segunda
+    verificação pode conferir o mesmo arquivo sem problema.
+  falsepositives:
+    - "Um arquivo que outro programa mantinha aberto sem permitir leitura naquele momento — um antivírus verificando, um instalador ou atualizador ainda gravando, ou o FiveM se atualizando"
+    - "Um caminho longo demais, ou um nome que o Windows não conseguiu abrir, que alguns descompactadores produzem ao extrair numa pasta profunda"
+    - "Uma resposta do Windows que este programa não classifica. Ele cita só as respostas documentadas, e qualquer outra cai aqui em vez de ser adivinhada"
+    - "Software de segurança que intercepta ou bloqueia programas que leem arquivos de outros programas"
+2ef0da16-e65e-4bb6-90c5-0898ffc93ad8:
+  title: "Quando as pastas de log, crash e cache do FiveM foram escritas"
+  description: >-
+    Coloca na linha do tempo os horários que as pastas de log, crash e cache do FiveM informam, para o
+    GTA V Legacy e o Enhanced: quando cada pasta foi criada e alterada por último, o horário de arquivo
+    mais antigo e mais novo nela, e quando cada pasta de cache de servidor do Enhanced foi criada e
+    alterada por último. São os horários que o sistema de arquivos informa, que o programa que grava um
+    arquivo pode definir. Uma pasta de cache de servidor aparece sem o nome. Nada disso é evidência de
+    nada.
+  retention: >-
+    As pastas como estão no momento da verificação. O FiveM grava, rotaciona e remove seus próprios
+    logs, relatórios de crash e cache, e um jogador pode limpá-los.
+  falsepositives:
+    - "O FiveM gravando, rotacionando e removendo seus próprios logs, relatórios de crash e cache no uso normal"
+    - "O jogador limpando o cache ou os logs do FiveM"
+    - "Reinstalar o FiveM, movê-lo para outro PC ou restaurá-lo de um backup"
+    - "Uma ferramenta de backup, sincronização ou cópia que define horários de arquivos"
+c402aedc-1ed7-49a6-998c-0762e17e9bd0:
+  title: "O FiveM para GTA V Enhanced mantém uma pasta de cache de um servidor"
+  description: >-
+    O FiveM para GTA V Enhanced guarda uma pasta de cache por servidor em que entrou, e esta linha é uma
+    delas: o nome da pasta e quando foi criada e alterada por último. Não se sabe de que o nome é
+    feito; ele permanece o mesmo para aquele servidor neste PC, então o mesmo nome em dois relatórios
+    deste PC é o mesmo servidor. Não se sabe se outro PC recebe o mesmo nome para aquele servidor. O
+    modo SS mostra o nome só se o jogador concordou em mostrar identidades de servidores. Lido só na
+    verificação avançada. Diz que o jogo entrou num servidor, não o que alguém fez nele.
+  retention: >-
+    As pastas de cache de servidor presentes no momento da verificação. Uma pasta que o jogador, um
+    limpador ou uma reinstalação removeu não é vista, e não se sabe se o FiveM remove as antigas
+    sozinho.
+  falsepositives:
+    - "Entrar em qualquer servidor com o FiveM para GTA V Enhanced, que é o que deixa essas pastas"
+    - "Uma pasta mantida de um servidor visitado há muito tempo, ou por outra pessoa usando esta conta do Windows"
+fd58dec6-84c1-49cb-806c-10b4614a046f:
+  title: "Uma pasta ou chave que o playbook Atlas instala está neste PC"
+  description: >-
+    Um dos locais que o playbook Atlas cria ao ser aplicado está aqui: sua pasta de módulos, sua pasta
+    de scripts de configuração na área de trabalho ou sua própria chave de Registro. O Atlas desliga
+    partes do Windows, e algumas delas são o que este programa e o anticheat de um servidor leem. Qual
+    sistema operacional usar é escolha do dono; esta linha diz o que está instalado, não que alguém
+    trapaceou. O conteúdo da pasta não foi lido.
+  retention: >-
+    Só o estado atual. Não diz nada sobre como o PC foi configurado no passado.
+  falsepositives:
+    - "Qualquer pessoa que aplicou o playbook por privacidade, bateria ou para um PC antigo, sem nunca tocar num jogo"
+    - "Um PC comprado usado com o playbook já aplicado"
+    - "Uma pasta ou chave que ficou depois que o playbook foi removido ou revertido"
+3ec29285-f365-4e60-81fe-818d27c6b47a:
+  title: "Uma pasta que o playbook ReviOS instala está neste PC"
+  description: >-
+    Um dos locais que o playbook ReviOS cria ao ser aplicado está aqui: a pasta da sua própria
+    ferramenta ou a pasta de papéis de parede que ele instala. O ReviOS desliga partes do Windows,
+    algumas das quais são o que este programa e o anticheat de um servidor leem. Qual sistema
+    operacional usar é escolha do dono; esta linha diz o que está instalado, não que alguém trapaceou.
+    O conteúdo da pasta não foi lido.
+  retention: >-
+    Só o estado atual. Não diz nada sobre como o PC foi configurado no passado.
+  falsepositives:
+    - "Qualquer pessoa que aplicou o playbook por privacidade, bateria ou para um PC antigo, sem nunca tocar num jogo"
+    - "Um PC comprado usado com o playbook já aplicado"
+    - "Uma pasta que ficou depois que o playbook foi removido ou revertido"
+f47de6d4-05ef-4f33-9aca-2307170fd5ab:
+  title: "A pasta de plataforma do Microsoft Defender não está neste PC"
+  description: >-
+    A pasta em que o Windows guarda o mecanismo do Defender não existe. Desligar o Defender nas
+    Configurações e instalar outro antivírus deixam a pasta no lugar, então isto é o que uma imagem do
+    Windows que removeu o componente parece. Leia ao lado de se o serviço do Defender ainda está
+    registrado, o que diz qual das duas coisas aconteceu. Descreve o que está instalado no PC e não é
+    evidência de trapaça.
+  retention: >-
+    Só o estado atual. Não diz nada sobre como o PC foi configurado no passado.
+  falsepositives:
+    - "Uma imagem do Windows pré-modificada instalada por desempenho, para um PC antigo ou um disco pequeno, por alguém que nunca tocou num jogo"
+    - "Uma edição do Windows ou uma build gerenciada que vem sem o Defender"
+    - "Uma ferramenta de remoção executada pelo dono do PC ou por quem montou o PC para ele"
+    - "Um PC cujo Defender está instalado em outro lugar que não a pasta padrão do Windows"
+65ee0ec1-bcda-47a3-a401-98632b42e75f:
+  title: "O arquivo hosts dá um endereço a um nome do Roblox, FiveM ou Rockstar"
+  description: >-
+    Uma linha em vigor no arquivo hosts deste PC dá a um nome sob roblox.com, rbxcdn.com,
+    robloxlabs.com, cfx.re, fivem.net ou rockstargames.com um endereço próprio, então o Windows usa
+    esse endereço para o nome em vez de perguntar a um servidor DNS. A linha mostra o nome, a linha do
+    arquivo e o tipo de endereço: loopback ou unspecified não manda o nome a lugar nenhum, que é como
+    listas de bloqueio bloqueiam um serviço; private ou public o manda para outra máquina. O modo SS
+    mostra só o tipo, porque o próprio endereço pode identificar o servidor do jogador. Isto não diz o
+    que escreveu a linha, quando, nem se algum programa a usou.
+  retention: >-
+    O arquivo hosts como estava no momento da verificação. Uma linha removida antes da verificação
+    não é vista.
+  falsepositives:
+    - "Listas de bloqueio de anúncios, rastreamento e telemetria, que apontam nomes de telemetria da Rockstar ou do Roblox para 0.0.0.0 ou 127.0.0.1"
+    - "Guias que bloqueiam os servidores de atualização ou login do launcher da Rockstar editando o arquivo hosts"
+    - "Software que grava suas próprias entradas no hosts, como uma VPN, uma suíte de segurança ou uma ferramenta de desenvolvimento"
+211d278c-58de-4287-974c-dda6f39a153c:
+  title: "O fabricante OEM mostrado nas Configurações é um projeto de modificação do Windows"
+  description: >-
+    As Configurações mostram `Atlas Team` como fabricante deste PC. É o valor que o playbook Atlas
+    grava por cima do fabricante da placa ou do notebook ao ser aplicado, lido do próprio código-fonte
+    dele (ADR 0056). Descreve o sistema operacional que o PC usa, que uma pessoa pode escolher na
+    própria máquina, e não prova nada sobre trapaça.
+  retention: >-
+    Só a configuração atual. Não diz nada sobre como o PC foi configurado no passado.
+  falsepositives:
+    - "Qualquer pessoa que aplicou o playbook Atlas por privacidade, bateria ou para um PC antigo, sem nunca tocar num jogo"
+    - "Um PC comprado usado com o playbook já aplicado"
+    - "Qualquer conta com direitos de administrador pode gravar este valor, então ele também pode ter sido digitado à mão"
+a935bb41-6ed4-41a3-9477-7b3fe3a987d9:
+  title: "O modelo OEM mostrado nas Configurações cita um playbook de modificação do Windows"
+  description: >-
+    As Configurações mostram um modelo de dispositivo que começa com o nome que um de dois playbooks
+    publicados de modificação do Windows grava ali — Atlas ou ReviOS. Num PC não modificado este valor
+    é o modelo da placa ou do notebook que o fabricante gravou (`MS-7A36` foi medido numa máquina
+    comum), então é a mesma afirmação da organização registrada, vinda do segundo lugar onde os
+    playbooks a gravam (ADR 0056). Descreve o sistema operacional do PC e não prova nada sobre
+    trapaça.
+  retention: >-
+    Só a configuração atual. Não diz nada sobre como o PC foi configurado no passado.
+  falsepositives:
+    - "Qualquer pessoa que aplicou um desses playbooks por privacidade, bateria ou para um PC antigo, sem nunca tocar num jogo"
+    - "Um PC comprado usado com o playbook já aplicado"
+    - "Qualquer conta com direitos de administrador pode gravar este valor, então ele também pode ter sido digitado à mão"
+3abb40b8-05a4-4cc9-a2f8-17ba52a98714:
+  title: "A organização registrada cita um playbook de modificação do Windows"
+  description: >-
+    O `winver` mostra uma organização registrada que começa com o nome que um de dois playbooks
+    publicados de modificação do Windows grava ali — Atlas ou ReviOS. Os dois gravam isso sozinhos, a
+    partir do próprio código-fonte, ao serem aplicados sobre uma instalação comum do Windows
+    (ADR 0056). Um playbook assim desliga partes do Windows, e algumas delas são o que este programa e
+    o anticheat de um servidor leem. Diz qual sistema operacional o PC usa, que uma pessoa tem o
+    direito de escolher na própria máquina, e não prova que alguém trapaceou.
+  retention: >-
+    Só a configuração atual. Não diz nada sobre como o PC foi configurado no passado.
+  falsepositives:
+    - "Qualquer pessoa que aplicou um desses playbooks por privacidade, bateria ou para um PC antigo, sem nunca tocar num jogo"
+    - "Um PC comprado usado com o playbook já aplicado"
+    - "Alguém que digitou um desses nomes na organização registrada à mão, o que qualquer conta com direitos de administrador pode fazer"
+77646339-caf4-4ade-93ef-133089dac30e:
+  title: "O serviço do Microsoft Defender está configurado para nunca iniciar"
+  description: >-
+    O serviço `WinDefend` está registrado e seu tipo de início é `disabled`, então o Windows não o
+    inicia. **Instalar outro antivírus faz exatamente isso**, e é o motivo mais comum desta linha; um
+    script de ajustes que desliga o Defender é outro. Leia ao lado do resto do relatório, nunca
+    sozinho, e como uma descrição da máquina, não como evidência de trapaça.
+  retention: >-
+    Só a configuração atual. Não diz nada sobre como o PC foi configurado no passado.
+  falsepositives:
+    - "Qualquer antivírus de terceiros, que desativa o serviço do Defender ao se instalar"
+    - "Um PC gerenciado por empresa ou escola cuja política desliga o Defender"
+    - "Um script de ajustes ou uma imagem do Windows pré-modificada que o dono instalou por desempenho"
+8f656238-36d2-4178-98db-87f55432edf7:
+  title: "O serviço do Microsoft Defender não está registrado neste PC"
+  description: >-
+    O Windows não tem nenhuma chave de serviço `WinDefend`. O Windows vem com uma, e desligar o
+    Defender nas Configurações ou instalar outro antivírus mantém a chave, então isto é o que uma
+    imagem do Windows que removeu o componente parece — o tipo vendido como Windows mais leve ou mais
+    rápido (ADR 0056). Uma máquina sem Defender também não tem log do Defender para um revisor ler.
+    Diz o que foi instalado no PC; não é evidência de que alguém trapaceou.
+  retention: >-
+    Só a configuração atual. Não diz nada sobre como o PC foi configurado no passado.
+  falsepositives:
+    - "Uma imagem do Windows pré-modificada instalada por desempenho, para um PC antigo ou um disco pequeno, por alguém que nunca tocou num jogo"
+    - "Uma edição do Windows ou uma build gerenciada que vem sem o Defender"
+    - "Uma ferramenta de remoção executada pelo dono do PC ou por quem montou o PC para ele"
+cf83f06e-23b5-47fc-b7a0-b6d1b8192379:
+  title: "O serviço Log de Eventos do Windows não inicia com o Windows"
+  description: >-
+    O serviço `EventLog` está configurado para iniciar sob demanda ou nunca, ou a chave dele não
+    existe. Esse serviço grava os logs do Windows que este programa lê, então numa máquina assim a
+    falta de um registro não é a mesma afirmação que "nada aconteceu" — pode não ter havido quem o
+    gravasse. O Windows configura este serviço para iniciar automaticamente, e tanto imagens enxutas
+    quanto scripts de ajustes são conhecidos por mudar isso. Descreve a máquina; não mostra que algo
+    foi removido nem que alguém trapaceou.
+  retention: >-
+    Só a configuração atual. Não diz nada sobre como o PC foi configurado no passado.
+  falsepositives:
+    - "Uma imagem do Windows pré-modificada instalada por desempenho, por alguém que nunca tocou num jogo"
+    - "Um script de ajustes que o dono executou por desempenho ou privacidade"
+    - "Uma build gerenciada cuja política configura o serviço de outra forma"
+c9012982-5fc1-4d61-ab0c-0bc1abe93830:
+  title: "O serviço Windows Update não pode iniciar neste PC"
+  description: >-
+    O serviço `wuauserv` está configurado para nunca iniciar, ou a chave dele não existe. Um PC que
+    não atualiza mantém o Windows com que foi instalado, que é como uma imagem pré-modificada continua
+    como foi entregue, e também é o que vários scripts de ajustes fazem numa instalação comum
+    (ADR 0056). O Windows vem com este serviço configurado para iniciar sob demanda. Diz como o PC é
+    mantido atualizado e não é evidência de trapaça.
+  retention: >-
+    Só a configuração atual. Não diz nada sobre como o PC foi configurado no passado.
+  falsepositives:
+    - "Um dono que desligou o Windows Update para evitar reinicializações, ou para manter um driver que uma atualização substitui"
+    - "Um PC gerenciado por empresa ou escola que o atualiza de outra forma"
+    - "Uma imagem do Windows pré-modificada ou um script de ajustes que o dono instalou por desempenho"
+eaf79187-e067-43ed-9afe-bffe65e6b2e5:
+  title: "Quando o Assistente de Compatibilidade de Programas registrou um programa com nome do processo de jogo do FiveM"
+  description: >-
+    Coloca na linha do tempo o horário que o Program Compatibility Assistant do Windows registrou para
+    um programa chamado FiveM_b<número>_GTAProcess.exe, o nome que o FiveM dá ao processo do jogo que
+    inicia, com a build do jogo no lugar de <número>. O registro guarda um nome, não qual programa era,
+    então isto mostra quando um programa com esse nome rodou segundo este registro, não que o FiveM ou
+    o GTA V rodou. Não é evidência de nada, e a falta de uma entrada não significa que o jogo nunca
+    rodou.
+  retention: >-
+    Só o que os arquivos do Program Compatibility Assistant ainda guardam. O Windows mantém esses
+    arquivos no Windows 11 22H2 e posteriores.
+  falsepositives:
+    - "Qualquer programa cujo nome comece com FiveM_b e termine com _GTAProcess.exe — o registro guarda um nome e nada que identifique o programa, então um programa renomeado nesse formato é registrado com esse nome"
+    - "Um programa com outro nome não é selecionado, seja ele qual for, então a falta de entrada não significa que nada rodou"
+    - "O Windows não gravar um registro — esses arquivos só existem no Windows 11 22H2 e posteriores"
+    - "O Windows manter o registro depois que os arquivos do programa foram removidos"
+6487719d-15cf-422c-8b8a-858647091fd1:
+  title: "Quando o Assistente de Compatibilidade de Programas registrou um programa com nome de FiveM ou GTA V"
+  description: >-
+    Coloca na linha do tempo o horário que o Program Compatibility Assistant do Windows registrou para
+    um programa chamado FiveM.exe, GTA5.exe, GTA5_Enhanced.exe ou PlayGTAV.exe, os nomes que o FiveM e
+    o GTA V dão aos seus executáveis. O registro guarda um nome, não qual programa era, então isto
+    mostra quando um programa com esse nome rodou segundo este registro, não que o FiveM ou o GTA V
+    rodou. Não é evidência de nada, e a falta de uma entrada não significa que o jogo nunca rodou.
+  retention: >-
+    Só o que os arquivos do Program Compatibility Assistant ainda guardam. O Windows mantém esses
+    arquivos no Windows 11 22H2 e posteriores.
+  falsepositives:
+    - "Qualquer programa com um desses nomes — o registro guarda um nome e nada que identifique o programa, então um programa renomeado para um deles é registrado com esse nome"
+    - "Um programa com outro nome não é selecionado, seja ele qual for, então a falta de entrada não significa que nada rodou"
+    - "O Windows não gravar um registro — esses arquivos só existem no Windows 11 22H2 e posteriores"
+    - "O Windows manter o registro depois que os arquivos do programa foram removidos"
+ae2f3bb9-a3ee-4175-bf89-982b9fbbbe08:
+  title: "Um dispositivo PCI que o Windows configurou antes não está presente agora"
+  description: >-
+    O Windows configurou este dispositivo PCI em algum momento e ele não está no PC agora. A linha
+    mostra quando o Windows o configurou pela primeira vez, o último início do Windows em que ele
+    estava presente e — só quando o Windows registrou um — um horário de remoção. O Windows registra um
+    horário de remoção quando o dispositivo sai com o Windows em execução e, num desligamento com
+    Inicialização Rápida (o "Desligar" padrão), no momento em que o Windows retoma; depois de um
+    desligamento completo não registra nenhum, então a falta do horário de remoção não diz nada sobre
+    quando o dispositivo saiu. A linha nunca diz como ou por que o dispositivo saiu, nem o que ele era
+    além dos ids que o Windows registrou.
+  retention: >-
+    Dispositivos que o Windows ainda lembra. O Windows mantém um dispositivo configurado depois que
+    ele sai, até ser desinstalado ou o Windows ser instalado de novo.
+  falsepositives:
+    - "Uma placa de vídeo, SSD ou placa de rede trocada, ou movida para outro slot"
+    - "Uma atualização ou configuração da BIOS que muda quais dispositivos a placa-mãe mostra — um controlador onboard desligado, o modo de um slot alterado"
+    - "Um dispositivo Thunderbolt ou PCIe externo desconectado"
+    - "O Windows levado para outro PC, ou a placa-mãe do PC trocada"
+fc74cf1c-a134-45f1-83bd-db42a4dab748:
+  title: "Um dispositivo PCI não tem driver instalado"
+  description: >-
+    O Windows encontrou este dispositivo PCI e não instalou driver para ele: registra o código de
+    problema 28. Este programa lê só os ids que o Windows registrou — números de fabricante,
+    dispositivo e subsistema e o código de classe — e não sabe dizer o que o dispositivo é além disso,
+    o que faz nem quem o colocou ali. Um dispositivo que imita outro bem o bastante para receber um
+    driver não apareceria aqui, então esta linha não é necessária para uma placa PCI estar no PC, e a
+    falta dela não diz nada sobre uma.
+  retention: >-
+    Os dispositivos presentes no momento da verificação, com o código de problema que o Windows tinha
+    para cada um.
+  falsepositives:
+    - "O Windows instalado de novo, antes de os drivers do chipset ou do dispositivo serem adicionados"
+    - "Uma placa de captura, som, serial ou expansão cujo driver do fabricante nunca foi instalado"
+    - "Hardware mais novo ou mais antigo que os drivers que o Windows traz"
+    - "Uma máquina virtual, cujos dispositivos virtuais muitas vezes não têm driver; numa medida, o dispositivo de rede não tinha"
+f360d84c-0ac6-437c-af21-5193d9264e0f:
+  title: "Quando o Windows registrou um dispositivo PCI que não está presente agora"
+  description: >-
+    Coloca na linha do tempo os horários que o Windows guarda para cada dispositivo PCI que não está no
+    PC agora: quando foi configurado pela primeira vez, o último início do Windows em que estava
+    presente e um horário de remoção quando o Windows registrou um. Dispositivos presentes ficam de
+    fora: todos chegaram por último no início do Windows. Um horário aqui não é evidência de que algo
+    foi removido de propósito.
+  retention: >-
+    Dispositivos que o Windows ainda lembra, até um dispositivo ser desinstalado ou o Windows ser
+    instalado de novo.
+  falsepositives:
+    - "Uma peça trocada ou movida, uma atualização ou configuração da BIOS, ou um dispositivo PCIe externo desconectado"
+    - "Depois de um desligamento completo o Windows não registra horário de remoção, então a falta dele não diz nada sobre quando um dispositivo saiu"
+    - "Um relógio que foi alterado, de modo que esses horários não estão no mesmo relógio que os outros"
+7c1f3a52-9d4e-4b8a-a6f2-3e5d9b0c41e7:
+  title: "Secure Boot está desligado"
+  description: >-
+    O Windows informa que o Secure Boot UEFI está desligado. O Secure Boot só deixa iniciar boot
+    loaders e drivers iniciais assinados; desligado, software de baixo nível sem assinatura é mais
+    fácil de carregar. Muitos PCs comuns funcionam com ele desligado, então sozinho isto descreve a
+    máquina — não é evidência de trapaça.
+  retention: >-
+    Só a configuração atual. Não diz nada sobre como o PC foi configurado no passado.
+  falsepositives:
+    - "PCs que iniciam em modo BIOS legado ou CSM, ou que nunca foram mudados para Secure Boot"
+    - "Configurações de dual boot com sistemas operacionais que precisam dele desligado"
+    - "Donos que o desligaram por causa de hardware, virtualização ou ferramentas de overclock"
+5ec56c3d-da70-4acc-99d6-2c41c0b75d71:
+  title: "O firmware diz Secure Boot desligado enquanto o Windows diz ligado"
+  description: >-
+    O Secure Boot é lido de dois lugares. O Registro do Windows diz que está ligado; a própria variável
+    de Secure Boot do firmware diz que está desligado. É o firmware que decide se o Secure Boot é
+    aplicado, então enquanto os dois discordam o valor do Registro não descreve como este PC iniciou.
+    Este programa não sabe dizer por que diferem nem qual mudou por último. Ler o firmware exige
+    direitos de administrador, então uma verificação sem eles não responde isto. Sozinho, isto
+    descreve a máquina — não é evidência de trapaça.
+  retention: >-
+    Só o estado atual: o que o firmware informa para este início do Windows e o que o Registro guarda
+    agora. Não diz nada sobre inícios anteriores.
+  falsepositives:
+    - "Máquinas virtuais, cujo firmware virtual pode informar o Secure Boot de forma diferente do que o Windows registrou"
+    - "Firmware que informa o Secure Boot de forma inconsistente, por exemplo depois de uma atualização de firmware ou de redefinir as chaves do Secure Boot"
+    - "Uma instalação do Windows ou um disco levado para outro hardware, ou o Secure Boot alterado nas configurações do firmware, se o Windows ainda não gravou o novo estado no Registro"
+75162c70-a6d1-47ec-94af-be25184d5ece:
+  title: "A assinatura de teste (test signing) do Windows está ligada"
+  description: >-
+    O Windows informa que o test signing está ligado, então o kernel também inicia drivers que nenhuma
+    editora confiável assinou, inclusive autoassinados. Isso facilita carregar software de nível de
+    kernel de qualquer tipo. É uma configuração que o dono da máquina escolheu, e vários tipos comuns
+    de trabalho precisam dela, então sozinho isto descreve a máquina — não é evidência de trapaça.
+  retention: >-
+    Só a configuração atual. Não diz nada sobre como o PC foi configurado no passado.
+  falsepositives:
+    - "Quem escreve ou testa os próprios drivers, para quem esta é uma configuração normal de trabalho"
+    - "Engenheiros de hardware e firmware usando ferramentas de fabricante ou de pré-lançamento"
+    - "Software cujas instruções de instalação pedem ao dono que ligue o test signing"
+c5c19a2d-8008-4bc8-b36f-6607ed091313:
+  title: "O firmware não descreve nenhum IOMMU ao Windows"
+  description: >-
+    Nenhuma das tabelas ACPI que firmware x86 usa para descrever um IOMMU ao Windows existe: DMAR
+    (Intel VT-d) ou IVRS (AMD-Vi). Um IOMMU é o que permite ao Windows restringir que memória um
+    dispositivo PCIe pode alcançar, e em muitas placas-mãe é uma configuração do firmware desligada por
+    padrão. Trata da configuração do PC, não de algum dispositivo nele, e não diz se o Kernel DMA
+    Protection está ligado.
+  retention: >-
+    Só o estado atual do firmware. Não diz nada sobre configurações anteriores do firmware.
+  falsepositives:
+    - "Placas-mãe cujo firmware vem com VT-d ou AMD-Vi (muitas vezes chamados de IOMMU ou SVM) desligado, o que é comum"
+    - "Processadores ou chipsets antigos sem IOMMU"
+    - "Máquinas virtuais que não recebem IOMMU virtual"
+98ee9213-39f3-4219-b2ac-f2bb3d21d6cc:
+  title: "Uma política da máquina desliga o script block logging do PowerShell 7"
+  description: >-
+    Uma política de máquina do PowerShell 7 — pwsh.exe, instalado separadamente do Windows — define o
+    registro de blocos de script como desligado, na política do próprio PowerShell 7 ou na do Windows
+    PowerShell quando a política do PowerShell 7 manda usar aquela. O Windows não vem com essa
+    política. Desligado, o PowerShell 7 não grava no log de eventos nenhum dos blocos de script que
+    executa, nem os que ele registraria sozinho por o conteúdo parecer suspeito. Isso foi medido numa
+    máquina de teste, não neste PC. Não é lido se o PowerShell 7 está instalado aqui, nem o arquivo de
+    configuração do próprio PowerShell 7. Não diz quais scripts rodaram nem quem definiu a política.
+    Sozinho, isto descreve a máquina — não é evidência de trapaça.
+  retention: >-
+    Só a configuração atual. Não diz nada sobre como o PC foi configurado no passado.
+  falsepositives:
+    - "PCs gerenciados por empresa, escola ou outra organização cuja política desliga o registro de blocos de script, por exemplo para manter fora do log conteúdos de script que podem ter senhas"
+    - "Uma política do PowerShell 7 que manda usar a configuração do Windows PowerShell, num PC cuja política do Windows PowerShell está desligada; a mesma configuração aparece então nas duas regras"
+    - "Baselines de segurança ou privacidade, guias de debloat e ferramentas \"otimizadoras\" que definem políticas de registro"
+    - "Uma política que ficou num PC sem PowerShell 7 instalado, ou de um gerenciamento anterior"
+e9f05cfb-6618-42ca-b4bf-f57f2e9ba8c7:
+  title: "Uma política do usuário desliga o script block logging do PowerShell 7"
+  description: >-
+    Uma política por usuário do PowerShell 7 — pwsh.exe, instalado separadamente do Windows — define o
+    registro de blocos de script como desligado, na política do próprio PowerShell 7 ou na do Windows
+    PowerShell quando a política do PowerShell 7 manda usar aquela, e nenhuma política de máquina tem
+    precedência sobre ela. O Windows não vem com essa política. Desligado, o PowerShell 7 executado por
+    essa conta não grava no log de eventos nenhum dos blocos que executa, nem os que registraria
+    sozinho por parecerem suspeitos. Isso foi medido numa máquina de teste, não neste PC. A política
+    lida é a da conta do Windows com que esta verificação rodou: se a verificação foi reiniciada com a
+    senha de outro administrador, é a política desse administrador. Não é lido se o PowerShell 7 está
+    instalado aqui. Não diz quais scripts rodaram nem quem definiu a política. Sozinho, isto descreve
+    as configurações de uma conta — não é evidência de trapaça.
+  retention: >-
+    Só a configuração atual. Não diz nada sobre como a conta foi configurada no passado.
+  falsepositives:
+    - "PCs gerenciados por empresa, escola ou outra organização cuja política de usuário desliga o registro de blocos de script, por exemplo para manter fora do log conteúdos de script que podem ter senhas"
+    - "Uma verificação reiniciada com a senha de outro administrador, que lê a política desse administrador e não a do jogador"
+    - "Uma política do PowerShell 7 que manda usar a configuração do Windows PowerShell, para uma conta cuja política por usuário do Windows PowerShell está desligada; a mesma configuração pode aparecer também na regra por usuário do Windows PowerShell"
+    - "Baselines de segurança ou privacidade, guias de debloat e ferramentas \"otimizadoras\" que definem políticas de registro, ou uma política que ficou de um gerenciamento anterior ou num PC sem PowerShell 7"
+88eb2aca-a33e-414d-bd0f-cfb87af95a2d:
+  title: "Uma política da máquina desliga o script block logging do Windows PowerShell"
+  description: >-
+    Uma política de máquina do Windows PowerShell — o powershell.exe que vem com o Windows — define o
+    registro de blocos de script como desligado. O Windows não vem com essa política, e um PC em que
+    ninguém definiu uma não é o que esta regra informa. Com a política desligada, o Windows PowerShell
+    não grava no log de eventos nenhum dos blocos que executa, nem os que registraria sozinho por o
+    conteúdo parecer suspeito, então um revisor que lê esse log tem menos para ler. Isso foi medido
+    numa máquina de teste, não neste PC. Não diz quais scripts rodaram nem quem definiu a política.
+    Uma política por usuário e a política do PowerShell 7 têm regras próprias. Sozinho, isto descreve a
+    máquina — não é evidência de trapaça. Este programa também lê esse log (ADR 0063, ADR 0064):
+    enquanto a política está desligada, a linha do tempo não tem horário de bloco de script marcado e
+    uma verificação avançada não encontra nenhum tipo de palavra num deles, seja o que for que rodou.
+    As linhas de comando com que o Windows PowerShell foi iniciado continuam sendo gravadas com a
+    política desligada (medido num runner hospedado do GitHub, 2026-10-09), e o histórico de comandos
+    é gravado pelo PSReadLine, cujo código não lê esta política, então essas linhas são lidas
+    normalmente.
+  retention: >-
+    Só a configuração atual. Não diz nada sobre como o PC foi configurado no passado.
+  falsepositives:
+    - "PCs gerenciados por empresa, escola ou outra organização cuja política desliga o registro de blocos de script, por exemplo para manter fora do log conteúdos de script que podem ter senhas"
+    - "Baselines de segurança ou privacidade, guias de debloat e ferramentas \"otimizadoras\" que definem políticas de log do Windows"
+    - "Um PC que já foi gerenciado por uma organização e ainda tem as políticas dela"
+    - "Administradores que o desligaram para reduzir o tamanho do log de eventos"
+869c34b6-7b32-4f56-a281-9f5ac00e43c4:
+  title: "Uma política do usuário desliga o script block logging do Windows PowerShell"
+  description: >-
+    Uma política por usuário do Windows PowerShell define o registro de blocos de script como
+    desligado, e nenhuma chave de política de máquina tem precedência sobre ela. O Windows não vem com
+    essa política. Desligado, o Windows PowerShell executado por essa conta não grava no log de
+    eventos nenhum dos blocos que executa, nem os que registraria sozinho por o conteúdo parecer
+    suspeito. Isso foi medido numa máquina de teste, não neste PC. A política lida é a da conta do
+    Windows com que esta verificação rodou: se a verificação foi reiniciada com a senha de outro
+    administrador, é a política desse administrador, e a do próprio jogador não foi lida. Não diz quais
+    scripts rodaram nem quem definiu a política. Sozinho, isto descreve as configurações de uma conta —
+    não é evidência de trapaça. Este programa também lê esse log (ADR 0063, ADR 0064): enquanto a
+    política está desligada, a linha do tempo não tem horário de bloco de script que o Windows
+    PowerShell dessa conta marcou, e uma verificação avançada não encontra nenhum tipo de palavra num
+    deles. As linhas de comando com que o Windows PowerShell foi iniciado continuam sendo gravadas com
+    a política desligada (medido para esta política por usuário e para a de máquina num runner
+    hospedado do GitHub, 2026-10-09), e o histórico de comandos é gravado pelo PSReadLine, cujo código
+    não lê esta política, então essas linhas são lidas normalmente.
+  retention: >-
+    Só a configuração atual. Não diz nada sobre como a conta foi configurada no passado.
+  falsepositives:
+    - "PCs gerenciados por empresa, escola ou outra organização cuja política de usuário desliga o registro de blocos de script, por exemplo para manter fora do log conteúdos de script que podem ter senhas"
+    - "Uma verificação reiniciada com a senha de outro administrador, que lê a política desse administrador e não a do jogador"
+    - "Baselines de segurança ou privacidade, guias de debloat e ferramentas \"otimizadoras\" que definem políticas de registro por usuário"
+    - "Um PC ou conta que já foi gerenciado por uma organização e ainda tem as políticas dela"
+8458638a-04fd-4bbf-910a-c4dd9bbe36bb:
+  title: "A integridade de memória (HVCI) está configurada como desligada"
+  description: >-
+    O Windows está configurado para não aplicar a Integridade de Código Imposta pelo Hipervisor
+    (HVCI), então o código do kernel não é verificado dentro do ambiente protegido pelo hipervisor que
+    esse recurso oferece. Isto lê a política configurada, não uma confirmação ao vivo de que o
+    hipervisor aplica algo: um PC cujo hardware não tem o suporte de virtualização necessário pode ter a
+    configuração de qualquer jeito e não aplicar nada. A integridade de memória está desligada em
+    muitíssimos PCs comuns, então sozinho isto descreve a máquina — não é evidência de trapaça.
+  retention: >-
+    Só a configuração atual. Não diz nada sobre como o PC foi configurado no passado.
+  falsepositives:
+    - "PCs cujo hardware ou firmware não suporta segurança baseada em virtualização"
+    - "Máquinas em que ela foi desligada para resolver um conflito com driver, anticheat ou virtualização"
+    - "Os muitos PCs domésticos, e PCs atualizados in-place, que simplesmente funcionam com ela desligada por padrão"
+dc858978-954d-418f-a42e-29f06975f4ed:
+  title: "A proteção SEHOP está desligada"
+  description: >-
+    O Windows está configurado para não validar a cadeia de manipuladores de exceção (SEHOP), uma
+    proteção contra uma forma de sequestrar o fluxo de um programa. Desligá-la é um passo de vários
+    scripts de ajustes para jogos, e alguns softwares antigos pedem isso. É uma configuração que o dono
+    da máquina escolheu e não é evidência de trapaça.
+  retention: >-
+    Só o estado atual. Não diz nada sobre como o PC foi configurado no passado.
+  falsepositives:
+    - "Software antigo cujas instruções pedem que esta proteção seja desligada"
+    - "Um script de ajustes ou uma imagem do Windows pré-modificada que o dono instalou por desempenho"
+    - "Um PC gerenciado por uma empresa cuja política o configura assim"
+a4af8cdc-a009-42ee-8368-7f35e93051fe:
+  title: "O namespace de objetos do kernel não está protegido como o Windows vem"
+  description: >-
+    O Windows está configurado para não separar programas de níveis de privilégio diferentes no
+    namespace de objetos do kernel, uma proteção que vem ligada (medido num PC comum). Desligá-la
+    facilita que um programa alcance objetos nomeados de outro. Alguns scripts de ajustes fazem isso, e
+    alguns softwares antigos pedem. É uma configuração que o dono da máquina escolheu e não é evidência
+    de trapaça.
+  retention: >-
+    Só o estado atual. Não diz nada sobre como o PC foi configurado no passado.
+  falsepositives:
+    - "Software antigo cujas instruções pedem que esta proteção seja desligada"
+    - "Um script de ajustes ou uma imagem do Windows pré-modificada que o dono instalou por desempenho"
+    - "Um PC gerenciado por uma empresa cuja política o configura assim"
+d2f86e75-7692-468e-88a2-52eb1e24dc30:
+  title: "As mitigações de execução especulativa estão desligadas"
+  description: >-
+    O Windows está configurado para desligar as mitigações do Spectre variante 2 e do Meltdown, pelo
+    par de valores que juntos significam desligado. As mitigações custam alguns por cento de
+    desempenho, e desligá-las é um passo de vários scripts de ajustes para jogos; também deixa o PC
+    exposto às falhas de processador para as quais foram feitas. É uma configuração que o dono da
+    máquina escolheu e não é evidência de trapaça.
+  retention: >-
+    Só o estado atual. Não diz nada sobre como o PC foi configurado no passado.
+  falsepositives:
+    - "Um dono que seguiu conselhos de desempenho para um processador antigo, em que essas mitigações custam mais"
+    - "Um script de ajustes ou uma imagem do Windows pré-modificada que o dono instalou por desempenho"
+    - "Um PC configurado assim por uma loja ou por quem o montou"
+66d513b5-fe61-415a-9385-9d01f85c3ef5:
+  title: "Nenhum TPM presente"
+  description: >-
+    A plataforma informa que esta máquina não tem TPM. Um TPM é uma das peças de hardware estáveis a
+    que uma identidade pode ser ligada, então saber se existe é um contexto útil quando um revisor lê
+    o resto do relatório. Um número enorme de PCs que funcionam não tem TPM ou o tem desligado no
+    firmware, então isto não diz nada sobre quem usa a máquina e não é evidência de trapaça.
+  retention: >-
+    Só o estado atual do hardware. Não diz nada sobre hardware ou configurações de firmware anteriores.
+  falsepositives:
+    - "PCs montados sem TPM, o que inclui muitíssimas máquinas antigas e montadas pelo próprio usuário"
+    - "Um TPM desligado ou oculto no firmware, configuração de fábrica comum"
+    - "Máquinas virtuais e sistemas de teste sem TPM virtual"
+1fd8ec4a-f6d1-4496-aac5-54ed276717f7:
+  title: "Um comando em uma execução do Windows PowerShell mandou o Microsoft Defender não olhar"
+  description: >-
+    Nas linhas de comando com que o Windows PowerShell foi iniciado, como o próprio log dele as guarda,
+    pelo menos um comando adicionou uma exclusão ao Microsoft Defender ou desligou uma das proteções
+    dele. O relatório também diz o que o Defender está instruído a não verificar agora, quando a
+    verificação tem direitos de administrador. Esta ferramenta lê o comando só para classificar suas
+    palavras em tipos e não guarda texto dele, então a linha diz que tipo de palavras ele tinha, nunca
+    qual comando, o que executou nem se funcionou. Uma palavra montada de outra forma que não os
+    escapes comuns do PowerShell não é reconhecida, então a falta da linha não diz nada.
+  retention: >-
+    Só os inícios que o log do Windows PowerShell ainda guarda. Ele mantém 15 MiB por padrão e
+    sobrescreve os registros mais antigos quando enche; num PC com Windows 11 isso era cerca de seis
+    dias. Um log limpo não guarda nenhum.
+  falsepositives:
+    - "Desenvolvedores e equipe de TI excluindo pastas de compilação ou ferramentas para acelerar o Defender"
+    - "Guias de jogos, emuladores ou mods que mandam excluir uma pasta"
+    - "Desligar a proteção para instalar um programa que o Defender marcou por engano"
+    - "A falta da linha não significa que o Defender nunca foi alterado, já que as próprias configurações e o log dele dizem mais"
+45a6c6d4-6759-48c0-82e6-4cafb2ea2bfb:
+  title: "Um comando em uma execução do Windows PowerShell baixou algo e executou"
+  description: >-
+    Nas linhas de comando com que o Windows PowerShell foi iniciado, como o próprio log dele as guarda,
+    pelo menos um comando tinha tanto uma palavra que baixa da internet quanto uma que executa texto
+    como comando, o formato de uma linha que busca um script e o executa sem salvá-lo. A linha dá
+    quantos e a primeira e a última vez, e o nome do site só se o jogador concordou em mostrá-lo. Esta
+    ferramenta lê o comando só para classificar suas palavras em tipos e não guarda texto dele, então a
+    linha diz que tipo de palavras ele tinha, nunca qual comando, o que executou nem se funcionou. Uma
+    palavra montada de outra forma que não os escapes comuns do PowerShell não é reconhecida, então a
+    falta da linha não diz nada.
+  retention: >-
+    Só os inícios que o log do Windows PowerShell ainda guarda. Ele mantém 15 MiB por padrão e
+    sobrescreve os registros mais antigos quando enche; num PC com Windows 11 isso era cerca de seis
+    dias. Um log limpo não guarda nenhum.
+  falsepositives:
+    - "Instaladores e gerenciadores de pacotes que se instalam com uma linha nesse formato — o histórico do PC de desenvolvimento medido tinha três, todas de instalação de software"
+    - "Scripts que atualizam ou configuram ferramentas de desenvolvimento, terminais ou ajustes do Windows da mesma forma"
+    - "Um programa ou tarefa agendada que inicia o PowerShell assim para se atualizar"
+    - "A falta da linha não significa que nada foi executado, porque outras formas de executar um script não são lidas"
+a5b02d12-4999-4cd6-87cc-c7823aee66b9:
+  title: "Um comando em uma execução do Windows PowerShell apagou um log, o histórico ou o Prefetch"
+  description: >-
+    Nas linhas de comando com que o Windows PowerShell foi iniciado, como o próprio log dele as guarda,
+    pelo menos um comando limpou o histórico do PowerShell, limpou ou removeu um log de eventos, ou
+    apagou o arquivo de histórico ou arquivos do Prefetch. Esta ferramenta lê o comando só para
+    classificar suas palavras em tipos e não guarda texto dele, então a linha diz que tipo de palavras
+    ele tinha, nunca qual comando, o que executou nem se funcionou. Uma palavra montada de outra forma
+    que não os escapes comuns do PowerShell não é reconhecida, então a falta da linha não diz nada.
+  retention: >-
+    Só os inícios que o log do Windows PowerShell ainda guarda. Ele mantém 15 MiB por padrão e
+    sobrescreve os registros mais antigos quando enche; num PC com Windows 11 isso era cerca de seis
+    dias. Um log limpo não guarda nenhum.
+  falsepositives:
+    - "Scripts de limpeza e otimização que limpam logs e Prefetch num clique, comuns entre jogadores"
+    - "Uma pessoa limpando o próprio histórico de comandos"
+    - "Administradores redefinindo um log durante testes"
+    - "A falta da linha não significa que nada foi limpo, porque outras ferramentas não deixam linha aqui"
+b97cb4c6-9dac-47f4-a974-ce17f07d6fc5:
+  title: "Um comando no histórico do PowerShell mandou o Microsoft Defender não olhar"
+  description: >-
+    No histórico de comandos digitados numa janela do PowerShell na conta que executa esta
+    verificação, pelo menos um comando adicionou uma exclusão ao Microsoft Defender ou desligou uma das
+    proteções dele. O relatório também diz o que o Defender está instruído a não verificar agora,
+    quando a verificação tem direitos de administrador. Esta ferramenta lê o comando só para
+    classificar suas palavras em tipos e não guarda texto dele, então a linha diz que tipo de palavras
+    ele tinha, nunca qual comando, o que executou nem se funcionou. Uma palavra montada de outra forma
+    que não os escapes comuns do PowerShell não é reconhecida, então a falta da linha não diz nada.
+  retention: >-
+    Só as linhas que o arquivo de histórico do PowerShell ainda guarda. Ele mantém os 4096 comandos
+    mais novos por padrão e não grava horário por linha, então a linha diz há quantos comandos, não
+    quando. O PowerShell deixa fora do arquivo toda linha com as palavras password, token, key ou
+    secret.
+  falsepositives:
+    - "Desenvolvedores e equipe de TI excluindo pastas de compilação ou ferramentas para acelerar o Defender"
+    - "Guias de jogos, emuladores ou mods que mandam excluir uma pasta"
+    - "Desligar a proteção para instalar um programa que o Defender marcou por engano"
+    - "A falta da linha não significa que o Defender nunca foi alterado, já que as próprias configurações e o log dele dizem mais"
+    - "Uma verificação reiniciada com a senha de outro administrador, que lê o histórico desse administrador, não o de quem está no teclado; cada linha então diz `account: other`"
+2b4a3f03-e520-44d4-ad91-77f5d7857d71:
+  title: "Um comando no histórico do PowerShell baixou algo e executou"
+  description: >-
+    No histórico de comandos digitados numa janela do PowerShell na conta que executa esta
+    verificação, pelo menos um comando tinha tanto uma palavra que baixa da internet quanto uma que
+    executa texto como comando, o formato de uma linha que busca um script e o executa sem salvá-lo. A
+    linha dá quantos e há quantos comandos foi o mais recente, e o nome do site só se o jogador
+    concordou em mostrá-lo. Esta ferramenta lê o comando só para classificar suas palavras em tipos e
+    não guarda texto dele, então a linha diz que tipo de palavras ele tinha, nunca qual comando, o que
+    executou nem se funcionou. Uma palavra montada de outra forma que não os escapes comuns do
+    PowerShell não é reconhecida, então a falta da linha não diz nada.
+  retention: >-
+    Só as linhas que o arquivo de histórico do PowerShell ainda guarda. Ele mantém os 4096 comandos
+    mais novos por padrão e não grava horário por linha, então a linha diz há quantos comandos, não
+    quando. O PowerShell deixa fora do arquivo toda linha com as palavras password, token, key ou
+    secret.
+  falsepositives:
+    - "Instaladores e gerenciadores de pacotes que se instalam com uma linha nesse formato — o histórico do PC de desenvolvimento medido tinha três, todas de instalação de software"
+    - "Scripts que atualizam ou configuram ferramentas de desenvolvimento, terminais ou ajustes do Windows da mesma forma"
+    - "Um comando digitado que falhou ou foi cancelado, que o histórico guarda de qualquer jeito"
+    - "A falta da linha não significa que nada foi executado, porque outras formas de executar um script não são lidas"
+    - "Uma verificação reiniciada com a senha de outro administrador, que lê o histórico desse administrador, não o de quem está no teclado; cada linha então diz `account: other`"
+8d4941c6-3ca2-4ff7-8fce-8d1d2fcc7c8d:
+  title: "Um comando no histórico do PowerShell apagou um log, o histórico ou o Prefetch"
+  description: >-
+    No histórico de comandos digitados numa janela do PowerShell na conta que executa esta
+    verificação, pelo menos um comando limpou o histórico do PowerShell, limpou ou removeu um log de
+    eventos, ou apagou o arquivo de histórico ou arquivos do Prefetch. Esta ferramenta lê o comando só
+    para classificar suas palavras em tipos e não guarda texto dele, então a linha diz que tipo de
+    palavras ele tinha, nunca qual comando, o que executou nem se funcionou. Uma palavra montada de
+    outra forma que não os escapes comuns do PowerShell não é reconhecida, então a falta da linha não
+    diz nada.
+  retention: >-
+    Só as linhas que o arquivo de histórico do PowerShell ainda guarda. Ele mantém os 4096 comandos
+    mais novos por padrão e não grava horário por linha, então a linha diz há quantos comandos, não
+    quando. O PowerShell deixa fora do arquivo toda linha com as palavras password, token, key ou
+    secret.
+  falsepositives:
+    - "Scripts de limpeza e otimização que limpam logs e Prefetch num clique, comuns entre jogadores"
+    - "Uma pessoa limpando o próprio histórico de comandos"
+    - "Administradores redefinindo um log durante testes"
+    - "A falta da linha não significa que nada foi limpo, porque outras ferramentas não deixam linha aqui"
+    - "Uma verificação reiniciada com a senha de outro administrador, que lê o histórico desse administrador, não o de quem está no teclado; cada linha então diz `account: other`"
+bc3c9769-c57e-4c01-9f0d-8a71152102ec:
+  title: "Quando os logs do PowerShell registraram um comando que baixou algo e executou"
+  description: >-
+    Coloca na linha do tempo a primeira e a última vez que um bloco de script marcado ou um início do
+    Windows PowerShell tinha tanto uma palavra que baixa quanto uma que executa texto como comando. O
+    histórico não tem horários e não está na linha do tempo. Esta ferramenta lê o comando só para
+    classificar suas palavras em tipos e não guarda texto dele, então a linha diz que tipo de palavras
+    ele tinha, nunca qual comando, o que executou nem se funcionou. Uma palavra montada de outra forma
+    que não os escapes comuns do PowerShell não é reconhecida, então a falta da linha não diz nada.
+  retention: >-
+    Só os registros que os dois logs do Windows PowerShell ainda guardam; cada um mantém 15 MiB por
+    padrão e sobrescreve os registros mais antigos quando enche.
+  falsepositives:
+    - "Instaladores e scripts de atualização que baixam e executam numa linha"
+    - "A falta de horário não significa que nada rodou, e nenhum horário anterior ao registro mais antigo de um log é visto"
+    - "Uma política que desliga o registro de blocos de script, que as linhas de postura do PowerShell mostram: nenhum bloco marcado é gravado, e só os inícios do Windows PowerShell podem pôr um horário aqui"
+7d493537-7ecf-4f97-90a0-119e079d30d2:
+  title: "Um arquivo do Prefetch está marcado como somente leitura"
+  description: >-
+    Um arquivo na pasta Prefetch do Windows tem o atributo somente leitura. O Windows grava e regrava
+    esses arquivos ele mesmo, e na única máquina Windows 11 que este projeto mediu nenhum deles tinha o
+    atributo. Esta linha mostra o arquivo e o que ele registra. Não diz quem definiu o atributo, quando
+    ou por quê, e não é evidência de que algo foi escondido nem de que o programa citado foi usado para
+    trapacear.
+  retention: >-
+    O atributo como está no momento da verificação, nos arquivos de Prefetch ainda na pasta. Não diz
+    nada sobre quando foi definido nem sobre arquivos que foram removidos.
+  falsepositives:
+    - "Somente leitura escolhido nas Propriedades da pasta Prefetch ou de uma pasta acima, que o Windows aplica aos arquivos dentro"
+    - "Arquivos copiados ou restaurados na pasta por software de backup, imagem ou cópia que mantém atributos, como o robocopy do próprio Windows faz por padrão"
+d377e008-0a08-4d6e-adf2-f6cbc8b978db:
+  title: "Quando o Prefetch registrou um programa com nome do processo de jogo do FiveM"
+  description: >-
+    Coloca na linha do tempo o horário que o Prefetch do Windows registrou para um programa chamado
+    FiveM_b<número>_GTAProcess.exe, o nome que o FiveM dá ao processo do jogo que inicia, com a build
+    do jogo no lugar de <número>. O registro guarda um nome, não qual programa era, então isto mostra
+    quando um programa com esse nome rodou segundo este registro, não que o FiveM ou o GTA V rodou. Não
+    é evidência de nada, e a falta de uma entrada não significa que o jogo nunca rodou.
+  retention: >-
+    Só os arquivos de Prefetch ainda na pasta, e só a execução mais recente que cada um registra. O
+    Windows remove arquivos de Prefetch sozinho, e um PC com o Prefetch desligado não tem nenhum.
+  falsepositives:
+    - "Qualquer programa cujo nome comece com FiveM_b e termine com _GTAProcess.exe — o registro guarda um nome e nada que identifique o programa, então um programa renomeado nesse formato é registrado com esse nome"
+    - "Um programa com outro nome não é selecionado, seja ele qual for, então a falta de entrada não significa que nada rodou"
+    - "O Windows não gravar ou não manter um registro — Prefetch desligado, um arquivo de Prefetch que o Windows removeu, ou uma pasta esvaziada por uma ferramenta de limpeza"
+    - "O Windows manter o registro depois que os arquivos do programa foram removidos"
+a81a1693-2982-4004-8f40-186c2b90a6a2:
+  title: "Quando o Prefetch registrou um programa com nome de FiveM ou GTA V"
+  description: >-
+    Coloca na linha do tempo o horário que o Prefetch do Windows registrou para um programa chamado
+    FiveM.exe, GTA5.exe, GTA5_Enhanced.exe ou PlayGTAV.exe, os nomes que o FiveM e o GTA V dão aos seus
+    executáveis. O registro guarda um nome, não qual programa era, então isto mostra quando um programa
+    com esse nome rodou segundo este registro, não que o FiveM ou o GTA V rodou. Não é evidência de
+    nada, e a falta de uma entrada não significa que o jogo nunca rodou.
+  retention: >-
+    Só os arquivos de Prefetch ainda na pasta, e só a execução mais recente que cada um registra. O
+    Windows remove arquivos de Prefetch sozinho, e um PC com o Prefetch desligado não tem nenhum.
+  falsepositives:
+    - "Qualquer programa com um desses nomes — o registro guarda um nome e nada que identifique o programa, então um programa renomeado para um deles é registrado com esse nome"
+    - "Um programa com outro nome não é selecionado, seja ele qual for, então a falta de entrada não significa que nada rodou"
+    - "O Windows não gravar ou não manter um registro — Prefetch desligado, um arquivo de Prefetch que o Windows removeu, ou uma pasta esvaziada por uma ferramenta de limpeza"
+    - "O Windows manter o registro depois que os arquivos do programa foram removidos"
+1c73241b-b7f1-4f91-81d4-8de53db6d119:
+  title: "O change journal tem uma exclusão na pasta asi do FiveM para GTA V Enhanced"
+  description: >-
+    O change journal do NTFS guarda pelo menos um registro de arquivo apagado diretamente dentro da
+    pasta asi do FiveM para GTA V Enhanced. A linha dá quantos registros e a primeira e a última vez.
+    Mostra o intervalo que o journal cobria: num PC comum em uso isso pode ser bem menos de uma hora.
+    Nada antes desse intervalo é visto. Se esta regra não encontra nada, significa só que nada foi
+    apagado ali dentro desse intervalo. O journal não registra qual programa alterou um arquivo, então
+    isto não diz quem fez nem que algo foi escondido. Não está estabelecido se o FiveM para GTA V
+    Enhanced carrega algo desta pasta.
+  retention: >-
+    Só o intervalo que o change journal ainda guardava quando a verificação o leu, mostrado ao lado
+    desta linha. O journal tem tamanho fixo e descarta primeiro os registros mais antigos; num PC com
+    Windows 11 ele guardava cerca de 39 minutos.
+  falsepositives:
+    - "O jogador removeu ou substituiu um mod gráfico, ReShade, ENB ou outro plugin que tinha instalado"
+    - "O FiveM ou seu atualizador substituiu ou removeu um arquivo da pasta (não medido para esta pasta)"
+    - "Uma ferramenta de limpeza, de \"limpar cache do FiveM\" ou otimização que esvazia as pastas do FiveM"
+    - "Antivírus colocando um arquivo em quarentena ou removendo-o"
+    - "O FiveM reinstalado, ou a pasta apagada e criada de novo. Registros da pasta antiga não são contados, então isso também pode remover uma linha que estaria aqui"
+7996285e-8ccf-4b2d-8fec-339a32b95931:
+  title: "O change journal tem uma renomeação na pasta asi do FiveM para GTA V Enhanced"
+  description: >-
+    O change journal do NTFS guarda pelo menos um registro de arquivo renomeado diretamente dentro da
+    pasta asi do FiveM para GTA V Enhanced, movido para dentro dela ou para fora dela. Uma renomeação
+    dentro da pasta deixa dois registros, um com o nome antigo e um com o novo. A linha dá quantos
+    registros e a primeira e a última vez. Mostra o intervalo que o journal cobria: num PC comum em uso
+    isso pode ser bem menos de uma hora. Nada antes desse intervalo é visto. Se esta regra não encontra
+    nada, significa só que nada foi renomeado, movido para dentro ou para fora ali nesse intervalo. O
+    journal não registra qual programa alterou um arquivo, então isto não diz quem fez nem que algo foi
+    escondido. Não está estabelecido se o FiveM para GTA V Enhanced carrega algo desta pasta.
+  retention: >-
+    Só o intervalo que o change journal ainda guardava quando a verificação o leu, mostrado ao lado
+    desta linha. O journal tem tamanho fixo e descarta primeiro os registros mais antigos; num PC com
+    Windows 11 ele guardava cerca de 39 minutos.
+  falsepositives:
+    - "O jogador renomeou, moveu ou substituiu um mod gráfico, ReShade, ENB ou outro plugin que tinha instalado"
+    - "Uma atualização que grava uma cópia nova de um arquivo e a troca por renomeação, feita pelo FiveM, seu atualizador ou um plugin (não medido para esta pasta)"
+    - "Um arquivo movido para a Lixeira ou para outra pasta na mesma unidade, que o journal registra como renomeação (como a Lixeira aparece não foi medido)"
+    - "Antivírus colocando um arquivo em quarentena"
+    - "O FiveM reinstalado, ou a pasta apagada e criada de novo. Registros da pasta antiga não são contados, então isso também pode remover uma linha que estaria aqui"
+91dc8b45-8355-4554-8a6d-e979e4a95ecd:
+  title: "O change journal tem uma exclusão na pasta de plugins do FiveM"
+  description: >-
+    O change journal do NTFS guarda pelo menos um registro de arquivo apagado diretamente dentro da
+    pasta de plugins do FiveM para GTA V Legacy. A linha dá quantos registros e a primeira e a última
+    vez. Mostra o intervalo que o journal cobria: num PC comum em uso isso pode ser bem menos de uma
+    hora. Nada antes desse intervalo é visto. Se esta regra não encontra nada, significa só que nada
+    foi apagado ali nesse intervalo. O journal não registra qual programa alterou um arquivo, então
+    isto não diz quem fez nem que algo foi escondido.
+  retention: >-
+    Só o intervalo que o change journal ainda guardava quando a verificação o leu, mostrado ao lado
+    desta linha. O journal tem tamanho fixo e descarta primeiro os registros mais antigos; num PC com
+    Windows 11 ele guardava cerca de 39 minutos.
+  falsepositives:
+    - "O jogador removeu ou substituiu um mod gráfico, ReShade, ENB ou outro plugin que tinha instalado"
+    - "O FiveM ou seu atualizador substituiu ou removeu um arquivo da pasta (não medido para esta pasta)"
+    - "Uma ferramenta de limpeza, de \"limpar cache do FiveM\" ou otimização que esvazia as pastas do FiveM"
+    - "Antivírus colocando um arquivo em quarentena ou removendo-o"
+    - "O FiveM reinstalado, ou a pasta apagada e criada de novo. Registros da pasta antiga não são contados, então isso também pode remover uma linha que estaria aqui"
+7d7adb92-2c47-4ff5-94ec-dd8a2f9e453d:
+  title: "O change journal tem uma renomeação na pasta de plugins do FiveM"
+  description: >-
+    O change journal do NTFS guarda pelo menos um registro de arquivo renomeado diretamente dentro da
+    pasta de plugins do FiveM para GTA V Legacy, movido para dentro dela ou para fora dela. Uma
+    renomeação dentro da pasta deixa dois registros, um com o nome antigo e um com o novo. A linha dá
+    quantos registros e a primeira e a última vez. Mostra o intervalo que o journal cobria: num PC
+    comum em uso isso pode ser bem menos de uma hora. Nada antes desse intervalo é visto. Se esta regra
+    não encontra nada, significa só que nada foi renomeado, movido para dentro ou para fora ali nesse
+    intervalo. O journal não registra qual programa alterou um arquivo, então isto não diz quem fez nem
+    que algo foi escondido.
+  retention: >-
+    Só o intervalo que o change journal ainda guardava quando a verificação o leu, mostrado ao lado
+    desta linha. O journal tem tamanho fixo e descarta primeiro os registros mais antigos; num PC com
+    Windows 11 ele guardava cerca de 39 minutos.
+  falsepositives:
+    - "O jogador renomeou, moveu ou substituiu um mod gráfico, ReShade, ENB ou outro plugin que tinha instalado"
+    - "Uma atualização que grava uma cópia nova de um arquivo e a troca por renomeação, feita pelo FiveM, seu atualizador ou um plugin (não medido para esta pasta)"
+    - "Um arquivo movido para a Lixeira ou para outra pasta na mesma unidade, que o journal registra como renomeação (como a Lixeira aparece não foi medido)"
+    - "Antivírus colocando um arquivo em quarentena"
+    - "O FiveM reinstalado, ou a pasta apagada e criada de novo. Registros da pasta antiga não são contados, então isso também pode remover uma linha que estaria aqui"
+926b3863-8f4f-4d18-aab6-26b77934466e:
+  title: "O change journal tem uma exclusão na pasta de histórico de comandos do PowerShell"
+  description: >-
+    O change journal do NTFS guarda pelo menos um registro de arquivo apagado diretamente dentro da
+    pasta em que o PowerShell guarda o histórico de comandos digitados na janela dele. O PowerShell
+    acrescenta a esse arquivo e o regrava, mas não o apaga, então uma exclusão ali foi feita por uma
+    pessoa ou por outro programa. A linha dá quantos registros e a primeira e a última vez, nunca um
+    nome de arquivo nem o que o arquivo continha. Mostra o intervalo que o journal cobria: num PC comum
+    em uso isso pode ser bem menos de uma hora. Nada antes desse intervalo é visto, e uma pasta
+    apagada, em vez de um arquivo dentro dela, não é contada. Se esta regra não encontra nada,
+    significa só que nada foi apagado ali nesse intervalo. O journal não registra qual programa apagou
+    um arquivo, então isto não diz quem fez nem que algo foi escondido.
+  retention: >-
+    Só o intervalo que o change journal ainda guardava quando a verificação o leu, mostrado ao lado
+    desta linha. O journal tem tamanho fixo e descarta primeiro os registros mais antigos; num PC com
+    Windows 11 ele guardava cerca de 39 minutos.
+  falsepositives:
+    - "O jogador limpando o próprio histórico do PowerShell, o que apaga o arquivo"
+    - "Uma ferramenta de privacidade, limpeza ou otimização que limpa históricos de comandos"
+    - "Uma redefinição de perfil do Windows, ou uma ferramenta de backup ou sincronização restaurando a pasta"
+    - "Antivírus removendo um arquivo da pasta"
+8a39617a-30d6-4fc0-9b20-cb4f899985d5:
+  title: "O change journal tem uma renomeação na pasta de histórico de comandos do PowerShell"
+  description: >-
+    O change journal do NTFS guarda pelo menos um registro de arquivo renomeado diretamente dentro da
+    pasta em que o PowerShell guarda o histórico de comandos digitados na janela dele, movido para
+    dentro dela ou para fora dela. Uma renomeação dentro da pasta deixa dois registros, um com o nome
+    antigo e um com o novo. O PowerShell acrescenta ao arquivo de histórico e o regrava, mas não o
+    renomeia. A linha dá quantos registros e a primeira e a última vez, nunca um nome de arquivo nem o
+    que o arquivo continha. Mostra o intervalo que o journal cobria: num PC comum em uso isso pode ser
+    bem menos de uma hora. Nada antes desse intervalo é visto. Se esta regra não encontra nada,
+    significa só que nada foi renomeado, movido para dentro ou para fora ali nesse intervalo. O journal
+    não registra qual programa renomeou um arquivo, então isto não diz quem fez nem que algo foi
+    escondido.
+  retention: >-
+    Só o intervalo que o change journal ainda guardava quando a verificação o leu, mostrado ao lado
+    desta linha. O journal tem tamanho fixo e descarta primeiro os registros mais antigos; num PC com
+    Windows 11 ele guardava cerca de 39 minutos.
+  falsepositives:
+    - "O jogador movendo o arquivo de histórico para guardar ou compartilhar, ou trazendo-o de volta"
+    - "Um arquivo movido para a Lixeira, que o journal registra como renomeação (como a Lixeira aparece não foi medido)"
+    - "Um editor de texto que salva gravando uma cópia nova e renomeando-a por cima da antiga"
+    - "Uma ferramenta de backup, sincronização ou limpeza substituindo o arquivo"
+82c71896-ef70-492d-b6fc-8671c09b5e1c:
+  title: "Quando o change journal registrou mudanças numa pasta observada"
+  description: >-
+    Coloca na linha do tempo a mudança mais antiga e a mais nova que o change journal do NTFS ainda
+    guarda para cada pasta que este programa observa: Prefetch, a pasta de logs de eventos, a pasta do
+    Program Compatibility Assistant, as pastas de plugins do FiveM e a pasta em que o PowerShell guarda
+    o histórico de comandos. O journal conta mudanças sem dizer qual programa as fez, então um horário
+    aqui é quando um arquivo dessa pasta foi criado, alterado, renomeado ou apagado, por qualquer um,
+    incluindo o Windows e o FiveM; na pasta do PowerShell uma mudança geralmente é um comando digitado
+    numa janela do PowerShell, nunca qual comando. Não é evidência de que algo foi removido.
+  retention: >-
+    Só os registros que o journal ainda guarda. O journal tem tamanho fixo e descarta os registros
+    mais antigos conforme chegam novos, então só alcança o passado até onde o tamanho permite.
+  falsepositives:
+    - "O Windows gravando e removendo arquivos de Prefetch, logs de eventos e registros de compatibilidade no uso normal"
+    - "O FiveM, seu atualizador e plugins instalados ou removidos pelo jogador alterando arquivos nas pastas de plugins"
+    - "O PowerShell acrescentando cada comando digitado na janela ao arquivo de histórico"
+    - "Ferramentas de limpeza de disco, backup, antivírus e otimização"
+    - "Uma pasta sem mudança no intervalo do journal não tem horário aqui, o que não significa que nada mudou antes dele"
+fe57aa65-11b0-4e1f-b81c-a4fda597855b:
+  title: "O Windows iniciou após um desligamento com Inicialização Rápida"
+  description: >-
+    Coloca na linha do tempo cada início do Windows que o log System registra com tipo de boot 1, o
+    que foi medido depois de um desligamento com Inicialização Rápida ligada, o padrão. Um dispositivo
+    retirado com o Windows desligado desta forma tem um horário de remoção, gravado durante o
+    desligamento, e o início do Windows não regrava os horários de chegada dele.
+  retention: >-
+    Enquanto o log System mantiver seus registros: por padrão ele sobrescreve os mais antigos ao
+    atingir o tamanho máximo.
+  falsepositives:
+    - "A Inicialização Rápida vem ligada por padrão, então a maioria dos desligamentos pelo menu Iniciar termina assim"
+fa3e721e-98f2-4007-bbd8-133208564682:
+  title: "O Windows iniciou após desligamento completo ou reinício"
+  description: >-
+    Coloca na linha do tempo cada início do Windows que o log System registra com tipo de boot 0, o
+    que foi medido depois de um desligamento completo e depois de uma reinicialização. Um dispositivo
+    retirado com o Windows desligado desta forma não tem horário de remoção; o último início em que
+    estava presente é tudo o que o Windows guarda sobre quando ele saiu.
+  retention: >-
+    Enquanto o log System mantiver seus registros: por padrão ele sobrescreve os mais antigos ao
+    atingir o tamanho máximo.
+  falsepositives:
+    - "Todo PC inicia assim; um início é um ponto de referência para os outros horários, não um achado"
+
+e3f5c638-81e3-410a-9f1d-fe762b9f8731:
+  title: "O SRUM registrou uso de CPU por um programa com nome de executor ou injetor do Roblox"
+  description: >-
+    O banco do Monitor de Uso de Recursos do Sistema (SRUDB.dat, lido de uma shadow copy já existente)
+    tem linhas dizendo que um programa cujo nome de arquivo corresponde a um executor ou injetor do
+    Roblox usou tempo de CPU, com a primeira e a última hora registradas. O SRUM grava mais ou menos
+    uma vez por hora, então os horários são horas, não inícios. Um nome não prova o que o programa
+    era, e o banco não tem o que o SRUM ainda não tinha gravado quando a shadow copy foi criada.
+  retention: >-
+    O SRUM guarda cerca de 30 a 60 dias de linhas por hora; a shadow copy tem a idade do snapshot, e
+    nada posterior a ele está na cópia.
+  falsepositives:
+    - "Um programa sem relação que tem o mesmo nome de arquivo, como um jogo ou utilitário chamado Solara ou Wave"
+    - "Um arquivo renomeado com o nome de uma ferramenta por alguém testando este scanner"
+
+d600c6da-1da8-44b5-9e47-24c56cf01558:
+  title: "Horas em que o SRUM registrou programas com nome de ferramentas Roblox"
+  description: >-
+    Coloca na linha do tempo a primeira e a última hora em que o Monitor de Uso de Recursos do Sistema
+    registrou um programa cujo nome corresponde ao catálogo de ferramentas Roblox.
+  retention: >-
+    O SRUM guarda cerca de 30 a 60 dias de linhas por hora.
+  falsepositives:
+    - "O horário é a hora em que o SRUM gravou os números, não quando o programa começou; um nome não identifica um programa"
+
+d615135a-756a-4da8-ae18-ef2737a3e921:
+  title: "A Master File Table guarda um registro liberado com nome de executor ou injetor do Roblox"
+  description: >-
+    Um registro da Master File Table do volume do sistema que o NTFS marcou como fora de uso ainda
+    guarda o nome de um arquivo ou pasta que corresponde a um executor ou injetor do Roblox, com o
+    caminho da pasta e os horários do NTFS. São os metadados de uma entrada excluída; o conteúdo não é
+    recuperado nem lido, o registro pode ser reutilizado a qualquer momento, e um nome não prova o que
+    era o arquivo nem que ele foi executado.
+  retention: >-
+    Um registro liberado dura até o NTFS reutilizá-lo para um arquivo novo: horas num volume
+    movimentado, meses num volume parado.
+  falsepositives:
+    - "Um download apagado sem ter sido aberto, ou um antivírus que pôs o arquivo em quarentena e o removeu"
+    - "Um arquivo sem relação com o mesmo nome, apagado por qualquer motivo"
+
+59259bcb-c00a-46fa-897d-40b4ef75ea99:
+  title: "Horários NTFS de registros da Master File Table com nome de ferramentas Roblox"
+  description: >-
+    Coloca na linha do tempo os horários de criação e de última gravação que o NTFS guarda em
+    registros da Master File Table cujos nomes correspondem ao catálogo de ferramentas Roblox, em uso
+    ou liberados.
+  retention: >-
+    Um registro liberado dura até o NTFS reutilizá-lo.
+  falsepositives:
+    - "Esses horários podem ser definidos por programas que copiam ou extraem arquivos; um nome não identifica um programa"
+
+1a7a3594-5b68-4142-8426-96aa0e0a2e90:
+  title: "O Explorer lembra de ter aberto uma pasta com nome de executor ou injetor do Roblox"
+  description: >-
+    As ShellBags da conta guardam o caminho de uma pasta com um trecho que corresponde a um executor
+    ou injetor do Roblox: o Explorer salvou a exibição dessa pasta em algum momento. A pasta pode ter
+    sido apagada, renomeada ou estar num disco que não está mais conectado. Abrir uma pasta não é
+    executar um programa.
+  retention: >-
+    As ShellBags duram até o perfil da conta ser apagado ou o histórico ser limpo; o Windows guarda
+    milhares de pastas.
+  falsepositives:
+    - "Uma pasta com nome comum que corresponde, como um álbum de fotos chamado Wave ou Solara"
+    - "Olhar o conteúdo de um arquivo compactado ou de uma pasta compartilhada por outra pessoa sem executar nada"
+
+600956be-c11f-43de-9070-02ceea97461c:
+  title: "A caixa Abrir/Salvar lembra de um arquivo com nome de executor ou injetor do Roblox"
+  description: >-
+    A lista da caixa de diálogo comum Abrir/Salvar (OpenSavePidlMRU) guarda um caminho cujo nome de
+    arquivo ou pasta corresponde a um executor ou injetor do Roblox: algum programa usou a caixa para
+    abri-lo ou salvá-lo. Não prova que o arquivo foi executado, nem qual programa usou a caixa.
+  retention: >-
+    A lista guarda cerca das 20 últimas entradas por extensão até o histórico ser limpo.
+  falsepositives:
+    - "Enviar ou anexar um arquivo com esse nome num navegador ou programa de chat"
+    - "Um arquivo sem relação com o mesmo nome"
+
+7a7cebaa-f0ae-4e82-9234-4b53f853eacb:
+  title: "Uma assinatura WMI permanente executa uma linha de comando ou um script"
+  description: >-
+    O WMI tem um CommandLineEventConsumer ou ActiveScriptEventConsumer que não é um dos que vêm com o
+    Windows: quando o filtro de evento dispara, o Windows inicia o programa ou executa o script
+    sozinho, sem usuário conectado. A linha mostra o programa, o arquivo de script ou os arquivos
+    citados pelo script, e o hash e a assinatura deles quando existem; o texto do script e os
+    argumentos do comando nunca são guardados. É uma forma de iniciar algo de modo persistente, não
+    prova do que é iniciado.
+  retention: >-
+    Uma assinatura dura até ser apagada; o repositório do WMI sobrevive a reinicializações.
+  falsepositives:
+    - "Software de fabricante e de gerenciamento (utilitários Dell, HP, Lenovo, agentes SCCM/Intune) que usam assinaturas WMI"
+    - "Scripts de manutenção criados pelo departamento de TI ou pelo dono do PC"
+
+2a0c35e1-7d5e-425e-a0f7-99424e7973ec:
+  title: "Uma assinatura WMI permanente cita um executor ou injetor do Roblox"
+  description: >-
+    O nome, o programa, o arquivo de script ou os arquivos citados pelo script de um consumidor de
+    eventos do WMI correspondem a um executor ou injetor do Roblox. O Windows iniciaria isso sozinho
+    sempre que o evento da assinatura acontecesse. Um nome não prova o que é o programa.
+  retention: >-
+    Uma assinatura dura até ser apagada.
+  falsepositives:
+    - "Um programa sem relação com o mesmo nome, iniciado pela assinatura WMI de um fabricante"
+
+40126502-5a4c-421d-9603-522ea7152433:
+  title: "Um arquivo compactado em Downloads, Área de Trabalho ou Temp esconde os nomes internos (cabeçalhos criptografados)"
+  description: >-
+    Um arquivo .rar ou .7z num local que esta verificação lista tem cabeçalhos criptografados, então
+    nem os nomes dentro dele podem ser lidos sem a senha. Nada lá dentro foi examinado; isto diz
+    apenas que o conteúdo não pôde ser verificado.
+  retention: >-
+    O arquivo compactado como está no momento da verificação.
+  falsepositives:
+    - "Qualquer arquivo compactado com senha: backups, documentos enviados pelo trabalho ou pela escola, mods de jogos"

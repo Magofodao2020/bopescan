@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: 3322da9a-b8ad-4462-8d9e-7acb55a97f5e
+title: "A DLL is set to load through AppCertDlls or Application Verifier"
+description: >-
+  Windows is told to load the named DLL into processes that create other processes (AppCertDlls), or
+  into the target program through Application Verifier. Both are rarely used outside development and
+  testing.
+status: experimental
+collector: hijack
+strength: tamper
+match:
+  mechanism: ["appcert_dlls", "ifeo_verifier"]
+retention: >-
+  The setting as it is at scan time.
+unmeasured_when: [not_windows]
+falsepositives:
+  - "Application Verifier sessions left configured by a developer"
+  - "Some security products"
+author: B.O.P.E Scanner contributors
+date: 2026-10-15
+tags: [persistence, injection]
+level: warn
+category: persistence

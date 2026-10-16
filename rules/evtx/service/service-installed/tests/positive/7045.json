@@ -1,0 +1,19 @@
+{
+  "description": "Synthetic positive case for evtx/service/service-installed: 7045.",
+  "observations": [
+    {
+      "collector": "evtx",
+      "fields": {
+        "log": "System.evtx",
+        "channel": "System",
+        "provider": "Service Control Manager",
+        "event_id": 7045,
+        "level": 4,
+        "count": 2,
+        "first_seen": "2026-10-14T10:00:00Z",
+        "last_seen": "2026-10-15T09:00:00Z"
+      }
+    }
+  ],
+  "expect_matches": 1
+}

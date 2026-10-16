@@ -1,0 +1,19 @@
+{
+  "description": "Synthetic negative case for user_files/lua/remote-loadstring: plain.",
+  "observations": [
+    {
+      "collector": "user_files",
+      "fields": {
+        "kind": "lua_script",
+        "folder": "desktop",
+        "name": "x.lua",
+        "path": "C:\\Users\\fixtureuser\\Desktop\\x.lua",
+        "location_kind": "user_desktop",
+        "extension": "lua",
+        "distinct_markers": 0,
+        "markers": "",
+        "remote_loadstring": false
+      }
+    }
+  ]
+}

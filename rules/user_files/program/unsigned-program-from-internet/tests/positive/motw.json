@@ -1,0 +1,20 @@
+{
+  "description": "Synthetic positive case for user_files/program/unsigned-program-from-internet: motw.",
+  "observations": [
+    {
+      "collector": "user_files",
+      "fields": {
+        "kind": "program",
+        "folder": "downloads",
+        "name": "x.exe",
+        "path": "C:\\Users\\fixtureuser\\Downloads\\x.exe",
+        "location_kind": "user_downloads",
+        "extension": "exe",
+        "zone_id": 3,
+        "signature": "no_embedded_signature",
+        "sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+      }
+    }
+  ],
+  "expect_matches": 1
+}

@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: e7a540ea-3155-4cac-acc0-195890b35302
+title: "Plug and Play recorded devices being configured or started"
+description: >-
+  The Kernel-PnP configuration log holds events 400 or 410, written when a device is configured or
+  started, with the first and last time. Shown beside the USB device times to read when devices were
+  plugged in.
+status: experimental
+collector: evtx
+strength: context
+match:
+  provider: "Microsoft-Windows-Kernel-PnP"
+  event_id: [400, 410]
+retention: >-
+  Only what the Kernel-PnP log still holds.
+unmeasured_when: [not_windows]
+falsepositives:
+  - "Every USB device plugged in, and every start of Windows"
+author: B.O.P.E Scanner contributors
+date: 2026-10-15
+tags: [evtx, usb]
+level: info
+category: usb_devices

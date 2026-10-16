@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: 62242277-a132-48b2-b457-83c1b433c61c
+title: "A cleaner that can erase usage traces is installed"
+description: >-
+  Windows' list of installed programs holds one whose name puts it in the "trace_cleaner" group. The
+  row shows its name, publisher, version and install date. Being installed says what the software
+  can do, not what it was used for, and an uninstalled or portable copy leaves no entry here.
+status: experimental
+collector: installed_programs
+strength: context
+match:
+  category: "trace_cleaner"
+retention: >-
+  Programs whose uninstall entry is still in the registry at scan time.
+unmeasured_when: [not_windows]
+falsepositives:
+  - "Ordinary disk cleanup and privacy hygiene"
+author: B.O.P.E Scanner contributors
+date: 2026-10-15
+tags: [installed, trace_cleaner]
+level: info
+category: other

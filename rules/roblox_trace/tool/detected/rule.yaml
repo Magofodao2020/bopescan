@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: 8771df3a-d8eb-4e26-90d3-ea6fb112ba83
+title: "A Roblox executor or injector is detected by one source family"
+description: >-
+  One source family shows a Roblox script executor or injector, named in a Roblox context, with
+  execution, an executor folder layout, executor-only scripts or a module in the Roblox player. No
+  second independent family saw it. The row says which source and class.
+status: experimental
+collector: roblox_trace
+strength: presence
+match:
+  scope: "tool"
+  status: "detected"
+retention: >-
+  Whatever the sources read in this scan still hold; the sources table says which could not be read.
+falsepositives:
+  - "A name shared with unrelated software, or a file named this way on purpose; a legitimate tool renamed to match"
+  - "Files kept from the past, before the account or PC was used for play"
+author: B.O.P.E Scanner contributors
+date: 2026-10-15
+tags: [roblox, correlation]
+level: flag
+category: roblox_tools

@@ -1,0 +1,13 @@
+{
+  "description": "Synthetic positive case for net_adapter/proxy/winhttp-proxy-set: set.",
+  "observations": [
+    {
+      "collector": "net_adapter",
+      "fields": {
+        "place": "winhttp_proxy",
+        "set": true
+      }
+    }
+  ],
+  "expect_matches": 1
+}

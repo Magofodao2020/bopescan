@@ -1,0 +1,13 @@
+{
+  "description": "Synthetic positive case for process/runtime/script-runtime-running: node.",
+  "observations": [
+    {
+      "collector": "process",
+      "fields": {
+        "name": "node.exe",
+        "path": "C:\\Program Files\\nodejs\\node.exe"
+      }
+    }
+  ],
+  "expect_matches": 1
+}

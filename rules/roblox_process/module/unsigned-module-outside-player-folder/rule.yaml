@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: 4a3bec67-abe3-4fb4-88f0-13f365ee2d8d
+title: "The running Roblox player has an unsigned module from outside its own folder"
+description: >-
+  A DLL loaded in the running Roblox player, outside Windows and outside the player's own version
+  folder, carries no embedded signature or one that does not verify. Most overlays, capture tools
+  and drivers that load into games are signed. It does not say what the module does.
+status: experimental
+collector: roblox_process
+strength: presence
+match:
+  scope: "roblox_module"
+  under_player_folder: false
+  signature: ["no_embedded_signature", "invalid"]
+retention: >-
+  The modules loaded at the moment of the scan.
+unmeasured_when: [not_windows, access_denied]
+falsepositives:
+  - "Small or open-source overlays, FPS counters and input tools that are not code-signed"
+  - "A module signed through a Windows catalog, which this check does not read"
+references:
+  - https://learn.microsoft.com/en-us/windows/win32/seccrypto/authenticode
+author: B.O.P.E Scanner contributors
+date: 2026-10-15
+tags: [roblox, module, signature]
+level: warn

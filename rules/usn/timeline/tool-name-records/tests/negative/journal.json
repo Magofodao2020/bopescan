@@ -1,0 +1,14 @@
+{
+  "description": "Synthetic negative case for usn/timeline/tool-name-records: journal.",
+  "observations": [
+    {
+      "collector": "usn",
+      "fields": {
+        "location": "journal",
+        "records": 100,
+        "first_seen": "2026-10-01T00:00:00Z",
+        "last_seen": "2026-10-15T00:00:00Z"
+      }
+    }
+  ]
+}

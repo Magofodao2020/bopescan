@@ -1,0 +1,17 @@
+{
+  "description": "Synthetic positive case for usn/timeline/tool-name-records: named.",
+  "observations": [
+    {
+      "collector": "usn",
+      "fields": {
+        "location": "named",
+        "name": "Bloxstrap.exe",
+        "tool_id": "bloxstrap",
+        "records": 2,
+        "first_seen": "2026-10-14T20:00:00Z",
+        "last_seen": "2026-10-14T20:05:00Z"
+      }
+    }
+  ],
+  "expect_matches": 1
+}

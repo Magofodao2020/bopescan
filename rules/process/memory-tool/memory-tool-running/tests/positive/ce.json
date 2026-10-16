@@ -1,0 +1,13 @@
+{
+  "description": "Synthetic positive case for process/memory-tool/memory-tool-running: ce.",
+  "observations": [
+    {
+      "collector": "process",
+      "fields": {
+        "name": "cheatengine-x86_64.exe",
+        "path": "C:\\Program Files\\Cheat Engine 7.5\\cheatengine-x86_64.exe"
+      }
+    }
+  ],
+  "expect_matches": 1
+}

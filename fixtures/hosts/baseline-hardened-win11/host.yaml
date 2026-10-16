@@ -1,0 +1,106 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Synthetic fixture host — see ../PROVENANCE.md.
+#
+# A baseline (ADR 0017): this host asserts "a machine like this is unremarkable", and
+# `cargo xtask check-baseline` requires the whole rule set to stay quiet on it. It is a documented
+# profile, not a machine tuned until the gate passed — changing a setting here to silence a rule would
+# be changing what the project claims an ordinary PC looks like.
+#
+# Profile: Windows 11 set up the way Microsoft ships it. Secure Boot on, the memory-integrity policy
+# written and on, test signing off, a TPM 2.0 present. FiveM is not installed — %LOCALAPPDATA% is set
+# and the plugin folder does not exist, so `fivem_dir` looked and saw nothing. A short list of
+# ordinary programs is running.
+platform: windows
+os_build: "26100"
+elevated: false
+env:
+  LOCALAPPDATA: 'C:\Users\fixtureuser\AppData\Local'
+  APPDATA: 'C:\Users\fixtureuser\AppData\Roaming'
+# Microsoft Defender's exclusions are refused to a token without administrator rights, as measured on a
+# runner and a Windows 11 PC (ADR 0060), so `defender_exclusion` is `not_admin` here.
+access_denied:
+  - 'HKLM\SOFTWARE\Microsoft\Windows Defender\Exclusions\Paths'
+registry:
+  # What Windows says this installation is, and how the services Windows ships with are set to start
+  # (ADR 0056). Every value below was measured on one Windows 11 PC (build 26220, DisplayVersion 25H2)
+  # on 2026-09-20 with an elevated token — including `ProductName`, which still reads "Windows 10 Home"
+  # on a genuine Windows 11, and the OEM information an ordinary retail board carries.
+  'HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion':
+    ProductName: "Windows 10 Home"
+    EditionID: "Core"
+    CompositionEditionID: "Core"
+    DisplayVersion: "25H2"
+    CurrentBuild: "26220"
+    UBR: 9492
+    BuildLabEx: "26100.6.amd64fre.ge_release_flt.260716-1700"
+    InstallationType: "Client"
+    RegisteredOrganization: ""
+  'HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\OEMInformation':
+    Manufacturer: "Msi"
+    Model: "MS-7A36"
+    SupportURL: "http://www.msi.com/"
+  'HKLM\SYSTEM\CurrentControlSet\Services\WinDefend':
+    Start: 2
+  # Measured on the same PC on 2026-09-21 (ADR 0057): object-namespace protection as Windows ships
+  # it, and no override of the speculative-execution mitigations and no SEHOP switch written at all.
+  'HKLM\SYSTEM\CurrentControlSet\Control\Session Manager':
+    ProtectionMode: 1
+  'HKLM\SYSTEM\CurrentControlSet\Services\EventLog':
+    Start: 2
+  'HKLM\SYSTEM\CurrentControlSet\Services\SysMain':
+    Start: 2
+  'HKLM\SYSTEM\CurrentControlSet\Services\DPS':
+    Start: 2
+  'HKLM\SYSTEM\CurrentControlSet\Services\WSearch':
+    Start: 2
+  'HKLM\SYSTEM\CurrentControlSet\Services\DiagTrack':
+    Start: 2
+  'HKLM\SYSTEM\CurrentControlSet\Services\wuauserv':
+    Start: 3
+  'HKLM\SYSTEM\CurrentControlSet\Services\WerSvc':
+    Start: 3
+  'HKLM\SYSTEM\CurrentControlSet\Control\SecureBoot\State':
+    UEFISecureBootEnabled: 1
+  'HKLM\SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity':
+    Enabled: 1
+code_integrity:
+  enabled: true
+  test_signing: false
+tpm:
+  present: true
+  spec_version: "2.0"
+# Firmware (ADR 0038): a scan without administrator rights cannot read the firmware's Secure Boot
+# variable, so this is what it gets — measured on a real Windows 11 machine under a limited token, not
+# chosen. No PowerShell policy key is written: Windows ships with none (fixtures/hosts/PROVENANCE.md).
+firmware:
+  secure_boot: access_denied
+# The IOMMU's ACPI table (ADR 0038, amendment of 2026-10-15): an Intel PC with VT-d on, which is what this hardened machine is assumed to be (not measured).
+iommu_table: dmar
+processes:
+  - pid: 4
+    name: System
+  - pid: 1024
+    name: explorer.exe
+    path: 'C:\Windows\explorer.exe'
+  - pid: 2048
+    name: chrome.exe
+    path: 'C:\Program Files\Google\Chrome\Application\chrome.exe'
+  - pid: 3072
+    name: steam.exe
+    path: 'C:\Program Files (x86)\Steam\steam.exe'
+# The PCI devices Windows remembers (ADR 0069, ADR 0070): shaped like the development PC ADR 0069 measured — host
+# bridges and an SMBus controller with no driver service and problem code 0, the rest with their drivers, all
+# present, all set up the day Windows was installed and last arrived at the last start. Every device id is
+# invented; the vendor ids are the chipset, storage, display, network and audio makers such a PC has.
+devices:
+  - { id: 'PCI\VEN_8086&DEV_A0F0&SUBSYS_00000000&REV_00\3&2411e6fe&0&00', present: true, compatible_ids: ['PCI\CC_060000', 'PCI\CC_0600'], problem_code: 0, first_install: '2026-03-02T09:14:20Z', last_arrival: '2026-10-09T08:46:15Z' }
+  - { id: 'PCI\VEN_8086&DEV_A0F1&SUBSYS_00000000&REV_00\3&2411e6fe&0&08', present: true, compatible_ids: ['PCI\CC_060000', 'PCI\CC_0600'], problem_code: 0, first_install: '2026-03-02T09:14:20Z', last_arrival: '2026-10-09T08:46:15Z' }
+  - { id: 'PCI\VEN_8086&DEV_A0F2&SUBSYS_00000000&REV_00\3&2411e6fe&0&10', present: true, compatible_ids: ['PCI\CC_060000', 'PCI\CC_0600'], problem_code: 0, first_install: '2026-03-02T09:14:20Z', last_arrival: '2026-10-09T08:46:15Z' }
+  - { id: 'PCI\VEN_8086&DEV_A0F3&SUBSYS_A0F31022&REV_71\3&2411e6fe&0&A0', present: true, compatible_ids: ['PCI\CC_0C0500', 'PCI\CC_0C05'], problem_code: 0, first_install: '2026-03-02T09:14:20Z', last_arrival: '2026-10-09T08:46:15Z' }
+  - { id: 'PCI\VEN_8086&DEV_A0F4&SUBSYS_88D21043&REV_00\3&2411e6fe&0&09', present: true, compatible_ids: ['PCI\CC_060400', 'PCI\CC_0604'], service: pci, problem_code: 0, first_install: '2026-03-02T09:14:20Z', last_arrival: '2026-10-09T08:46:15Z' }
+  - { id: 'PCI\VEN_144D&DEV_A0F5&SUBSYS_A801144D&REV_00\4&1f2e3d4c&0&0009', present: true, compatible_ids: ['PCI\CC_010802', 'PCI\CC_0108'], service: stornvme, problem_code: 0, first_install: '2026-03-02T09:14:20Z', last_arrival: '2026-10-09T08:46:15Z' }
+  - { id: 'PCI\VEN_1002&DEV_A0F6&SUBSYS_88D21043&REV_A1\4&2c3b4a59&0&0019', present: true, compatible_ids: ['PCI\CC_030000', 'PCI\CC_0300'], service: amdkmdag, problem_code: 0, first_install: '2026-03-02T09:22:03Z', last_arrival: '2026-10-09T08:46:15Z' }
+  - { id: 'PCI\VEN_10EC&DEV_A0F7&SUBSYS_88D21043&REV_15\4&3d4c5b6a&0&0029', present: true, compatible_ids: ['PCI\CC_020000', 'PCI\CC_0200'], service: e1i68x64, problem_code: 0, first_install: '2026-03-02T09:14:21Z', last_arrival: '2026-10-09T08:46:15Z' }
+  - { id: 'PCI\VEN_8086&DEV_A0F8&SUBSYS_88D21043&REV_00\4&4e5d6c7b&0&0341', present: true, compatible_ids: ['PCI\CC_0C0330', 'PCI\CC_0C03'], service: USBXHCI, problem_code: 0, first_install: '2026-03-02T09:14:21Z', last_arrival: '2026-10-09T08:46:15Z' }
+  - { id: 'PCI\VEN_8086&DEV_A0F9&SUBSYS_88D21043&REV_00\4&4e5d6c7b&0&0641', present: true, compatible_ids: ['PCI\CC_040300', 'PCI\CC_0403'], service: HDAudBus, problem_code: 0, first_install: '2026-03-02T09:14:21Z', last_arrival: '2026-10-09T08:46:15Z' }

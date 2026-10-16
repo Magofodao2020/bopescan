@@ -1,0 +1,16 @@
+{
+  "description": "Synthetic positive case for amcache/timeline/tool-entry-times: tool.",
+  "observations": [
+    {
+      "collector": "amcache",
+      "fields": {
+        "scope": "file",
+        "name": "bloxstrap.exe",
+        "path": "c:\\users\\fixtureuser\\appdata\\local\\bloxstrap\\bloxstrap.exe",
+        "tool_id": "bloxstrap",
+        "key_written": "2026-10-14T20:00:00Z"
+      }
+    }
+  ],
+  "expect_matches": 1
+}

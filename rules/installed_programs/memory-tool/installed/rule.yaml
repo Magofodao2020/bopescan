@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: bb11792b-bbdd-48c6-ba23-667a118b4308
+title: "A memory-editing or process-inspection tool is installed"
+description: >-
+  Windows' list of installed programs holds one whose name puts it in the "memory_tool" group. The
+  row shows its name, publisher, version and install date. Being installed says what the software
+  can do, not what it was used for, and an uninstalled or portable copy leaves no entry here.
+status: experimental
+collector: installed_programs
+strength: presence
+match:
+  category: "memory_tool"
+retention: >-
+  Programs whose uninstall entry is still in the registry at scan time.
+unmeasured_when: [not_windows]
+falsepositives:
+  - "Modding of single-player games, game development and reverse-engineering study"
+  - "System administrators and developers who use Process Hacker or System Informer"
+author: B.O.P.E Scanner contributors
+date: 2026-10-15
+tags: [installed, memory_tool]
+level: warn
+category: processes_memory

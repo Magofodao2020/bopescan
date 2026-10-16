@@ -1,0 +1,17 @@
+{
+  "description": "Synthetic positive case for user_files/automation/macro-script-present: ahk.",
+  "observations": [
+    {
+      "collector": "user_files",
+      "fields": {
+        "kind": "automation_script",
+        "folder": "documents",
+        "name": "clicker.ahk",
+        "path": "C:\\Users\\fixtureuser\\Documents\\clicker.ahk",
+        "location_kind": "user_documents",
+        "extension": "ahk"
+      }
+    }
+  ],
+  "expect_matches": 1
+}

@@ -1,0 +1,13 @@
+{
+  "description": "Synthetic negative case for wmi_subscription/consumer/command-or-script-consumer: filter.",
+  "observations": [
+    {
+      "collector": "wmi_subscription",
+      "fields": {
+        "scope": "filter",
+        "name": "Upd",
+        "known_default": false
+      }
+    }
+  ]
+}

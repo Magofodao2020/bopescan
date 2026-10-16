@@ -1,0 +1,14 @@
+{
+  "description": "Synthetic negative case for muicache/version-resource/injector-or-executor-in-product-name: notepad.",
+  "observations": [
+    {
+      "collector": "muicache",
+      "fields": {
+        "path": "C:\\Windows\\notepad.exe",
+        "name": "notepad.exe",
+        "location_kind": "windows",
+        "friendly_name": "Notepad"
+      }
+    }
+  ]
+}

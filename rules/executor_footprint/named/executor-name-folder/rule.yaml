@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: b127ba49-3637-47b3-b5c7-614b6a57a29a
+title: "A folder carries the name of a publicly known Roblox executor"
+description: >-
+  A folder in one of the places looked at is named exactly like a Roblox script executor that is
+  discussed publicly (Solara, Xeno, Celery, KRNL, Fluxus and others). Several of those names are
+  ordinary words and a folder name is whatever someone typed, so this is context only: look at what
+  the folder holds.
+status: experimental
+collector: executor_footprint
+strength: context
+match:
+  scope: "named_folder"
+retention: >-
+  The folders as they are at scan time.
+unmeasured_when: [not_windows]
+falsepositives:
+  - "A folder that shares the name for an unrelated reason: a game save, a project, a music folder"
+author: B.O.P.E Scanner contributors
+date: 2026-10-15
+tags: [roblox, executor, name]
+level: info

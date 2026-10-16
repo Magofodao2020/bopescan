@@ -1,0 +1,13 @@
+{
+  "description": "Synthetic negative case for feature_usage/timeline/executor-like-name: other.",
+  "observations": [
+    {
+      "collector": "feature_usage",
+      "fields": {
+        "path": "C:\\Program Files\\App\\app.exe",
+        "name": "app.exe",
+        "location_kind": "program_files"
+      }
+    }
+  ]
+}

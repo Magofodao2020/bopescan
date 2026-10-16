@@ -1,0 +1,14 @@
+{
+  "description": "Synthetic positive case for machine_identity/vm/virtual-machine-hint: vbox.",
+  "observations": [
+    {
+      "collector": "machine_identity",
+      "fields": {
+        "manufacturer": "innotek GmbH",
+        "product": "VirtualBox",
+        "vm_hint": true
+      }
+    }
+  ],
+  "expect_matches": 1
+}

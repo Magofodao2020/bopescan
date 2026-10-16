@@ -1,0 +1,15 @@
+{
+  "description": "Synthetic negative case for roblox_process/user-location/unsigned-process-in-user-folder: signed.",
+  "observations": [
+    {
+      "collector": "roblox_process",
+      "fields": {
+        "scope": "user_location_process",
+        "name": "Discord.exe",
+        "path": "C:\\Users\\fixtureuser\\AppData\\Local\\Discord\\app-1\\Discord.exe",
+        "location_kind": "appdata_local",
+        "signature": "valid"
+      }
+    }
+  ]
+}

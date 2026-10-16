@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: 0e329d8d-b915-45ac-8cfb-d2daef40f901
+title: "Winlogon starts something other than Windows' own shell or Userinit"
+description: >-
+  The Winlogon Shell or Userinit value names a program that is not Windows' explorer.exe or
+  userinit.exe, so it starts at every sign-in. Only the program is shown.
+status: experimental
+collector: hijack
+strength: tamper
+match:
+  mechanism: "winlogon"
+  windows_default: false
+retention: >-
+  The setting as it is at scan time.
+unmeasured_when: [not_windows]
+falsepositives:
+  - "Kiosk and shell-replacement software set up on purpose"
+  - "Some parental-control and management tools"
+author: B.O.P.E Scanner contributors
+date: 2026-10-15
+tags: [persistence]
+level: warn
+category: persistence

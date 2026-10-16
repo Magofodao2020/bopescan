@@ -1,0 +1,17 @@
+{
+  "description": "Synthetic negative case for executor_footprint/script/autoexec-script-calls-executor-api: plain.",
+  "observations": [
+    {
+      "collector": "executor_footprint",
+      "fields": {
+        "scope": "autoexec_script",
+        "name": "readme.txt",
+        "path": "C:\\Users\\fixtureuser\\Downloads\\tool\\autoexec\\readme.txt",
+        "location_kind": "user_downloads",
+        "distinct_markers": 0,
+        "markers": "",
+        "remote_loadstring": false
+      }
+    }
+  ]
+}

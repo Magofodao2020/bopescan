@@ -1,0 +1,19 @@
+{
+  "description": "Synthetic negative case for roblox_files/archive/executor-layout-in-archive: entry.",
+  "observations": [
+    {
+      "collector": "roblox_files",
+      "fields": {
+        "scope": "archive_entry",
+        "place": "downloads",
+        "name": "Solara.exe",
+        "archive": "C:\\Users\\fixtureuser\\Downloads\\pack.zip",
+        "path": "C:\\Users\\fixtureuser\\Downloads\\pack.zip\\Solara.exe",
+        "executor_layout": false,
+        "tool_id": "solara",
+        "tool_kind": "executor",
+        "match_kind": "ambiguous_alias"
+      }
+    }
+  ]
+}

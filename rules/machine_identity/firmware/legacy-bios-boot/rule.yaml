@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: d5f36166-0023-4b99-9334-333938feca9e
+title: "Windows started through legacy BIOS, not UEFI"
+description: >-
+  Windows reports it started through legacy BIOS (or a UEFI compatibility module). Secure Boot needs
+  UEFI, so it cannot be on. A setting, not evidence of cheating.
+status: experimental
+collector: machine_identity
+strength: posture
+match:
+  firmware_type: "bios"
+retention: >-
+  How Windows started this time.
+unmeasured_when: [not_windows]
+falsepositives:
+  - "Older PCs and installations made before switching the firmware to UEFI"
+author: B.O.P.E Scanner contributors
+date: 2026-10-15
+tags: [firmware]
+level: info
+category: firmware_boot

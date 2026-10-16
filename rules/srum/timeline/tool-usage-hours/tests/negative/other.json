@@ -1,0 +1,13 @@
+{
+  "description": "Synthetic negative case for srum/timeline/tool-usage-hours: other.",
+  "observations": [
+    {
+      "collector": "srum",
+      "fields": {
+        "scope": "app",
+        "name": "chrome.exe",
+        "first_seen": "2026-10-14T20:00:00Z"
+      }
+    }
+  ]
+}

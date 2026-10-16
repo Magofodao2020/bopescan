@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: 7bb54914-266d-4f79-9103-a31a457e1a8d
+title: "A file named like a Roblox executor or injector was deleted"
+description: >-
+  The Recycle Bin holds a deleted item, or the NTFS change journal holds a deletion record, for a
+  file whose name matches a Roblox executor or injector. Deleting a file is ordinary; the row is a
+  reason to ask what it was.
+status: experimental
+collector: roblox_trace
+strength: context
+match:
+  scope: "hit"
+  tool_kind: ["executor", "injector"]
+  evidence_class: "deleted"
+retention: >-
+  The Recycle Bin until emptied; the change journal until its oldest records are overwritten.
+falsepositives:
+  - "Removing a download one decided not to use"
+author: B.O.P.E Scanner contributors
+date: 2026-10-15
+tags: [roblox, history]
+level: warn
+category: roblox_tools

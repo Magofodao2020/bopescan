@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: 40a072f5-89ee-408d-be3c-41d631978b1e
+title: "An unsigned program named like a Roblox executor or injector, in a Roblox context"
+description: >-
+  A program (.exe or .dll) whose name matches a Roblox executor or injector, in a path that names
+  Roblox or a Roblox launcher, has no embedded signature that verifies here.
+status: experimental
+collector: roblox_files
+strength: presence
+match:
+  scope: "file"
+  tool_kind: ["executor", "injector"]
+  roblox_context: true
+  signature: ["no_embedded_signature", "invalid", "unverifiable_offline"]
+retention: >-
+  The file as it is at scan time.
+falsepositives:
+  - "An unrelated unsigned tool that happens to carry the name"
+author: B.O.P.E Scanner contributors
+date: 2026-10-15
+tags: [roblox, executor]
+level: warn
+category: files

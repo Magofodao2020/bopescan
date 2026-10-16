@@ -1,0 +1,14 @@
+{
+  "description": "Synthetic negative case for shellbags/shellbag/executor-named-folder-viewed: roblox.",
+  "observations": [
+    {
+      "collector": "shellbags",
+      "fields": {
+        "list": "shellbag",
+        "path": "%USERPROFILE%\\AppData\\Local\\Roblox",
+        "name": "Roblox",
+        "roblox_context": true
+      }
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: b456ead3-43f6-498d-9471-77aa9b576501
+title: "A launcher or FastFlag tool keeps network or physics FastFlags"
+description: >-
+  A bootstrapper's or FastFlag tool's settings file sets flags whose names are about physics or
+  network sending. They are applied only when Roblox is started through that tool; whether that
+  happened is read from the version folder's file and the launch history.
+status: experimental
+collector: fastflags
+strength: context
+match:
+  location: ["bootstrapper", "tool_folder"]
+  "flags_network|gte": 1
+retention: >-
+  The file as it is at scan time.
+falsepositives:
+  - "Settings kept but never used to start Roblox"
+author: B.O.P.E Scanner contributors
+date: 2026-10-15
+tags: [roblox, fastflags]
+level: info
+category: fastflags

@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: 600956be-c11f-43de-9070-02ceea97461c
+title: "The Open/Save dialog remembers a file named like a Roblox executor or injector"
+description: >-
+  The common Open/Save dialog's list (OpenSavePidlMRU) holds a path whose file or folder name matches
+  a Roblox executor or injector: a program used the dialog to open or save it. It is not proof that the
+  file ran, nor which program used the dialog.
+status: experimental
+collector: shellbags
+strength: presence
+match:
+  list: "open_save"
+  tool_kind: ["executor", "injector"]
+retention: >-
+  The list keeps the last 20 or so entries per extension until the history is cleared.
+unmeasured_when: [access_denied]
+falsepositives:
+  - "Uploading or attaching a file with that name in a browser or chat program"
+  - "An unrelated file with the same name"
+author: B.O.P.E Scanner contributors
+date: 2026-10-15
+tags: [roblox, shellbags]
+level: warn
+category: execution

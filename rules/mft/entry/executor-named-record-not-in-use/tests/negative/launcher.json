@@ -1,0 +1,16 @@
+{
+  "description": "Synthetic negative case for mft/entry/executor-named-record-not-in-use: launcher.",
+  "observations": [
+    {
+      "collector": "mft",
+      "fields": {
+        "scope": "entry",
+        "in_use": false,
+        "name": "Bloxstrap.exe",
+        "tool_id": "bloxstrap",
+        "tool_kind": "bootstrapper",
+        "match_kind": "known_tool"
+      }
+    }
+  ]
+}

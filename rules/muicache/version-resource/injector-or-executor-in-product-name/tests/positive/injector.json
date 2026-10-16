@@ -1,0 +1,15 @@
+{
+  "description": "Synthetic positive case for muicache/version-resource/injector-or-executor-in-product-name: injector.",
+  "observations": [
+    {
+      "collector": "muicache",
+      "fields": {
+        "path": "C:\\Users\\fixtureuser\\Downloads\\x.exe",
+        "name": "x.exe",
+        "location_kind": "user_downloads",
+        "friendly_name": "Extreme Injector"
+      }
+    }
+  ],
+  "expect_matches": 1
+}

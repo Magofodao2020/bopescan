@@ -1,0 +1,14 @@
+{
+  "description": "Synthetic positive case for userassist/location/program-in-temp-or-recycle-bin: temp.",
+  "observations": [
+    {
+      "collector": "userassist",
+      "fields": {
+        "path": "C:\\Users\\fixtureuser\\AppData\\Local\\Temp\\x\\run.exe",
+        "name": "run.exe",
+        "location_kind": "temp"
+      }
+    }
+  ],
+  "expect_matches": 1
+}

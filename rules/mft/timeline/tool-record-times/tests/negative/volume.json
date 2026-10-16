@@ -1,0 +1,12 @@
+{
+  "description": "Synthetic negative case for mft/timeline/tool-record-times: volume.",
+  "observations": [
+    {
+      "collector": "mft",
+      "fields": {
+        "scope": "volume",
+        "records_read": 100
+      }
+    }
+  ]
+}

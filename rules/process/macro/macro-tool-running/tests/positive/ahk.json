@@ -1,0 +1,13 @@
+{
+  "description": "Synthetic positive case for process/macro/macro-tool-running: ahk.",
+  "observations": [
+    {
+      "collector": "process",
+      "fields": {
+        "name": "AutoHotkey64.exe",
+        "path": "C:\\Program Files\\AutoHotkey\\v2\\AutoHotkey64.exe"
+      }
+    }
+  ],
+  "expect_matches": 1
+}

@@ -1,0 +1,15 @@
+{
+  "description": "Synthetic positive case for srum/timeline/tool-usage-hours: tool.",
+  "observations": [
+    {
+      "collector": "srum",
+      "fields": {
+        "scope": "app",
+        "name": "Fluxus.exe",
+        "tool_id": "fluxus",
+        "first_seen": "2026-10-14T20:00:00Z"
+      }
+    }
+  ],
+  "expect_matches": 1
+}

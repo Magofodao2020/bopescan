@@ -1,0 +1,16 @@
+{
+  "description": "Synthetic positive case for hijack/ifeo/debugger-on-roblox: roblox.",
+  "observations": [
+    {
+      "collector": "hijack",
+      "fields": {
+        "mechanism": "ifeo_debugger",
+        "target": "RobloxPlayerBeta.exe",
+        "program": "C:\\Users\\fixtureuser\\AppData\\Local\\Temp\\x.exe",
+        "program_name": "x.exe",
+        "location_kind": "temp"
+      }
+    }
+  ],
+  "expect_matches": 1
+}

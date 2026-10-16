@@ -1,0 +1,13 @@
+{
+  "description": "Synthetic negative case for installed_programs/virtual-machine/installed: other.",
+  "observations": [
+    {
+      "collector": "installed_programs",
+      "fields": {
+        "hive": "hklm",
+        "uninstall_key": "Y",
+        "name": "Y"
+      }
+    }
+  ]
+}

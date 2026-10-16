@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: 8ea0ab9d-21dd-4f8a-8bec-08336f5088cb
+title: "Change journal times for files named like Roblox tools"
+description: >-
+  Puts on the timeline the first and last change journal record for each file name that matches the
+  Roblox tool catalog.
+status: experimental
+role: timeline
+collector: usn
+strength: context
+match:
+  location: "named"
+retention: >-
+  The change journal keeps a bounded number of recent records.
+falsepositives:
+  - "A name is not a file identity"
+author: B.O.P.E Scanner contributors
+date: 2026-10-15
+tags: [timeline, roblox]
+category: files

@@ -1,0 +1,19 @@
+{
+  "description": "Synthetic positive case for evtx/pnp/device-configured: 400.",
+  "observations": [
+    {
+      "collector": "evtx",
+      "fields": {
+        "log": "Microsoft-Windows-Kernel-PnP%4Configuration.evtx",
+        "channel": "Microsoft-Windows-Kernel-PnP/Configuration",
+        "provider": "Microsoft-Windows-Kernel-PnP",
+        "event_id": 400,
+        "level": 4,
+        "count": 12,
+        "first_seen": "2026-10-14T10:00:00Z",
+        "last_seen": "2026-10-15T09:00:00Z"
+      }
+    }
+  ],
+  "expect_matches": 1
+}

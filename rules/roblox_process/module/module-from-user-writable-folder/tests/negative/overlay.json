@@ -1,0 +1,16 @@
+{
+  "description": "Synthetic negative case for roblox_process/module/module-from-user-writable-folder: overlay.",
+  "observations": [
+    {
+      "collector": "roblox_process",
+      "fields": {
+        "scope": "roblox_module",
+        "path": "C:\\Users\\fixtureuser\\AppData\\Local\\Discord\\app-1\\overlay.dll",
+        "name": "overlay.dll",
+        "location_kind": "appdata_local",
+        "under_player_folder": false,
+        "signature": "valid"
+      }
+    }
+  ]
+}

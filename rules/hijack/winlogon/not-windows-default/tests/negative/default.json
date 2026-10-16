@@ -1,0 +1,17 @@
+{
+  "description": "Synthetic negative case for hijack/winlogon/not-windows-default: default.",
+  "observations": [
+    {
+      "collector": "hijack",
+      "fields": {
+        "mechanism": "winlogon",
+        "scope": "hklm",
+        "target": "Shell",
+        "program": "explorer.exe",
+        "program_name": "explorer.exe",
+        "location_kind": "unknown",
+        "windows_default": true
+      }
+    }
+  ]
+}

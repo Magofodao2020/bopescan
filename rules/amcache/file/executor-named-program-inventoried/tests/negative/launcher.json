@@ -1,0 +1,18 @@
+{
+  "description": "Synthetic negative case for amcache/file/executor-named-program-inventoried: launcher.",
+  "observations": [
+    {
+      "collector": "amcache",
+      "fields": {
+        "scope": "file",
+        "name": "bloxstrap.exe",
+        "path": "c:\\users\\fixtureuser\\appdata\\local\\bloxstrap\\bloxstrap.exe",
+        "tool_id": "bloxstrap",
+        "tool_kind": "bootstrapper",
+        "match_kind": "known_tool",
+        "key_written": "2026-10-14T20:00:00Z",
+        "location_kind": "appdata_local"
+      }
+    }
+  ]
+}

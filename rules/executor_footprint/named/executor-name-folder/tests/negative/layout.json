@@ -1,0 +1,19 @@
+{
+  "description": "Synthetic negative case for executor_footprint/named/executor-name-folder: layout.",
+  "observations": [
+    {
+      "collector": "executor_footprint",
+      "fields": {
+        "scope": "layout",
+        "name": "tool",
+        "path": "C:\\Users\\fixtureuser\\Downloads\\tool",
+        "location_kind": "user_downloads",
+        "has_autoexec": true,
+        "has_workspace": true,
+        "has_scripts": false,
+        "has_bin": false,
+        "autoexec_files": 0
+      }
+    }
+  ]
+}

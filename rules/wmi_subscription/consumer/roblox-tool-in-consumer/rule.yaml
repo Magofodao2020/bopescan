@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: 2a0c35e1-7d5e-425e-a0f7-99424e7973ec
+title: "A permanent WMI subscription names a Roblox executor or injector"
+description: >-
+  A WMI event consumer's name, program, script file or the files its script mentions match a Roblox
+  executor or injector. Windows would start that by itself whenever the subscription's event happens.
+  A name is not proof of what the program is.
+status: experimental
+collector: wmi_subscription
+strength: presence
+match:
+  scope: "consumer"
+  tool_kind: ["executor", "injector"]
+retention: >-
+  A subscription lasts until it is deleted.
+unmeasured_when: [access_denied, source_absent]
+falsepositives:
+  - "An unrelated program with the same name started by a vendor's WMI subscription"
+author: B.O.P.E Scanner contributors
+date: 2026-10-15
+tags: [roblox, persistence, wmi]
+level: flag
+category: persistence

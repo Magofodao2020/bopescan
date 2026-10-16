@@ -1,0 +1,19 @@
+{
+  "description": "Synthetic negative case for roblox_files/recycled/executor-in-recycle-bin: bloxstrap.",
+  "observations": [
+    {
+      "collector": "roblox_files",
+      "fields": {
+        "scope": "recycled",
+        "place": "recycle_bin",
+        "name": "Bloxstrap.exe",
+        "path": "C:\\Users\\fixtureuser\\Downloads\\Bloxstrap.exe",
+        "tool_id": "bloxstrap",
+        "tool_kind": "bootstrapper",
+        "match_kind": "known_tool",
+        "deleted_at": "2026-10-14T21:00:00Z",
+        "in_bin": true
+      }
+    }
+  ]
+}

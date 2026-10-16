@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: 023f1d59-2377-4212-bb42-d293d1e5de44
+title: "A browser extension can read or change Roblox's website"
+description: >-
+  An extension's host permissions or content scripts name roblox.com. Many Roblox website extensions
+  (themes, trading helpers, server finders) need this; it concerns the website, not the game client.
+status: experimental
+collector: browser_ext
+strength: context
+match:
+  roblox_access: true
+  all_sites: false
+retention: >-
+  Extensions installed in each browser profile at scan time.
+unmeasured_when: [not_windows]
+falsepositives:
+  - "Website-customisation, trading and server-finder extensions for Roblox"
+references:
+  - https://developer.chrome.com/docs/extensions/reference/permissions-list
+author: B.O.P.E Scanner contributors
+date: 2026-10-15
+tags: [browser]
+level: info
+category: browser_scripts

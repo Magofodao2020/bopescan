@@ -1,0 +1,18 @@
+{
+  "description": "Synthetic positive case for hijack/winlogon/not-windows-default: evil.",
+  "observations": [
+    {
+      "collector": "hijack",
+      "fields": {
+        "mechanism": "winlogon",
+        "scope": "hklm",
+        "target": "Userinit",
+        "program": "C:\\Users\\fixtureuser\\evil.exe",
+        "program_name": "evil.exe",
+        "location_kind": "user_profile",
+        "windows_default": false
+      }
+    }
+  ],
+  "expect_matches": 1
+}

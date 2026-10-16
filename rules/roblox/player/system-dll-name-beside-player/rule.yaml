@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: 9888b00d-53c9-47ff-b719-2ed7c44b8fe1
+title: "A file named like a Windows system DLL sits beside the Roblox player"
+description: >-
+  A DLL with the name of a Windows system library (version.dll, dxgi.dll, winmm.dll and similar)
+  sits directly in a Roblox version folder. Windows looks in the program's own folder before
+  System32, so a file there with one of these names is loaded into the player instead of, or before,
+  the real library: the "proxy DLL" technique. The official player does not ship these files. This
+  does not say what the DLL does or that the player loaded it.
+status: experimental
+collector: roblox
+strength: presence
+match:
+  location: "version_binary"
+  name: ["version.dll", "dxgi.dll", "d3d11.dll", "d3d9.dll", "winmm.dll", "dinput8.dll", "xinput1_3.dll", "xinput1_4.dll", "winhttp.dll", "dwmapi.dll", "opengl32.dll", "wininet.dll", "dbghelp.dll", "dsound.dll"]
+retention: >-
+  The version folder as it is at scan time.
+unmeasured_when: [not_windows]
+falsepositives:
+  - "Graphics post-processing tools such as ReShade, which install themselves as dxgi.dll or d3d11.dll beside a game"
+  - "A file copied there by hand while troubleshooting a crash"
+references:
+  - https://learn.microsoft.com/en-us/windows/win32/dlls/dynamic-link-library-search-order
+author: B.O.P.E Scanner contributors
+date: 2026-10-15
+tags: [roblox, dll-hijack]
+level: flag

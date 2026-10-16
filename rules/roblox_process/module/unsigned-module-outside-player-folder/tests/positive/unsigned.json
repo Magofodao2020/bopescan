@@ -1,0 +1,17 @@
+{
+  "description": "Synthetic positive case for roblox_process/module/unsigned-module-outside-player-folder: unsigned.",
+  "observations": [
+    {
+      "collector": "roblox_process",
+      "fields": {
+        "scope": "roblox_module",
+        "path": "D:\\Tools\\x.dll",
+        "name": "x.dll",
+        "location_kind": "other",
+        "under_player_folder": false,
+        "signature": "no_embedded_signature"
+      }
+    }
+  ],
+  "expect_matches": 1
+}

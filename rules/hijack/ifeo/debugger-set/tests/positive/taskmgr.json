@@ -1,0 +1,16 @@
+{
+  "description": "Synthetic positive case for hijack/ifeo/debugger-set: taskmgr.",
+  "observations": [
+    {
+      "collector": "hijack",
+      "fields": {
+        "mechanism": "ifeo_debugger",
+        "target": "taskmgr.exe",
+        "program": "C:\\Tools\\procexp64.exe",
+        "program_name": "procexp64.exe",
+        "location_kind": "other"
+      }
+    }
+  ],
+  "expect_matches": 1
+}

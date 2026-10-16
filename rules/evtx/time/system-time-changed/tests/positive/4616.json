@@ -1,0 +1,19 @@
+{
+  "description": "Synthetic positive case for evtx/time/system-time-changed: 4616.",
+  "observations": [
+    {
+      "collector": "evtx",
+      "fields": {
+        "log": "Security.evtx",
+        "channel": "Security",
+        "provider": "Microsoft-Windows-Security-Auditing",
+        "event_id": 4616,
+        "level": 0,
+        "count": 3,
+        "first_seen": "2026-10-14T10:00:00Z",
+        "last_seen": "2026-10-15T09:00:00Z"
+      }
+    }
+  ],
+  "expect_matches": 1
+}

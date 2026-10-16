@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: d5560346-9ad6-4b02-ad7b-692097d5bf8a
+title: "Times Amcache wrote entries for Roblox tools"
+description: >-
+  Puts on the timeline when Windows' program inventory wrote its entry for a program whose name
+  matches the Roblox tool catalog.
+status: experimental
+role: timeline
+collector: amcache
+strength: context
+match:
+  scope: "file"
+  "tool_id|exists": true
+retention: >-
+  Amcache keeps entries for months.
+falsepositives:
+  - "An entry's time is when it was written, not a run time"
+author: B.O.P.E Scanner contributors
+date: 2026-10-15
+tags: [timeline, roblox]
+category: execution

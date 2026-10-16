@@ -1,0 +1,14 @@
+{
+  "description": "Synthetic positive case for roblox/client-settings/client-settings-present: flags.",
+  "observations": [
+    {
+      "collector": "roblox",
+      "fields": {
+        "location": "client_settings",
+        "path": "C:\\Users\\fixtureuser\\AppData\\Local\\Roblox\\Versions\\version-0123456789abcdef\\ClientSettings\\ClientAppSettings.json",
+        "flag_count": 3
+      }
+    }
+  ],
+  "expect_matches": 1
+}

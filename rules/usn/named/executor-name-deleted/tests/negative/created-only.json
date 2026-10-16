@@ -1,0 +1,20 @@
+{
+  "description": "Synthetic negative case for usn/named/executor-name-deleted: created-only.",
+  "observations": [
+    {
+      "collector": "usn",
+      "fields": {
+        "location": "named",
+        "name": "Solara.exe",
+        "tool_id": "solara",
+        "tool_kind": "executor",
+        "match_kind": "ambiguous_alias",
+        "records": 1,
+        "created": 1,
+        "deleted": 0,
+        "renamed": 0,
+        "data_changed": 0
+      }
+    }
+  ]
+}

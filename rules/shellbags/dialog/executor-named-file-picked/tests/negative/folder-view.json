@@ -1,0 +1,14 @@
+{
+  "description": "Synthetic negative case for shellbags/dialog/executor-named-file-picked: folder-view.",
+  "observations": [
+    {
+      "collector": "shellbags",
+      "fields": {
+        "list": "shellbag",
+        "path": "C:\\Users\\fixtureuser\\Downloads\\Fluxus",
+        "tool_id": "fluxus",
+        "tool_kind": "executor"
+      }
+    }
+  ]
+}

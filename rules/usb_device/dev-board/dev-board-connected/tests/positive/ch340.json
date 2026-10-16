@@ -1,0 +1,19 @@
+{
+  "description": "Synthetic positive case for usb_device/dev-board/dev-board-connected: ch340.",
+  "observations": [
+    {
+      "collector": "usb_device",
+      "fields": {
+        "source": "device_list",
+        "bus": "usb",
+        "model_id": "USB\\VID_1A86&PID_7523",
+        "vid": "1A86",
+        "pid": "7523",
+        "maker": "QinHeng (CH340)",
+        "dev_board_vendor": true,
+        "present": true
+      }
+    }
+  ],
+  "expect_matches": 1
+}

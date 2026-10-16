@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: d5e16389-ebfc-4885-adf7-f24e6bcd7b0c
+title: "RobloxPlayerBeta.exe has no embedded signature that verifies here"
+description: >-
+  The Roblox player in a version folder under Versions carries no embedded Authenticode signature,
+  one that does not verify, or one Windows could not verify without the internet; the row says
+  which. The official player is signed by Roblox Corporation. This does not say the file was
+  changed, what it does, or that it ran. "Could not verify without the internet" also covers a PC
+  whose certificate store lacks the root the signature chains to.
+status: experimental
+collector: roblox
+strength: presence
+match:
+  location: "player_exe"
+  signature: ["no_embedded_signature", "invalid", "unverifiable_offline"]
+retention: >-
+  The file as it is at scan time. An update of Roblox replaces the version folder.
+unmeasured_when: [not_windows]
+falsepositives:
+  - "A PC whose certificate store does not hold the root certificate, which Windows normally fetches online the first time it is needed; this check never goes online"
+  - "A player file damaged by an interrupted update, a disk problem or security software that partly quarantined it"
+references:
+  - https://learn.microsoft.com/en-us/windows/win32/seccrypto/authenticode
+author: B.O.P.E Scanner contributors
+date: 2026-10-15
+tags: [roblox, signature]
+level: warn

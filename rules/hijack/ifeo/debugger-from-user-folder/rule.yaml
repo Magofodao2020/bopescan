@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: e2c3db41-ea07-4a4d-a416-7202b2d01cae
+title: "A program in a user folder is set to start in place of, or after, another program"
+description: >-
+  An Image File Execution Options "Debugger" or a SilentProcessExit "MonitorProcess" names a program
+  in a folder any user may write to. Windows then starts it instead of, or when, the target program
+  runs. Malware uses this for persistence; so do some tools a person configured.
+status: experimental
+collector: hijack
+strength: tamper
+match:
+  mechanism: ["ifeo_debugger", "silent_process_exit"]
+  location_kind: ["temp", "user_downloads", "user_desktop", "user_documents", "appdata_local", "appdata_roaming", "users_public", "user_profile", "recycle_bin"]
+retention: >-
+  The setting as it is at scan time.
+unmeasured_when: [not_windows]
+falsepositives:
+  - "Process Explorer or another task-manager replacement kept in a user folder"
+  - "Debugging tools set up by a developer"
+author: B.O.P.E Scanner contributors
+date: 2026-10-15
+tags: [persistence, ifeo]
+level: warn
+category: persistence

@@ -1,0 +1,19 @@
+{
+  "description": "Synthetic positive case for shellbags/dialog/executor-named-file-picked: fluxus.",
+  "observations": [
+    {
+      "collector": "shellbags",
+      "fields": {
+        "list": "open_save",
+        "extension": "exe",
+        "position": 0,
+        "path": "C:\\Users\\fixtureuser\\Downloads\\Fluxus\\Fluxus.exe",
+        "name": "Fluxus.exe",
+        "tool_id": "fluxus",
+        "tool_kind": "executor",
+        "match_kind": "known_tool"
+      }
+    }
+  ],
+  "expect_matches": 1
+}

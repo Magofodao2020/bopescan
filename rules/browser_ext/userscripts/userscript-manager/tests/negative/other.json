@@ -1,0 +1,18 @@
+{
+  "description": "Synthetic negative case for browser_ext/userscripts/userscript-manager: other.",
+  "observations": [
+    {
+      "collector": "browser_ext",
+      "fields": {
+        "browser": "chrome",
+        "profile": "Default",
+        "extension_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "name": "Ext",
+        "version": "1.0",
+        "user_scripts": false,
+        "roblox_access": false,
+        "all_sites": false
+      }
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "description": "Synthetic positive case for roblox_process/user-location/unsigned-process-in-user-folder: downloads.",
+  "observations": [
+    {
+      "collector": "roblox_process",
+      "fields": {
+        "scope": "user_location_process",
+        "name": "loader.exe",
+        "path": "C:\\Users\\fixtureuser\\Downloads\\loader.exe",
+        "location_kind": "user_downloads",
+        "signature": "no_embedded_signature"
+      }
+    }
+  ],
+  "expect_matches": 1
+}

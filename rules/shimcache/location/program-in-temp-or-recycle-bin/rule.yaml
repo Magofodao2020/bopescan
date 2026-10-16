@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: 71839ff2-255a-4df3-8014-de800fd4ffa1
+title: "A program in Temp or the Recycle Bin: the compatibility engine recorded the file (not proof it ran)"
+description: >-
+  For a file in a Temp folder or the Recycle Bin, the compatibility engine recorded the file (not
+  proof it ran). Programs rarely run from the Recycle Bin, and loaders often unpack to Temp before
+  running; installers and updaters also run from Temp. Context for the timeline, never a finding on
+  its own.
+status: experimental
+collector: shimcache
+strength: context
+match:
+  location_kind: ["temp", "recycle_bin"]
+retention: >-
+  Up to 1 024 entries, written at shutdown; files seen since the last restart are usually missing.
+unmeasured_when: [not_windows, source_absent]
+falsepositives:
+  - "Installers, updaters and self-extracting archives, which unpack to Temp and run from there"
+author: B.O.P.E Scanner contributors
+date: 2026-10-15
+tags: [execution]
+level: info

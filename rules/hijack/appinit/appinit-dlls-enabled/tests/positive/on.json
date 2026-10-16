@@ -1,0 +1,17 @@
+{
+  "description": "Synthetic positive case for hijack/appinit/appinit-dlls-enabled: on.",
+  "observations": [
+    {
+      "collector": "hijack",
+      "fields": {
+        "mechanism": "appinit_dlls",
+        "scope": "native",
+        "enabled": true,
+        "program": "C:\\Users\\fixtureuser\\x.dll",
+        "program_name": "x.dll",
+        "location_kind": "user_profile"
+      }
+    }
+  ],
+  "expect_matches": 1
+}

@@ -1,0 +1,22 @@
+{
+  "description": "Synthetic positive case for srum/app/executor-named-program-used-cpu: fluxus.",
+  "observations": [
+    {
+      "collector": "srum",
+      "fields": {
+        "scope": "app",
+        "name": "Fluxus.exe",
+        "path": "\\Device\\HarddiskVolume3\\Users\\fixtureuser\\Downloads\\Fluxus\\Fluxus.exe",
+        "used_cpu": true,
+        "foreground_cycles": 5000000000,
+        "tool_id": "fluxus",
+        "tool_kind": "executor",
+        "match_kind": "known_tool",
+        "first_seen": "2026-10-14T20:00:00Z",
+        "last_seen": "2026-10-14T20:00:00Z",
+        "location_kind": "user_downloads"
+      }
+    }
+  ],
+  "expect_matches": 1
+}

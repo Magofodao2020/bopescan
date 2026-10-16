@@ -1,0 +1,16 @@
+{
+  "description": "Synthetic negative case for roblox_files/archive/archive-with-encrypted-headers: open.",
+  "observations": [
+    {
+      "collector": "roblox_files",
+      "fields": {
+        "scope": "archive",
+        "place": "downloads",
+        "name": "pack.zip",
+        "archive_format": "zip",
+        "encrypted_headers": false,
+        "executor_layout": true
+      }
+    }
+  ]
+}

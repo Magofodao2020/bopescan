@@ -1,0 +1,16 @@
+{
+  "description": "Synthetic positive case for net_adapter/tunnel/tunnel-adapter-installed: set.",
+  "observations": [
+    {
+      "collector": "net_adapter",
+      "fields": {
+        "place": "adapter",
+        "description": "TAP-Windows Adapter V9",
+        "component_id": "tap0901",
+        "software_adapter": true,
+        "tunnel_like": true
+      }
+    }
+  ],
+  "expect_matches": 1
+}

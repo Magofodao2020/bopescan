@@ -1,0 +1,12 @@
+{
+  "description": "Synthetic negative case for process/macro/macro-tool-running: explorer.",
+  "observations": [
+    {
+      "collector": "process",
+      "fields": {
+        "name": "explorer.exe",
+        "path": "C:\\Windows\\explorer.exe"
+      }
+    }
+  ]
+}

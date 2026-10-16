@@ -1,0 +1,15 @@
+{
+  "description": "Synthetic positive case for hijack/appcert/appcert-dlls-set: appcert.",
+  "observations": [
+    {
+      "collector": "hijack",
+      "fields": {
+        "mechanism": "appcert_dlls",
+        "program": "C:\\x.dll",
+        "program_name": "x.dll",
+        "location_kind": "other"
+      }
+    }
+  ],
+  "expect_matches": 1
+}

@@ -1,0 +1,13 @@
+{
+  "description": "Synthetic negative case for machine_identity/firmware/legacy-bios-boot: uefi.",
+  "observations": [
+    {
+      "collector": "machine_identity",
+      "fields": {
+        "manufacturer": "X",
+        "firmware_type": "uefi",
+        "vm_hint": false
+      }
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "description": "Synthetic positive case for wmi_subscription/consumer/command-or-script-consumer: command.",
+  "observations": [
+    {
+      "collector": "wmi_subscription",
+      "fields": {
+        "scope": "consumer",
+        "namespace": "ROOT\\subscription",
+        "class": "CommandLineEventConsumer",
+        "consumer_kind": "command_line",
+        "name": "Upd",
+        "known_default": false,
+        "program": "C:\\Users\\fixtureuser\\AppData\\Local\\x\\x.exe"
+      }
+    }
+  ],
+  "expect_matches": 1
+}

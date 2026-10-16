@@ -1,0 +1,1895 @@
+// SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+
+//! Hosts: where collectors read artifacts from.
+//!
+//! Collectors only ever see the [`Host`] trait. The real machine is `bope_host_windows::LiveHost`;
+//! tests use [`FixtureHost`] (feature `fixture`), a fake machine described in YAML, so collectors can
+//! be tested on any operating system. Every method only reads.
+
+#[cfg(feature = "fixture")]
+mod fixture;
+
+#[cfg(feature = "fixture")]
+pub use fixture::{FixtureError, FixtureHost};
+
+/// Operating system family of a host.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "fixture", derive(serde::Deserialize))]
+#[cfg_attr(feature = "fixture", serde(rename_all = "snake_case"))]
+pub enum Platform {
+    /// Windows.
+    Windows,
+    /// Anything else. Collectors report `not_windows`.
+    Other,
+}
+
+impl Platform {
+    /// Stable identifier used in reports.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Windows => "windows",
+            Self::Other => "other",
+        }
+    }
+}
+
+/// Why a source could not be read. Collectors turn these into `Unmeasured` reasons.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum SourceError {
+    /// The operating system denied access.
+    #[error("access denied")]
+    AccessDenied,
+    /// The request is not supported by this host.
+    #[error("unsupported: {0}")]
+    Unsupported(String),
+    /// The file holds more bytes than a host will read into memory in one piece (ADR 0019).
+    ///
+    /// A separate variant rather than a `Failed`: the file was found and was readable, and the limit
+    /// is this program's, not the machine's. It carries the limit and never the size, because the
+    /// reader stops one byte past the limit and so never learns how large the file really is.
+    #[error("larger than the {limit} bytes this host reads in one piece")]
+    TooLarge {
+        /// Most bytes this host reads for one file.
+        limit: usize,
+    },
+    /// Anything else.
+    #[error("read failed: {0}")]
+    Failed(String),
+}
+
+impl SourceError {
+    /// Classifies an I/O error from a file-system read, so that every host that reads real files
+    /// reports the same problem the same way.
+    ///
+    /// A caller for which a missing path is a fact rather than a failure — `list_dir` — checks
+    /// [`std::io::ErrorKind::NotFound`] itself before calling this.
+    pub fn from_io(error: &std::io::Error) -> Self {
+        match error.kind() {
+            std::io::ErrorKind::PermissionDenied => Self::AccessDenied,
+            _ => Self::Failed(error.to_string()),
+        }
+    }
+}
+
+/// One registry value as its type and data, for a caller whose answer depends on the type as well as on
+/// what the value holds (ADR 0038).
+///
+/// Windows PowerShell 5.1 and PowerShell 7 read the same policy value differently: measured on one
+/// runner, 5.1 honours a `REG_SZ` `"0"` and a `REG_QWORD` 0 as it honours a `REG_DWORD` 0, and PowerShell 7
+/// honours only the `REG_DWORD`. [`RegistrySource::read_u32`] cannot tell those apart, because a live
+/// host's reader accepts a `REG_QWORD` there too.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RegistryData {
+    /// `REG_DWORD`.
+    Dword(u32),
+    /// `REG_QWORD`.
+    Qword(u64),
+    /// `REG_SZ` or `REG_EXPAND_SZ`, as stored: environment variables in an expandable string are not
+    /// expanded.
+    Text(String),
+    /// Any other type. Its data is not read.
+    OtherType,
+}
+
+/// Read-only access to the registry. Keys are written as `HKLM\...` or, for the account this program
+/// runs as, `HKCU\...` (ADR 0038). A live host refuses every other root.
+pub trait RegistrySource {
+    /// Reads a `REG_DWORD`. `Ok(None)` when the key or value does not exist.
+    fn read_u32(&self, key: &str, value: &str) -> Result<Option<u32>, SourceError>;
+    /// Reads a `REG_SZ`. `Ok(None)` when the key or value does not exist.
+    fn read_string(&self, key: &str, value: &str) -> Result<Option<String>, SourceError>;
+
+    /// Names of the keys directly inside `key`; it never recurses (ADR 0022).
+    ///
+    /// `Ok(None)` means the key does not exist, which is something the collector looked at and saw —
+    /// the same distinction [`FilesystemSource::list_dir`] makes for a directory. A key that is there
+    /// and holds no subkey is `Ok(Some(vec![]))`, which is a different statement.
+    ///
+    /// The count is not bounded, for the reason `list_dir` does not bound a directory listing: a
+    /// truncated enumeration would read as "there was nothing else", which is the one wrong answer.
+    fn subkeys(&self, key: &str) -> Result<Option<Vec<String>>, SourceError>;
+
+    /// Names of the values directly under `key`, as the registry spells them (ADR 0022).
+    ///
+    /// `Ok(None)` when the key does not exist; `Ok(Some(vec![]))` when it is there and holds no
+    /// value. The names are returned, never the data: a value's bytes are read one at a time with
+    /// [`RegistrySource::read_bytes`], so that the bound below applies to each of them.
+    fn value_names(&self, key: &str) -> Result<Option<Vec<String>>, SourceError>;
+
+    /// The bytes of one `REG_BINARY` value, at most [`MAX_REGISTRY_VALUE_BYTES`] of them (ADR 0022).
+    ///
+    /// `Ok(None)` when the key or the value does not exist, like [`RegistrySource::read_u32`]. A
+    /// value of another type is an error rather than an answer: a caller that wanted a number or a
+    /// string has a method for it, and guessing a conversion here would hand a parser bytes that
+    /// mean something else.
+    ///
+    /// A value larger than the limit is [`SourceError::TooLarge`]; nothing is truncated, because a
+    /// truncated artifact parses as a damaged one.
+    fn read_bytes(&self, key: &str, value: &str) -> Result<Option<Vec<u8>>, SourceError>;
+
+    /// One value's type, and its data when it is a number or a string (ADR 0038).
+    ///
+    /// `Ok(None)` when the key or the value does not exist, like [`RegistrySource::read_u32`]. A string
+    /// longer than [`MAX_REGISTRY_VALUE_BYTES`] bytes is [`SourceError::TooLarge`], as a binary value
+    /// is; what that bounds is the same as for [`RegistrySource::read_bytes`].
+    fn read_value(&self, key: &str, value: &str) -> Result<Option<RegistryData>, SourceError>;
+}
+
+/// One entry directly inside a directory, with what the listing itself holds about it (ADR 0009,
+/// ADR 0050): its size and its creation and last-write times. Nothing about its owner, ACL, other
+/// attributes or last-access time is read, and nothing is opened to get these values.
+///
+/// The times are what the file system recorded, which programs update as they create, copy, extract
+/// and write files, and which any program able to write a file can set. A last-write time earlier than
+/// a creation time is ordinary. No value orders two events on its own (ADR 0050).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DirEntryInfo {
+    /// Name inside the directory, without any parent path.
+    pub name: String,
+    /// `true` for a regular file; `false` for a directory or anything else.
+    pub is_file: bool,
+    /// Size in bytes as the listing reports it. `None` for anything that is not a file, and when the
+    /// listing did not provide one.
+    pub size: Option<u64>,
+    /// Creation time, in whole seconds (see [`listed_time`]). `None` when the listing did not provide
+    /// one or it is outside the range a [`jiff::Timestamp`] represents — never a stand-in value.
+    pub created: Option<jiff::Timestamp>,
+    /// Last-write time, in whole seconds, with the same meaning of `None` as [`Self::created`].
+    pub modified: Option<jiff::Timestamp>,
+}
+
+impl DirEntryInfo {
+    /// An entry the listing said nothing more about than its name and whether it is a file.
+    pub fn named(name: impl Into<String>, is_file: bool) -> Self {
+        Self {
+            name: name.into(),
+            is_file,
+            size: None,
+            created: None,
+            modified: None,
+        }
+    }
+}
+
+/// A time a directory listing reported, as a timestamp in whole seconds (ADR 0050).
+///
+/// The sub-second part is dropped by rounding down, towards the earlier second, so an instant before
+/// 1970 is not moved later. The 100-nanosecond part of a file time adds nothing a reviewer reads, and
+/// makes two reports of the same machine easier to match. `None` means the value is outside the range
+/// [`jiff::Timestamp`] represents.
+pub fn listed_time(time: std::time::SystemTime) -> Option<jiff::Timestamp> {
+    let exact = jiff::Timestamp::try_from(time).ok()?;
+    let mut seconds = exact.as_second();
+    if exact.subsec_nanosecond() < 0 {
+        seconds -= 1;
+    }
+    jiff::Timestamp::from_second(seconds).ok()
+}
+
+/// One path's own creation and last-write times, as the file system records them for that entry
+/// (ADR 0061).
+///
+/// The same values a listing of its parent would report, read without listing the parent: the parent
+/// of a profile folder is a profile root, whose listing holds other people's names. The same limits as
+/// [`DirEntryInfo`]'s times apply: any program able to write the entry can set them, and a time is in
+/// whole seconds.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct EntryTimes {
+    /// Creation time, in whole seconds (see [`listed_time`]); `None` when the file system did not
+    /// provide one or it is outside the range a [`jiff::Timestamp`] represents.
+    pub created: Option<jiff::Timestamp>,
+    /// Last-write time, with the same meaning of `None`.
+    pub modified: Option<jiff::Timestamp>,
+}
+
+/// Read-only access to the file system. Paths are absolute and Windows-style, e.g. `C:\Users\a\x.dll`.
+pub trait FilesystemSource {
+    /// Lists what is directly inside `dir`; it never recurses.
+    ///
+    /// `Ok(None)` means the directory does not exist, which is something the collector looked at and
+    /// saw — not a failure to look. An error means the directory could not be read at all.
+    fn list_dir(&self, dir: &str) -> Result<Option<Vec<DirEntryInfo>>, SourceError>;
+
+    /// SHA-256 of one file, as lowercase hex.
+    ///
+    /// The error is about that one file. A collector that cannot hash a file still reports the file.
+    fn file_sha256(&self, path: &str) -> Result<String, SourceError>;
+
+    /// The bytes of one file, at most [`MAX_FILE_BYTES`] of them (ADR 0019).
+    ///
+    /// `Ok(None)` means the file does not exist, which is something the collector looked at and saw —
+    /// the same distinction [`FilesystemSource::list_dir`] makes for a directory. A file enumerated a
+    /// moment ago and gone by the time it is read is that case, not a failure.
+    ///
+    /// A file larger than the limit is [`SourceError::TooLarge`]: nothing is truncated, because a
+    /// truncated artifact parses as a damaged one and would show damage this program caused.
+    ///
+    /// The path must name a regular file; `list_dir` already says which entries are files. Anything
+    /// else is an error rather than an answer.
+    fn read_file(&self, path: &str) -> Result<Option<Vec<u8>>, SourceError>;
+
+    /// Whether the file at `path` carries the read-only attribute (ADR 0037).
+    ///
+    /// One bit of a file's attributes and nothing else: no timestamps, no size, no owner, no other
+    /// attribute. `Ok(None)` means the file does not exist, the same fact [`FilesystemSource::read_file`]
+    /// reports for a file that is gone. The file's contents are not opened, and nothing about the file
+    /// is changed by asking.
+    fn is_read_only(&self, path: &str) -> Result<Option<bool>, SourceError>;
+
+    /// The creation and last-write times of the file or folder at `path` itself (ADR 0061).
+    ///
+    /// `path` may be a drive root such as `C:\`. `Ok(None)` means nothing is there, the same fact
+    /// [`FilesystemSource::read_file`] reports for a file that is gone. A link is not followed: the
+    /// times are the entry's own, as a listing of its parent reports them. Nothing is opened for
+    /// reading or writing, and nothing about the entry is changed by asking.
+    fn times(&self, path: &str) -> Result<Option<EntryTimes>, SourceError>;
+}
+
+/// What Windows says about the Authenticode signature **embedded in** one file, checked without the
+/// network (ADR 0035).
+///
+/// Four answers, because "not valid" is three different statements and a reviewer has to be able to
+/// tell them apart. None of them is a finding on its own: most files in a plugin folder are unsigned.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SignatureCheck {
+    /// The signature is intact and chains to a root this machine trusts.
+    Valid {
+        /// Simple display name of the signing certificate's subject, for a person to read. Never
+        /// compared by `allow`: a stolen certificate carries the same name as the real one.
+        signer: String,
+        /// SHA-256 of the signing certificate's encoded bytes, as lowercase hex — the identity `allow`
+        /// compares.
+        signer_cert_sha256: String,
+    },
+    /// The file carries no embedded signature, or is not a kind of file one can be embedded in.
+    ///
+    /// Not "unsigned": a file can be signed through a Windows catalog instead, and this check does not
+    /// look there.
+    NoEmbeddedSignature,
+    /// A signature is there and Windows does not trust it: the file changed after signing, a
+    /// certificate's own signature does not verify, it expired without a timestamp, it is not for code
+    /// signing, or it is explicitly distrusted.
+    Invalid,
+    /// The answer needed something this machine does not hold locally — an intermediate certificate, a
+    /// root it holds as trusted, or revocation data — and this program does not fetch it. A fact about
+    /// the check, not the file. A chain that ends at a root this machine does not trust is here too,
+    /// because offline that cannot be told apart from a root it has not fetched yet: a self-signed
+    /// signature reads this way as well as a genuine one on such a PC (ADR 0035, amendment of
+    /// 2026-09-14).
+    UnverifiableOffline,
+}
+
+/// Read-only access to the Authenticode signature embedded in a file (ADR 0035).
+pub trait SignatureSource {
+    /// Checks the signature embedded in the file at `path`, without the network.
+    ///
+    /// The error is about that one file, like [`FilesystemSource::file_sha256`]: a collector that
+    /// cannot check one file still reports the file.
+    fn file_signature(&self, path: &str) -> Result<SignatureCheck, SourceError>;
+}
+
+/// What the Windows Event Log service states about one channel's log file (ADR 0042).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ChannelConfig {
+    /// The path of the file the service writes this channel to, as the service spells it — normally
+    /// beginning `%SystemRoot%`, which is not expanded here.
+    pub log_file_path: String,
+    /// The largest the service lets this channel's file grow, in bytes.
+    pub max_size_bytes: u64,
+}
+
+/// Read-only access to the Event Log service's configuration of a channel (ADR 0042).
+///
+/// A source of its own rather than a registry read: the service's answer is the one it acts on, and
+/// on the Windows 11 machine ADR 0042 measured, the registry's `MaxSize` differed from it for 18 of
+/// the 94 keys that carry one.
+///
+/// It hands out a [`ChannelConfigReader`] rather than answering itself, because asking the service is
+/// a call into another process that this program cannot interrupt. A reader can be moved to a thread
+/// of its own, so that a collector can stop waiting for a service that does not answer and report
+/// that it stopped, instead of never returning (ADR 0042).
+pub trait EventLogConfigSource {
+    /// A reader for channel configurations, which may be moved to another thread.
+    ///
+    /// An error means the service cannot be asked at all on this host — not that one channel failed.
+    fn channel_config_reader(&self) -> Result<Box<dyn ChannelConfigReader>, SourceError>;
+}
+
+/// Asks the Event Log service about channels, from whichever thread holds it (ADR 0042).
+pub trait ChannelConfigReader: Send {
+    /// The log file and maximum size the service states for `channel`, e.g. `Security` or
+    /// `Microsoft-Windows-Kernel-Boot/Operational`.
+    ///
+    /// `Ok(None)` when the service has no channel of that name — which is an answer: a log file can
+    /// outlive the software that registered its channel. Nothing is changed by asking.
+    ///
+    /// **This call may not return.** It waits on the Event Log service, and a service that accepts a
+    /// request and never answers it leaves this call blocked; a caller that must return bounds its wait
+    /// from another thread.
+    fn channel_config(&self, channel: &str) -> Result<Option<ChannelConfig>, SourceError>;
+}
+
+/// Read-only access to the process environment. Names are case-insensitive, like Windows.
+pub trait EnvironmentSource {
+    /// Value of `name`, or `None` when it is not set or is not valid Unicode.
+    fn env_var(&self, name: &str) -> Option<String>;
+}
+
+/// Read-only access to which account this program runs as (ADR 0060).
+pub trait AccountSource {
+    /// The SID of the account this process's token belongs to, as `S-1-…` text.
+    ///
+    /// A collector compares it — with a scheduled task's principal, to know whose profile variables a
+    /// command may use — and never reports it: a SID identifies one account on one machine.
+    fn account_sid(&self) -> Result<String, SourceError>;
+}
+
+/// What the running kernel reports about code integrity.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CodeIntegrityOptions {
+    /// Kernel-mode code integrity is enforcing driver signatures.
+    pub enabled: bool,
+    /// Test signing is on, so the kernel also accepts self-signed drivers.
+    pub test_signing: bool,
+}
+
+/// Read-only access to the kernel's own code-integrity state (ADR 0011).
+pub trait SystemIntegritySource {
+    /// What the running kernel reports about code integrity and test signing.
+    fn code_integrity_options(&self) -> Result<CodeIntegrityOptions, SourceError>;
+}
+
+/// What the platform reports about the TPM.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TpmInfo {
+    /// Whether a TPM is present at all.
+    pub present: bool,
+    /// Specification family, e.g. `2.0`, when the platform reports one it recognises. `None` when
+    /// there is no TPM, or when its version is not one this program can name.
+    pub spec_version: Option<String>,
+}
+
+/// Read-only access to the TPM's identity (ADR 0011). No command is ever submitted to the device.
+pub trait TpmSource {
+    /// Whether a TPM is present and, when known, which specification family it implements.
+    ///
+    /// A machine with no TPM is an answer (`present: false`), not a failure to look.
+    fn tpm_info(&self) -> Result<TpmInfo, SourceError>;
+}
+
+/// What the platform firmware itself says about UEFI Secure Boot (ADR 0038).
+///
+/// A second reading, independent of the `UEFISecureBootEnabled` registry value: this one is the UEFI
+/// `SecureBoot` variable in the EFI global-variable namespace, read from the firmware through
+/// Windows. Four answers, because "not enabled" is three different statements.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FirmwareSecureBoot {
+    /// The `SecureBoot` variable holds 1.
+    Enabled,
+    /// The `SecureBoot` variable holds 0.
+    Disabled,
+    /// The firmware is UEFI and holds no `SecureBoot` variable.
+    VariableAbsent,
+    /// Windows was started through legacy BIOS, or through a UEFI compatibility module, so there are
+    /// no firmware variables to read at all.
+    NotUefi,
+}
+
+/// Read-only access to the platform firmware's own variables (ADR 0038). Nothing is ever written to
+/// the firmware.
+pub trait FirmwareSource {
+    /// What the firmware's `SecureBoot` variable says.
+    ///
+    /// Reading a firmware variable needs a privilege that a process without administrator rights does
+    /// not hold. That is [`SourceError::AccessDenied`], never a guessed value.
+    fn firmware_secure_boot(&self) -> Result<FirmwareSecureBoot, SourceError>;
+
+    /// Which ACPI table describing an IOMMU the firmware gives Windows (ADR 0038, amendment of
+    /// 2026-10-15). Nothing is read from the table but its name.
+    fn iommu_table(&self) -> Result<IommuTable, SourceError>;
+}
+
+/// Whether the firmware describes an IOMMU to Windows, by the ACPI table x86 firmware uses for one
+/// (ADR 0038, amendment of 2026-10-15).
+///
+/// A table says the firmware set the IOMMU up and handed Windows its description. It does **not** say
+/// that Windows' Kernel DMA Protection is on, which has no documented interface (ADR 0038 section 3).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IommuTable {
+    /// `DMAR`: Intel VT-d.
+    Dmar,
+    /// `IVRS`: AMD-Vi.
+    Ivrs,
+    /// An x86 PC whose ACPI tables include neither.
+    Neither,
+    /// Not an x86 PC. Arm describes an IOMMU in other tables, which are not read, so the absence of
+    /// both x86 tables says nothing.
+    NotX86,
+}
+
+/// One process that was running when the process list was read.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProcessRecord {
+    /// Process id, as the operating system reported it at that moment.
+    pub pid: u32,
+    /// Name of the image file, without a path, e.g. `FiveM.exe`.
+    pub name: String,
+    /// Full path of the image file, when it could be resolved.
+    pub path: Option<String>,
+    /// When the process was created, in whole seconds (see [`process_started_at`]), when Windows
+    /// gave a time for it (ADR 0062). `None` is a time that could not be read, as a `None` path is a
+    /// path that could not be — never a stand-in value.
+    pub started_at: Option<jiff::Timestamp>,
+    /// The id of the process that created it, as the snapshot recorded it, when there is one. A
+    /// parent id can be reused after the parent exits, so a reader compares the parent's start time
+    /// with this one's before reading it as a relationship (B.O.P.E, ADR 0102).
+    pub parent_pid: Option<u32>,
+}
+
+/// Read-only access to the list of running processes (ADR 0010).
+pub trait ProcessSource {
+    /// Every process running at the moment of the call.
+    ///
+    /// A process whose image path cannot be resolved — a protected process, or one that exited
+    /// between the list being taken and the query — is still returned, with `path` as `None`.
+    /// Dropping it would understate what is running. The same holds for a process whose creation
+    /// time cannot be read: it is returned with `started_at` as `None` (ADR 0062).
+    fn running_processes(&self) -> Result<Vec<ProcessRecord>, SourceError>;
+}
+
+/// What one walk of a process's address space with `VirtualQueryEx` found executable, counted by
+/// the kind of memory it is (B.O.P.E, ADR 0102). Only region **types and protections** are read: no
+/// byte of the process's memory is ever copied, and no address is kept.
+///
+/// Private executable memory is what a manually mapped or shellcode injection leaves, and it is
+/// also what every just-in-time compiler, many overlays and anti-cheat software (Roblox's own
+/// Hyperion among them) allocate on purpose. A count is therefore context for a reviewer, never a
+/// finding on its own.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct ExecutableMemory {
+    /// Committed `MEM_PRIVATE` regions with an execute protection.
+    pub private_regions: u32,
+    /// Their total size in bytes.
+    pub private_bytes: u64,
+    /// Committed `MEM_MAPPED` regions with an execute protection (a mapped file that is not an image).
+    pub mapped_regions: u32,
+    /// Their total size in bytes.
+    pub mapped_bytes: u64,
+    /// Committed `MEM_IMAGE` regions with an execute protection.
+    pub image_regions: u32,
+    /// Every region the walk visited.
+    pub regions_walked: u32,
+    /// `false` when the walk stopped at this program's own limit before the end of the address space.
+    pub complete: bool,
+}
+
+/// Read-only access to the modules and the executable memory of one running process (B.O.P.E,
+/// ADR 0102). The process is opened with `PROCESS_QUERY_INFORMATION | PROCESS_VM_READ` and nothing
+/// else: nothing is written, suspended, injected or debugged.
+///
+/// A protected process, or one whose anti-cheat refuses the access, is
+/// [`SourceError::AccessDenied`]: that is the answer, not something to work around.
+pub trait ModuleSource {
+    /// The full paths of the modules loaded in process `pid`, in the order Windows lists them.
+    fn process_modules(&self, pid: u32) -> Result<Vec<String>, SourceError>;
+    /// What one walk of process `pid`'s address space found executable.
+    fn executable_memory(&self, pid: u32) -> Result<ExecutableMemory, SourceError>;
+}
+
+/// A process's creation time as `GetProcessTimes` reports it, a `FILETIME`, as a timestamp in whole
+/// seconds (ADR 0062).
+///
+/// The sub-second part is dropped as [`listed_time`] drops it: a person compares a process's start
+/// with other times by minutes, not by fractions of a second. `None` is a value that names no start —
+/// zero, the `FILETIME` epoch, which no running process was created at — or one outside the range a
+/// [`jiff::Timestamp`] represents.
+pub fn process_started_at(creation: u64) -> Option<jiff::Timestamp> {
+    if creation == 0 {
+        return None;
+    }
+    // 1601-01-01 to 1970-01-01, in seconds: `UNIX_EPOCH_AS_FILETIME` in whole seconds.
+    let filetime_epoch = std::time::UNIX_EPOCH.checked_sub(std::time::Duration::from_secs(
+        UNIX_EPOCH_AS_FILETIME / 10_000_000,
+    ))?;
+    let since = std::time::Duration::from_secs(creation / 10_000_000);
+    listed_time(filetime_epoch.checked_add(since)?)
+}
+
+/// Read-only access to how long the running Windows kernel has been counting since it started
+/// (ADR 0039).
+///
+/// Context for the report header, never evidence: a person reads the times other rows carry against
+/// it. What "started" means is Windows' own, and it is not what a person means by "I turned the PC
+/// on": a "Shut down" with Fast Startup — the default — hibernates the kernel instead of ending it,
+/// and sleep and hibernation do not reset the count either. Only a restart, or a shutdown with Fast
+/// Startup off, starts it again.
+pub trait BootTimeSource {
+    /// Time elapsed since the system started, sleep and hibernation included.
+    ///
+    /// Nothing about who is logged on is read: it is one number about the machine.
+    fn since_boot(&self) -> Result<std::time::Duration, SourceError>;
+}
+
+/// The device enumerator a [`DeviceRecord`] was listed under (ADR 0069 section 2). Only these two are
+/// read; storage, phones, cameras and every other enumerator are not.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum DeviceBus {
+    /// `PCI`: cards, controllers and the board's own bridges.
+    Pci,
+    /// `HID`: mice, keyboards and other human-interface devices.
+    Hid,
+    /// `USB`: every USB device and interface Windows remembers, by vendor and product id
+    /// (B.O.P.E, ADR 0103). The serial number in the instance part is dropped like every instance.
+    Usb,
+}
+
+impl DeviceBus {
+    /// The enumerator's name as `CfgMgr32` takes it, and the first part of a device instance id.
+    pub fn enumerator(self) -> &'static str {
+        match self {
+            Self::Pci => "PCI",
+            Self::Hid => "HID",
+            Self::Usb => "USB",
+        }
+    }
+}
+
+/// A property of a device that a host tried to read and could not (ADR 0070 section 1). A property
+/// Windows holds no value for is `None` in the record, never one of these.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum DeviceProperty {
+    /// `DEVPKEY_Device_CompatibleIds`, which holds the class code.
+    CompatibleIds,
+    /// `DEVPKEY_Device_Service`.
+    Service,
+    /// `DEVPKEY_Device_ProblemCode`.
+    ProblemCode,
+    /// `DEVPKEY_Device_FirstInstallDate`.
+    FirstInstall,
+    /// `DEVPKEY_Device_LastArrivalDate`.
+    LastArrival,
+    /// `DEVPKEY_Device_LastRemovalDate`.
+    LastRemoval,
+}
+
+/// One device Windows remembers, present or not (ADR 0069).
+///
+/// It names a **model**, never an instance: `model_id` keeps only the fields of the device id that
+/// name a maker, a product and a revision, so no serial number or position on the board reaches a
+/// report (ADR 0069 section 3).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DeviceRecord {
+    /// The enumerator it was listed under.
+    pub bus: DeviceBus,
+    /// The model, e.g. `PCI\VEN_1234&DEV_11E8&SUBSYS_11001AF4&REV_10` (see [`device_model_id`]).
+    pub model_id: String,
+    /// For a PCI device, the four hex digits of `PCI\CC_xxxx` in its compatible ids, upper case.
+    pub class_code: Option<String>,
+    /// The driver service bound to the device; `None` when none is.
+    pub service: Option<String>,
+    /// Windows' problem code, read for present devices only; `None` for an absent one.
+    pub problem_code: Option<u32>,
+    /// Listed when only present devices are asked for.
+    pub present: bool,
+    /// `DEVPKEY_Device_FirstInstallDate`, in whole seconds.
+    pub first_install: Option<jiff::Timestamp>,
+    /// `DEVPKEY_Device_LastArrivalDate`, in whole seconds. Re-written at each start of Windows, but
+    /// not at a resume from a Fast Startup shutdown (ADR 0069, measured).
+    pub last_arrival: Option<jiff::Timestamp>,
+    /// `DEVPKEY_Device_LastRemovalDate`, in whole seconds. Not written at a full shutdown (ADR 0069,
+    /// measured).
+    pub last_removal: Option<jiff::Timestamp>,
+    /// The properties that could not be read, so that a collector can make each one a gap rather
+    /// than read its `None` as "Windows holds no value".
+    pub unreadable: Vec<DeviceProperty>,
+}
+
+/// Read-only access to the devices Windows remembers (ADR 0069). Nothing is installed, started,
+/// stopped or changed.
+pub trait DeviceSource {
+    /// Every device `bus`'s enumerator lists, present or not.
+    ///
+    /// One device whose properties cannot be read is still returned, with those properties in
+    /// [`DeviceRecord::unreadable`]; only a list that cannot be read at all is an error.
+    fn devices(&self, bus: DeviceBus) -> Result<Vec<DeviceRecord>, SourceError>;
+}
+
+/// The model part of a device instance id (ADR 0069 section 3), or `None` when `instance_id` is not
+/// one of `bus`'s.
+///
+/// An instance id is `<enumerator>\<device id>\<instance>`. The instance part is dropped: for a
+/// device behind USB it is often the device's serial number, for a PCI device a position on the
+/// board. Of the device id, only the `&`-separated fields that name a model are kept — `VEN_`,
+/// `DEV_`, `SUBSYS_` and `REV_` for PCI; `VID_`, `PID_`, `REV_`, `MI_` and `COL` for HID — in the
+/// order Windows wrote them, upper case. Anything else in the device id is dropped rather than kept
+/// unread.
+pub fn device_model_id(bus: DeviceBus, instance_id: &str) -> Option<String> {
+    let mut parts = instance_id.split('\\');
+    let enumerator = parts.next()?;
+    if !enumerator.eq_ignore_ascii_case(bus.enumerator()) {
+        return None;
+    }
+    let device = parts.next()?;
+    let wanted: &[&str] = match bus {
+        DeviceBus::Pci => &["VEN_", "DEV_", "SUBSYS_", "REV_"],
+        DeviceBus::Hid => &["VID_", "PID_", "REV_", "MI_", "COL"],
+        DeviceBus::Usb => &["VID_", "PID_", "REV_", "MI_"],
+    };
+    let kept: Vec<String> = device
+        .split('&')
+        .map(str::to_ascii_uppercase)
+        .filter(|field| wanted.iter().any(|prefix| field.starts_with(prefix)))
+        .filter(|field| {
+            field
+                .split_once('_')
+                .map_or(field.len() > 3, |(_, value)| !value.is_empty())
+        })
+        .filter(|field| {
+            field
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_')
+        })
+        .collect();
+    Some(format!("{}\\{}", bus.enumerator(), kept.join("&")))
+}
+
+/// The class code of a PCI device: the first four hex digits after `PCI\CC_` in its compatible ids,
+/// upper case — `0600` for a host bridge, `0108` for an `NVMe` controller. `None` when no compatible id
+/// carries one.
+pub fn pci_class_code<S: AsRef<str>>(compatible_ids: &[S]) -> Option<String> {
+    compatible_ids.iter().find_map(|id| {
+        let id = id.as_ref();
+        let rest = id
+            .get(..7)
+            .filter(|prefix| prefix.eq_ignore_ascii_case("PCI\\CC_"))
+            .map(|_| &id[7..])?;
+        let digits = rest.get(..4)?;
+        digits
+            .bytes()
+            .all(|byte| byte.is_ascii_hexdigit())
+            .then(|| digits.to_ascii_uppercase())
+    })
+}
+
+/// A device time property, a `FILETIME`, as a timestamp in whole seconds: the conversion
+/// [`process_started_at`] makes, for the same reasons (ADR 0050, ADR 0062).
+pub fn device_time(filetime: u64) -> Option<jiff::Timestamp> {
+    process_started_at(filetime)
+}
+
+/// A volume's change journal as `FSCTL_QUERY_USN_JOURNAL` states it, without its identifier
+/// (ADR 0047). The identifier stays inside the host: it is needed to read the journal and would
+/// identify one machine across two reports.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct UsnJournalState {
+    /// `FirstUsn`: "The number of first record that can be read from the journal."
+    pub first_usn: i64,
+    /// `NextUsn` when the journal was queried: the read stops once it reaches this.
+    pub next_usn: i64,
+    /// `LowestValidUsn`: "The first record that was written into the journal for this journal
+    /// instance." Equal to `first_usn` while nothing has been trimmed since the journal was made.
+    pub lowest_valid_usn: i64,
+    /// `MaximumSize`, in bytes: the size Windows trims the journal back to.
+    pub maximum_size: u64,
+    /// The UTC date the journal's `UsnJournalID` gives when it is read as a `FILETIME`, or `None` when
+    /// that date is not a plausible one (ADR 0047 amendment, ADR 0061). Microsoft documents the
+    /// identifier only as assigned when the journal is created; that it encodes a time is **not
+    /// documented**. The identifier itself never leaves the host, and neither does a time finer than a
+    /// day: to the 100 nanoseconds it names one journal on one PC. See [`journal_created_on`].
+    pub created_on: Option<jiff::civil::Date>,
+}
+
+/// The first date [`journal_created_on`] accepts: Windows 2000, the first Windows with an NTFS change
+/// journal. An identifier that reads as an earlier date is not a creation time.
+const EARLIEST_JOURNAL_DATE: jiff::civil::Date = jiff::civil::date(2000, 1, 1);
+/// The first date [`journal_created_on`] refuses. Far enough out that no real journal reaches it, and
+/// near enough that a number that is not a time at all lands past it.
+const LATEST_JOURNAL_DATE: jiff::civil::Date = jiff::civil::date(2100, 1, 1);
+/// 100-nanosecond intervals from the `FILETIME` epoch (1601-01-01) to the Unix epoch.
+const UNIX_EPOCH_AS_FILETIME: u64 = 116_444_736_000_000_000;
+
+/// The UTC date a change journal identifier gives when it is read as a `FILETIME`, or `None` when it
+/// does not read as a date from 2000 up to 2100 (ADR 0047 amendment, ADR 0061).
+///
+/// That the identifier is a time is not documented by Microsoft: [Using the Change Journal
+/// Identifier](https://learn.microsoft.com/en-us/windows/win32/fileio/using-the-change-journal-identifier)
+/// says only that it is assigned when the journal is created. On one Windows 11 PC it read, twice, as
+/// a date within a day of the oldest installation date Windows Setup kept (ADR 0061). Only the date is
+/// returned, never the value: a date is what a reviewer compares, and the value names one journal.
+pub fn journal_created_on(identifier: u64) -> Option<jiff::civil::Date> {
+    let since_unix = identifier.checked_sub(UNIX_EPOCH_AS_FILETIME)? / 10_000_000;
+    let seconds = i64::try_from(since_unix).ok()?;
+    let date = jiff::Timestamp::from_second(seconds)
+        .ok()?
+        .to_zoned(jiff::tz::TimeZone::UTC)
+        .date();
+    (EARLIEST_JOURNAL_DATE..LATEST_JOURNAL_DATE)
+        .contains(&date)
+        .then_some(date)
+}
+
+/// How a read of a change journal ended.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UsnReadEnd {
+    /// Every buffer from `first_usn` up to `next_usn` was handed to the visitor.
+    Complete,
+    /// The journal was trimmed past the read, or deleted, while it was being read: some of it was
+    /// handed over and the rest cannot be.
+    JournalChanged,
+    /// The visitor asked to stop.
+    Stopped,
+}
+
+/// A read of a change journal: what the journal said about itself, and how the read ended.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct UsnJournalRead {
+    /// The journal's state when it was queried, before the read.
+    pub state: UsnJournalState,
+    /// How the read ended.
+    pub end: UsnReadEnd,
+}
+
+/// A file or folder's identifiers, in the two forms a change journal record names a parent by
+/// (ADR 0047).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FileId {
+    /// The 128-bit identifier `GetFileInformationByHandleEx` reports with `FileIdInfo`, which a version
+    /// 3 record carries.
+    pub id_128: [u8; 16],
+    /// `nFileIndexHigh` and `nFileIndexLow` from `GetFileInformationByHandle`, which a version 2 record
+    /// carries.
+    pub index_64: u64,
+    /// `FileIdInfo`'s `VolumeSerialNumber`: the volume `id_128` and `index_64` belong to. Both
+    /// identifiers are only ever unique within one volume, so a caller comparing two [`FileId`]s must
+    /// compare this field first — a folder reached through a junction to another volume can otherwise
+    /// share a number with an unrelated file on the volume the journal belongs to.
+    pub volume_serial: u64,
+}
+
+/// Read-only access to the NTFS change journal of a volume (ADR 0047).
+pub trait UsnJournalSource {
+    /// Queries the journal of `volume` (a drive letter) and reads it from its first record to the
+    /// `NextUsn` the query returned, handing each output buffer to `visit` as the control code returned
+    /// it: the next USN, eight bytes, then records. A buffer with no record is not handed over.
+    ///
+    /// `Ok(None)` when the volume has no active journal. `visit` returning `ControlFlow::Break` ends
+    /// the read with [`UsnReadEnd::Stopped`]. Nothing on the volume is changed.
+    fn read_usn_journal(
+        &self,
+        volume: char,
+        visit: &mut dyn FnMut(&[u8]) -> std::ops::ControlFlow<()>,
+    ) -> Result<Option<UsnJournalRead>, SourceError>;
+
+    /// The identifiers of the file or folder at `path`. `Ok(None)` when nothing is there. `path` may
+    /// also be a drive root such as `C:\`, so a caller can read a volume's own identifier to compare
+    /// against.
+    fn file_id(&self, path: &str) -> Result<Option<FileId>, SourceError>;
+}
+
+/// Most bytes one [`RandomReadSource`] call returns (B.O.P.E, ADR 0124).
+///
+/// A read at an offset is how a database that is larger than [`MAX_FILE_BYTES`] — `SRUDB.dat` is often
+/// hundreds of megabytes — or a raw volume is read one page at a time. 1 MiB is far above an ESE page
+/// (4–32 KiB) and an NTFS file record batch, and small enough that no read sizes an allocation from the
+/// file.
+pub const MAX_READ_AT_BYTES: usize = 1024 * 1024;
+
+/// Read-only random access to one file, or to the raw bytes of a volume (B.O.P.E, ADR 0124).
+///
+/// Every call opens for reading only, with every share mode, so the service that owns a file keeps
+/// writing it; nothing is locked, written or truncated, and no timestamp is changed. A volume is read
+/// through its device path (`\\.\C:`), which needs administrator rights and never locks or
+/// dismounts it.
+pub trait RandomReadSource {
+    /// The size in bytes of the regular file at `path`. `Ok(None)` when nothing is there.
+    fn file_size(&self, path: &str) -> Result<Option<u64>, SourceError>;
+
+    /// At most `len` bytes of the file at `path`, from `offset`. Fewer bytes come back only at the
+    /// end of the file. `len` above [`MAX_READ_AT_BYTES`] is refused with [`SourceError::TooLarge`].
+    /// `Ok(None)` when nothing is there.
+    fn read_file_at(
+        &self,
+        path: &str,
+        offset: u64,
+        len: usize,
+    ) -> Result<Option<Vec<u8>>, SourceError>;
+
+    /// `len` bytes of the raw volume `volume` (a drive letter) from `offset`, as the disk holds them.
+    /// The host aligns the read to the volume's sectors itself. Fewer bytes come back only at the end
+    /// of the volume. `len` above [`MAX_READ_AT_BYTES`] is refused.
+    fn read_volume_at(&self, volume: char, offset: u64, len: usize)
+    -> Result<Vec<u8>, SourceError>;
+}
+
+/// One WMI object of an event subscription, as the documented WMI query interface returns it
+/// (B.O.P.E, ADR 0127).
+///
+/// Only the system property `__CLASS` and the named properties a host is asked for are kept, as text;
+/// a property that is null or of a type that is not text, a number or a boolean is left out. Nothing
+/// is executed and nothing in WMI is changed by reading it.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[cfg_attr(feature = "fixture", derive(serde::Deserialize))]
+#[cfg_attr(feature = "fixture", serde(deny_unknown_fields))]
+pub struct WmiObject {
+    /// The object's class, `__CLASS`: `__EventFilter`, `CommandLineEventConsumer`,
+    /// `ActiveScriptEventConsumer`, `__FilterToConsumerBinding`, …
+    pub class: String,
+    /// The properties read, by name, as text. A host bounds each to [`MAX_WMI_PROPERTY_BYTES`].
+    #[cfg_attr(feature = "fixture", serde(default))]
+    pub properties: std::collections::BTreeMap<String, String>,
+}
+
+/// Most bytes kept of one WMI property's text. A script consumer's `ScriptText` can be any length; a
+/// longer one is cut here and the collector says so.
+pub const MAX_WMI_PROPERTY_BYTES: usize = 64 * 1024;
+
+/// The three kinds of object that make a permanent WMI event subscription (B.O.P.E, ADR 0127).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum WmiSubscriptionClass {
+    /// `__EventFilter`: the event query.
+    Filter,
+    /// `__EventConsumer` and every class derived from it: what is done when the event happens.
+    Consumer,
+    /// `__FilterToConsumerBinding`: which filter starts which consumer.
+    Binding,
+}
+
+impl WmiSubscriptionClass {
+    /// The WMI class queried for this kind; a query of an abstract class returns its subclasses.
+    pub fn wmi_class(self) -> &'static str {
+        match self {
+            Self::Filter => "__EventFilter",
+            Self::Consumer => "__EventConsumer",
+            Self::Binding => "__FilterToConsumerBinding",
+        }
+    }
+}
+
+/// Read-only access to the permanent WMI event subscriptions of one namespace (B.O.P.E, ADR 0127).
+///
+/// A live host asks WMI itself (`IWbemServices::ExecQuery`, `SELECT * FROM <class>`), with the caller's
+/// own rights; it never calls `PutInstance`, `DeleteInstance` or `ExecMethod`, and never starts a
+/// consumer. `Ok(None)` when the namespace does not exist on this PC.
+pub trait WmiSubscriptionSource {
+    /// Every object of `class` in `namespace` (`ROOT\subscription`), with the properties named in
+    /// `properties` that it holds.
+    fn wmi_objects(
+        &self,
+        namespace: &str,
+        class: WmiSubscriptionClass,
+        properties: &[&str],
+    ) -> Result<Option<Vec<WmiObject>>, SourceError>;
+}
+
+/// What the Service Control Manager says a service is doing now (B.O.P.E, ADR 0130).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "fixture", derive(serde::Deserialize))]
+#[cfg_attr(feature = "fixture", serde(rename_all = "snake_case"))]
+pub enum ServiceRunState {
+    /// `SERVICE_STOPPED`.
+    Stopped,
+    /// `SERVICE_START_PENDING`.
+    StartPending,
+    /// `SERVICE_STOP_PENDING`.
+    StopPending,
+    /// `SERVICE_RUNNING`.
+    Running,
+    /// `SERVICE_CONTINUE_PENDING`.
+    ContinuePending,
+    /// `SERVICE_PAUSE_PENDING`.
+    PausePending,
+    /// `SERVICE_PAUSED`.
+    Paused,
+    /// Any other value.
+    Other,
+}
+
+impl ServiceRunState {
+    /// The `dwCurrentState` value as this enum.
+    pub fn from_win32(value: u32) -> Self {
+        match value {
+            1 => Self::Stopped,
+            2 => Self::StartPending,
+            3 => Self::StopPending,
+            4 => Self::Running,
+            5 => Self::ContinuePending,
+            6 => Self::PausePending,
+            7 => Self::Paused,
+            _ => Self::Other,
+        }
+    }
+
+    /// The name observations use.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Stopped => "stopped",
+            Self::StartPending => "start_pending",
+            Self::StopPending => "stop_pending",
+            Self::Running => "running",
+            Self::ContinuePending => "continue_pending",
+            Self::PausePending => "pause_pending",
+            Self::Paused => "paused",
+            Self::Other => "other",
+        }
+    }
+}
+
+/// How a service is configured to start (B.O.P.E, ADR 0130).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "fixture", derive(serde::Deserialize))]
+#[cfg_attr(feature = "fixture", serde(rename_all = "snake_case"))]
+pub enum ServiceStartType {
+    /// `SERVICE_BOOT_START`.
+    Boot,
+    /// `SERVICE_SYSTEM_START`.
+    System,
+    /// `SERVICE_AUTO_START`.
+    Automatic,
+    /// `SERVICE_DEMAND_START`.
+    Manual,
+    /// `SERVICE_DISABLED`.
+    Disabled,
+    /// Any other value.
+    Other,
+}
+
+impl ServiceStartType {
+    /// The `dwStartType` value as this enum.
+    pub fn from_win32(value: u32) -> Self {
+        match value {
+            0 => Self::Boot,
+            1 => Self::System,
+            2 => Self::Automatic,
+            3 => Self::Manual,
+            4 => Self::Disabled,
+            _ => Self::Other,
+        }
+    }
+
+    /// The name observations use.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Boot => "boot",
+            Self::System => "system",
+            Self::Automatic => "automatic",
+            Self::Manual => "manual",
+            Self::Disabled => "disabled",
+            Self::Other => "other",
+        }
+    }
+}
+
+/// A service's configuration as `QueryServiceConfigW` returns it (B.O.P.E, ADR 0130).
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "fixture", derive(serde::Deserialize))]
+#[cfg_attr(feature = "fixture", serde(deny_unknown_fields))]
+pub struct ServiceConfig {
+    /// How it starts.
+    pub start_type: ServiceStartType,
+    /// Its display name.
+    #[cfg_attr(feature = "fixture", serde(default))]
+    pub display_name: Option<String>,
+    /// The account it runs as.
+    #[cfg_attr(feature = "fixture", serde(default))]
+    pub account: Option<String>,
+    /// Its command line as configured, bounded to [`MAX_SERVICE_TEXT_BYTES`].
+    #[cfg_attr(feature = "fixture", serde(default))]
+    pub binary_path: Option<String>,
+}
+
+/// Most bytes kept of one service text.
+pub const MAX_SERVICE_TEXT_BYTES: usize = 2048;
+
+/// One service as the Service Control Manager reports it at the moment it was asked (B.O.P.E,
+/// ADR 0130).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ServiceStatus {
+    /// What it is doing.
+    pub state: ServiceRunState,
+    /// Its process id while it has one.
+    pub pid: Option<u32>,
+    /// Its configuration, or why it could not be read: status and configuration are two queries, and
+    /// one can be refused when the other is not.
+    pub config: Result<ServiceConfig, SourceError>,
+    /// When the host asked.
+    pub queried_at: jiff::Timestamp,
+}
+
+/// Read-only access to the Service Control Manager (B.O.P.E, ADR 0130).
+///
+/// A live host opens the manager with `SC_MANAGER_CONNECT` and a service with
+/// `SERVICE_QUERY_STATUS | SERVICE_QUERY_CONFIG` only; it never starts, stops, pauses or reconfigures
+/// one. `Ok(None)` when no service of that name is installed.
+pub trait ServiceSource {
+    /// The service whose internal (key) name is `name`.
+    fn service_status(&self, name: &str) -> Result<Option<ServiceStatus>, SourceError>;
+}
+
+/// Cuts `text` to at most `limit` bytes at a character boundary, and says whether it cut.
+pub fn bound_text(mut text: String, limit: usize) -> (String, bool) {
+    if text.len() <= limit {
+        return (text, false);
+    }
+    let mut end = limit;
+    while !text.is_char_boundary(end) {
+        end -= 1;
+    }
+    text.truncate(end);
+    (text, true)
+}
+
+/// The bytes `[offset, offset + len)` of `content`, clamped to its end, for hosts that hold a file in
+/// memory. Refuses a `len` above [`MAX_READ_AT_BYTES`].
+pub fn slice_at(content: &[u8], offset: u64, len: usize) -> Result<Vec<u8>, SourceError> {
+    if len > MAX_READ_AT_BYTES {
+        return Err(SourceError::TooLarge {
+            limit: MAX_READ_AT_BYTES,
+        });
+    }
+    let start = usize::try_from(offset)
+        .unwrap_or(usize::MAX)
+        .min(content.len());
+    let end = start.saturating_add(len).min(content.len());
+    Ok(content[start..end].to_vec())
+}
+
+/// Size of one read when a file is streamed through SHA-256.
+const READ_BLOCK: usize = 64 * 1024;
+
+/// Streams `reader` through SHA-256 and returns the digest as lowercase hex.
+///
+/// Streaming, not `read_to_end`: a plugin can be tens of megabytes and only its digest is kept.
+pub fn sha256_reader<R: std::io::Read>(mut reader: R) -> std::io::Result<String> {
+    use std::fmt::Write as _;
+
+    use sha2::{Digest as _, Sha256};
+
+    let mut hasher = Sha256::new();
+    let mut buffer = vec![0_u8; READ_BLOCK];
+    loop {
+        match reader.read(&mut buffer) {
+            Ok(0) => break,
+            Ok(read) => hasher.update(&buffer[..read]),
+            // A signal interrupted the read; the same block is read again.
+            Err(error) if error.kind() == std::io::ErrorKind::Interrupted => {}
+            Err(error) => return Err(error),
+        }
+    }
+    let digest = hasher.finalize();
+    let mut hex = String::with_capacity(64);
+    for byte in &digest {
+        let _ = write!(hex, "{byte:02x}");
+    }
+    Ok(hex)
+}
+
+/// Streams the file at `path` through SHA-256. Opens it for reading only.
+///
+/// It lives here rather than in one host implementation so that every [`FilesystemSource`] that reads
+/// real files produces the same digest in the same form, and so that the streaming loop is covered by
+/// tests that run on any operating system.
+pub fn sha256_file(path: &std::path::Path) -> std::io::Result<String> {
+    sha256_reader(std::io::BufReader::new(std::fs::File::open(path)?))
+}
+
+/// Most bytes [`FilesystemSource::read_file`] returns for one file (ADR 0019).
+///
+/// Every file a collector reads is on the machine being examined, so its size is chosen by whoever
+/// put it there. Without a limit, `read_to_end` on a hostile path sizes an allocation from the file —
+/// the defect this project patched in the vendored `evtx` crate (ADR 0018), one layer lower.
+///
+/// 64 MiB is four times the 16 MiB cap `bope_parsers::prefetch` already applies to a declared
+/// decompressed size, and far above the artifacts this program reads: the vendored Event Log sample is
+/// 69 632 bytes and the largest vendored Prefetch file decompresses to 25 KiB. It is also far below a
+/// size that costs a player's machine anything to refuse.
+pub const MAX_FILE_BYTES: usize = 64 * 1024 * 1024;
+
+/// Reads at most `limit` bytes from `reader`, or reports [`SourceError::TooLarge`].
+///
+/// It reads one byte past the limit deliberately: that is what tells a file of exactly `limit` bytes,
+/// which is returned whole, from a larger one, which is refused. Nothing is ever truncated.
+///
+/// The buffer grows as bytes arrive rather than being reserved from a size the file declares, so the
+/// largest allocation this makes is the program's choice and not the file's. It lives here next to the
+/// trait, as [`sha256_file`] does, so every host that reads real files applies the same limit the same
+/// way and so the loop is covered by tests that need no Windows.
+pub fn read_bounded<R: std::io::Read>(reader: R, limit: usize) -> Result<Vec<u8>, SourceError> {
+    use std::io::Read as _;
+
+    let one_past = u64::try_from(limit.saturating_add(1)).unwrap_or(u64::MAX);
+    let mut bytes = Vec::new();
+    reader
+        .take(one_past)
+        .read_to_end(&mut bytes)
+        .map_err(|error| SourceError::from_io(&error))?;
+    if bytes.len() > limit {
+        return Err(SourceError::TooLarge { limit });
+    }
+    Ok(bytes)
+}
+
+/// Most bytes [`RegistrySource::read_bytes`] returns for one registry value (ADR 0022).
+///
+/// Every value a collector reads is on the machine being examined, so its size is chosen by whoever
+/// put it there — the same argument [`MAX_FILE_BYTES`] rests on, one source over.
+///
+/// 64 KiB is far above the artifact this exists for: the BAM layout `bope_parsers::bam` describes
+/// is 24 bytes, so the limit is some 2 700 times it, and a value that is longer is kept whole by that
+/// parser rather than trimmed. It is also a thousandth of what a file may be, which is the ratio
+/// between the two sources: the registry is a settings store, and a value in it is small by design.
+/// A machine with a larger value is answered with [`SourceError::TooLarge`], which is a fact about
+/// that value rather than a failure to look.
+///
+/// B.O.P.E Scanner raises it from 64 KiB to 4 MiB (docs/adr/0100-bope-scanner-fork.md): the
+/// `AppCompatCache` value the `shimcache` collector decodes holds up to 1 024 entries with their full
+/// paths and is routinely several hundred KiB on Windows 10 and 11. 4 MiB is still a sixteenth of
+/// [`MAX_FILE_BYTES`], and a value above it is refused rather than truncated, as before.
+pub const MAX_REGISTRY_VALUE_BYTES: usize = 4 * 1024 * 1024;
+
+/// Refuses a registry value larger than `limit`, as [`read_bounded`] refuses a file.
+///
+/// It takes bytes rather than a reader, and that difference is the honest part: a platform registry
+/// API hands back a whole value in one call, sized from the length the value declares, so this bounds
+/// what crosses the trait boundary and reaches a parser — not the allocation the platform already
+/// made. [`read_bounded`] can bound both because it owns the reading loop.
+///
+/// It lives here next to the trait so that every host refuses exactly the same values.
+pub fn bound_registry_value(bytes: Vec<u8>, limit: usize) -> Result<Vec<u8>, SourceError> {
+    if bytes.len() > limit {
+        return Err(SourceError::TooLarge { limit });
+    }
+    Ok(bytes)
+}
+
+/// Refuses a string value longer than `limit` bytes, as [`bound_registry_value`] refuses a binary one.
+/// The other kinds of [`RegistryData`] are a number or no data at all and pass unchanged.
+pub fn bound_registry_data(data: RegistryData, limit: usize) -> Result<RegistryData, SourceError> {
+    match data {
+        RegistryData::Text(text) if text.len() > limit => Err(SourceError::TooLarge { limit }),
+        other => Ok(other),
+    }
+}
+
+/// A machine that collectors can read. More source traits are added as collectors need them.
+pub trait Host:
+    RegistrySource
+    + FilesystemSource
+    + SignatureSource
+    + EventLogConfigSource
+    + EnvironmentSource
+    + SystemIntegritySource
+    + TpmSource
+    + FirmwareSource
+    + ProcessSource
+    + ModuleSource
+    + BootTimeSource
+    + DeviceSource
+    + UsnJournalSource
+    + AccountSource
+    + RandomReadSource
+    + WmiSubscriptionSource
+    + ServiceSource
+{
+    /// Operating system family.
+    fn platform(&self) -> Platform;
+    /// Windows build number, when known.
+    fn os_build(&self) -> Option<String>;
+    /// Whether the process can use administrator rights, when known. False when the Administrators group
+    /// is only deny-only in the token (UAC-filtered or restricted tokens).
+    fn is_elevated(&self) -> Option<bool>;
+}
+
+/// The host used when the program runs on something other than Windows: every read is unsupported.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct NonWindowsHost;
+
+impl RegistrySource for NonWindowsHost {
+    fn read_u32(&self, _key: &str, _value: &str) -> Result<Option<u32>, SourceError> {
+        Err(SourceError::Unsupported(
+            "no registry on this platform".to_owned(),
+        ))
+    }
+
+    fn read_string(&self, _key: &str, _value: &str) -> Result<Option<String>, SourceError> {
+        Err(SourceError::Unsupported(
+            "no registry on this platform".to_owned(),
+        ))
+    }
+
+    fn subkeys(&self, _key: &str) -> Result<Option<Vec<String>>, SourceError> {
+        Err(SourceError::Unsupported(
+            "no registry on this platform".to_owned(),
+        ))
+    }
+
+    fn value_names(&self, _key: &str) -> Result<Option<Vec<String>>, SourceError> {
+        Err(SourceError::Unsupported(
+            "no registry on this platform".to_owned(),
+        ))
+    }
+
+    fn read_bytes(&self, _key: &str, _value: &str) -> Result<Option<Vec<u8>>, SourceError> {
+        Err(SourceError::Unsupported(
+            "no registry on this platform".to_owned(),
+        ))
+    }
+
+    fn read_value(&self, _key: &str, _value: &str) -> Result<Option<RegistryData>, SourceError> {
+        Err(SourceError::Unsupported(
+            "no registry on this platform".to_owned(),
+        ))
+    }
+}
+
+impl FilesystemSource for NonWindowsHost {
+    fn list_dir(&self, _dir: &str) -> Result<Option<Vec<DirEntryInfo>>, SourceError> {
+        Err(SourceError::Unsupported(
+            "no Windows file system on this platform".to_owned(),
+        ))
+    }
+
+    fn file_sha256(&self, _path: &str) -> Result<String, SourceError> {
+        Err(SourceError::Unsupported(
+            "no Windows file system on this platform".to_owned(),
+        ))
+    }
+
+    fn read_file(&self, _path: &str) -> Result<Option<Vec<u8>>, SourceError> {
+        Err(SourceError::Unsupported(
+            "no Windows file system on this platform".to_owned(),
+        ))
+    }
+
+    fn is_read_only(&self, _path: &str) -> Result<Option<bool>, SourceError> {
+        Err(SourceError::Unsupported(
+            "no Windows file system on this platform".to_owned(),
+        ))
+    }
+
+    fn times(&self, _path: &str) -> Result<Option<EntryTimes>, SourceError> {
+        Err(SourceError::Unsupported(
+            "no Windows file system on this platform".to_owned(),
+        ))
+    }
+}
+
+impl EventLogConfigSource for NonWindowsHost {
+    fn channel_config_reader(&self) -> Result<Box<dyn ChannelConfigReader>, SourceError> {
+        Err(SourceError::Unsupported(
+            "no Windows Event Log on this platform".to_owned(),
+        ))
+    }
+}
+
+impl SignatureSource for NonWindowsHost {
+    fn file_signature(&self, _path: &str) -> Result<SignatureCheck, SourceError> {
+        Err(SourceError::Unsupported(
+            "no Authenticode verification on this platform".to_owned(),
+        ))
+    }
+}
+
+impl EnvironmentSource for NonWindowsHost {
+    fn env_var(&self, _name: &str) -> Option<String> {
+        None
+    }
+}
+
+impl SystemIntegritySource for NonWindowsHost {
+    fn code_integrity_options(&self) -> Result<CodeIntegrityOptions, SourceError> {
+        Err(SourceError::Unsupported(
+            "no Windows code integrity on this platform".to_owned(),
+        ))
+    }
+}
+
+impl TpmSource for NonWindowsHost {
+    fn tpm_info(&self) -> Result<TpmInfo, SourceError> {
+        Err(SourceError::Unsupported(
+            "no TPM base services on this platform".to_owned(),
+        ))
+    }
+}
+
+impl FirmwareSource for NonWindowsHost {
+    fn firmware_secure_boot(&self) -> Result<FirmwareSecureBoot, SourceError> {
+        Err(SourceError::Unsupported(
+            "no Windows firmware interface on this platform".to_owned(),
+        ))
+    }
+
+    fn iommu_table(&self) -> Result<IommuTable, SourceError> {
+        Err(SourceError::Unsupported(
+            "no Windows firmware interface on this platform".to_owned(),
+        ))
+    }
+}
+
+impl ProcessSource for NonWindowsHost {
+    fn running_processes(&self) -> Result<Vec<ProcessRecord>, SourceError> {
+        Err(SourceError::Unsupported(
+            "no Windows process list on this platform".to_owned(),
+        ))
+    }
+}
+
+impl ModuleSource for NonWindowsHost {
+    fn process_modules(&self, _pid: u32) -> Result<Vec<String>, SourceError> {
+        Err(SourceError::Unsupported(
+            "no Windows process modules on this platform".to_owned(),
+        ))
+    }
+
+    fn executable_memory(&self, _pid: u32) -> Result<ExecutableMemory, SourceError> {
+        Err(SourceError::Unsupported(
+            "no Windows process memory on this platform".to_owned(),
+        ))
+    }
+}
+
+impl BootTimeSource for NonWindowsHost {
+    fn since_boot(&self) -> Result<std::time::Duration, SourceError> {
+        Err(SourceError::Unsupported(
+            "no Windows boot time on this platform".to_owned(),
+        ))
+    }
+}
+
+impl DeviceSource for NonWindowsHost {
+    fn devices(&self, _bus: DeviceBus) -> Result<Vec<DeviceRecord>, SourceError> {
+        Err(SourceError::Unsupported(
+            "no Windows devices on this platform".to_owned(),
+        ))
+    }
+}
+
+impl UsnJournalSource for NonWindowsHost {
+    fn read_usn_journal(
+        &self,
+        _volume: char,
+        _visit: &mut dyn FnMut(&[u8]) -> std::ops::ControlFlow<()>,
+    ) -> Result<Option<UsnJournalRead>, SourceError> {
+        Err(SourceError::Unsupported(
+            "no NTFS change journal on this platform".to_owned(),
+        ))
+    }
+
+    fn file_id(&self, _path: &str) -> Result<Option<FileId>, SourceError> {
+        Err(SourceError::Unsupported(
+            "no Windows file identifiers on this platform".to_owned(),
+        ))
+    }
+}
+
+impl AccountSource for NonWindowsHost {
+    fn account_sid(&self) -> Result<String, SourceError> {
+        Err(SourceError::Unsupported(
+            "no Windows account on this platform".to_owned(),
+        ))
+    }
+}
+
+impl RandomReadSource for NonWindowsHost {
+    fn file_size(&self, _path: &str) -> Result<Option<u64>, SourceError> {
+        Err(SourceError::Unsupported(
+            "no Windows file system on this platform".to_owned(),
+        ))
+    }
+
+    fn read_file_at(
+        &self,
+        _path: &str,
+        _offset: u64,
+        _len: usize,
+    ) -> Result<Option<Vec<u8>>, SourceError> {
+        Err(SourceError::Unsupported(
+            "no Windows file system on this platform".to_owned(),
+        ))
+    }
+
+    fn read_volume_at(
+        &self,
+        _volume: char,
+        _offset: u64,
+        _len: usize,
+    ) -> Result<Vec<u8>, SourceError> {
+        Err(SourceError::Unsupported(
+            "no NTFS volume on this platform".to_owned(),
+        ))
+    }
+}
+
+impl WmiSubscriptionSource for NonWindowsHost {
+    fn wmi_objects(
+        &self,
+        _namespace: &str,
+        _class: WmiSubscriptionClass,
+        _properties: &[&str],
+    ) -> Result<Option<Vec<WmiObject>>, SourceError> {
+        Err(SourceError::Unsupported(
+            "no WMI on this platform".to_owned(),
+        ))
+    }
+}
+
+impl ServiceSource for NonWindowsHost {
+    fn service_status(&self, _name: &str) -> Result<Option<ServiceStatus>, SourceError> {
+        Err(SourceError::Unsupported(
+            "no Service Control Manager on this platform".to_owned(),
+        ))
+    }
+}
+
+impl Host for NonWindowsHost {
+    fn platform(&self) -> Platform {
+        Platform::Other
+    }
+
+    fn os_build(&self) -> Option<String> {
+        None
+    }
+
+    fn is_elevated(&self) -> Option<bool> {
+        None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use std::time::{Duration, UNIX_EPOCH};
+
+    fn at(text: &str) -> jiff::Timestamp {
+        text.parse().unwrap()
+    }
+
+    #[test]
+    fn a_pci_instance_id_keeps_its_model_and_drops_the_instance() {
+        assert_eq!(
+            device_model_id(
+                DeviceBus::Pci,
+                r"PCI\VEN_1234&DEV_11E8&SUBSYS_11001AF4&REV_10\4&c580b9d&0&0020"
+            )
+            .as_deref(),
+            Some(r"PCI\VEN_1234&DEV_11E8&SUBSYS_11001AF4&REV_10")
+        );
+    }
+
+    #[test]
+    fn a_hid_instance_id_keeps_vendor_product_interface_and_collection() {
+        assert_eq!(
+            device_model_id(
+                DeviceBus::Hid,
+                r"HID\VID_046D&PID_C52B&MI_02&Col01\8&2a1b3c4d&0&0000"
+            )
+            .as_deref(),
+            Some(r"HID\VID_046D&PID_C52B&MI_02&COL01")
+        );
+    }
+
+    /// Whatever the device id holds besides the model fields is dropped rather than carried unread:
+    /// a Bluetooth HID id puts a service GUID where a vendor would be.
+    #[test]
+    fn fields_that_name_no_model_are_dropped() {
+        assert_eq!(
+            device_model_id(
+                DeviceBus::Hid,
+                r"HID\{00001124-0000-1000-8000-00805f9b34fb}_VID&0002046d_PID&b023\9&1&0&0000"
+            )
+            .as_deref(),
+            Some(r"HID\")
+        );
+        assert_eq!(
+            device_model_id(DeviceBus::Pci, r"PCI\VEN_8086&DEV_&CC_0600\3&0").as_deref(),
+            Some(r"PCI\VEN_8086")
+        );
+    }
+
+    #[test]
+    fn an_id_of_another_enumerator_is_not_a_device_of_this_bus() {
+        assert_eq!(
+            device_model_id(DeviceBus::Pci, r"USB\VID_0627&PID_0001\1"),
+            None
+        );
+        assert_eq!(
+            device_model_id(DeviceBus::Hid, r"PCI\VEN_1234&DEV_11E8\1"),
+            None
+        );
+        assert_eq!(device_model_id(DeviceBus::Pci, "PCI"), None);
+        // USB keeps the vendor, product and interface and drops the serial number in the instance.
+        assert_eq!(
+            device_model_id(DeviceBus::Usb, r"USB\VID_2341&PID_8036&MI_02\6&2A3F&0&0002")
+                .as_deref(),
+            Some(r"USB\VID_2341&PID_8036&MI_02")
+        );
+        assert_eq!(
+            device_model_id(DeviceBus::Usb, r"USB\VID_046D&PID_C52B\SERIAL0123").as_deref(),
+            Some(r"USB\VID_046D&PID_C52B")
+        );
+    }
+
+    #[test]
+    fn the_class_code_is_the_first_four_hex_digits_of_the_cc_compatible_id() {
+        let ids = [
+            r"PCI\VEN_1B36&DEV_0010&REV_02",
+            r"PCI\CC_010802",
+            r"PCI\CC_0108",
+        ];
+        assert_eq!(pci_class_code(&ids).as_deref(), Some("0108"));
+        assert_eq!(pci_class_code(&[r"pci\cc_0c05"]).as_deref(), Some("0C05"));
+        assert_eq!(pci_class_code(&[r"PCI\CC_06"]), None);
+        assert_eq!(pci_class_code(&[r"PCI\CC_ZZZZ"]), None);
+        assert_eq!(pci_class_code::<&str>(&[]), None);
+    }
+
+    #[test]
+    fn a_device_time_is_the_filetime_in_whole_seconds() {
+        // 2026-10-15T11:32:36Z plus 0.5 s, as a FILETIME.
+        let filetime = (1_792_063_956 * 10_000_000) + UNIX_EPOCH_AS_FILETIME + 5_000_000;
+        assert_eq!(device_time(filetime), Some(at("2026-10-15T11:32:36Z")));
+        assert_eq!(device_time(0), None);
+    }
+
+    /// A `FILETIME` of 2020-01-01T00:00:00Z plus most of a day: only the UTC date comes back.
+    #[test]
+    fn a_journal_identifier_read_as_a_filetime_gives_its_utc_date() {
+        let new_year = 132_223_104_000_000_000_u64;
+        assert_eq!(
+            journal_created_on(new_year),
+            Some(jiff::civil::date(2020, 1, 1))
+        );
+        let late = new_year + 23 * 3_600 * 10_000_000 + 59 * 60 * 10_000_000;
+        assert_eq!(
+            journal_created_on(late),
+            Some(jiff::civil::date(2020, 1, 1))
+        );
+    }
+
+    /// An identifier that is not a time — a small counter, the epoch, a number past any real date —
+    /// gives no date rather than a wrong one.
+    #[test]
+    fn an_identifier_that_is_not_a_plausible_date_gives_none() {
+        for identifier in [
+            0,
+            1,
+            UNIX_EPOCH_AS_FILETIME,
+            // 1999-12-31: before the first Windows with a change journal.
+            125_911_583_990_000_000,
+            // 2100-01-01.
+            157_469_184_000_000_000,
+            u64::MAX,
+        ] {
+            assert_eq!(journal_created_on(identifier), None, "{identifier}");
+        }
+        assert_eq!(
+            journal_created_on(125_911_584_000_000_000),
+            Some(jiff::civil::date(2000, 1, 1))
+        );
+    }
+
+    /// A `FILETIME` of 2020-01-01T00:00:00Z plus a fraction of a second: the second it falls in.
+    #[test]
+    fn a_process_creation_time_keeps_whole_seconds() {
+        let new_year = 132_223_104_000_000_000_u64;
+        assert_eq!(
+            process_started_at(new_year),
+            Some(at("2020-01-01T00:00:00Z"))
+        );
+        assert_eq!(
+            process_started_at(new_year + 9_999_999),
+            Some(at("2020-01-01T00:00:00Z"))
+        );
+        assert_eq!(
+            process_started_at(new_year + 10_000_000),
+            Some(at("2020-01-01T00:00:01Z"))
+        );
+        assert_eq!(
+            process_started_at(UNIX_EPOCH_AS_FILETIME),
+            Some(at("1970-01-01T00:00:00Z"))
+        );
+    }
+
+    /// Zero names no start, and a value past the year 9999 names none this program can represent:
+    /// both are "not read", never a wrong instant, and nothing panics.
+    #[test]
+    fn a_process_creation_time_that_names_no_start_gives_none() {
+        assert_eq!(process_started_at(0), None);
+        assert_eq!(process_started_at(u64::MAX), None);
+        assert_eq!(
+            process_started_at(1),
+            Some(at("1601-01-01T00:00:00Z")),
+            "a non-zero value before 1970 is still an instant"
+        );
+    }
+
+    #[test]
+    fn a_listed_time_keeps_whole_seconds_and_drops_the_rest() {
+        let exact = UNIX_EPOCH + Duration::new(1_789_000_000, 999_999_900);
+        assert_eq!(listed_time(exact), Some(at("2026-09-10T00:26:40Z")));
+        let whole = UNIX_EPOCH + Duration::from_secs(1_789_000_000);
+        assert_eq!(listed_time(whole), Some(at("2026-09-10T00:26:40Z")));
+    }
+
+    /// Rounding towards zero would move an instant before 1970 later than it was. The file-time epoch
+    /// is 1601, and a copied file can carry a write time that far back.
+    #[test]
+    fn a_listed_time_before_1970_rounds_to_the_earlier_second() {
+        let before = UNIX_EPOCH - Duration::new(10, 100);
+        assert_eq!(listed_time(before), Some(at("1969-12-31T23:59:49Z")));
+        // 1601-01-01 to 1970-01-01: 134 774 days, 11 644 473 600 seconds.
+        let filetime_epoch = UNIX_EPOCH - Duration::from_hours(134_774 * 24);
+        assert_eq!(
+            listed_time(filetime_epoch),
+            Some(at("1601-01-01T00:00:00Z"))
+        );
+    }
+
+    #[test]
+    fn a_named_entry_carries_no_size_and_no_times() {
+        let entry = DirEntryInfo::named("a.dll", true);
+        assert_eq!(
+            (entry.size, entry.created, entry.modified),
+            (None, None, None)
+        );
+    }
+
+    #[test]
+    fn non_windows_host_reads_no_files_and_no_environment() {
+        assert!(matches!(
+            NonWindowsHost.list_dir(r"C:\Users\a"),
+            Err(SourceError::Unsupported(_))
+        ));
+        assert!(matches!(
+            NonWindowsHost.file_sha256(r"C:\Users\a\x.dll"),
+            Err(SourceError::Unsupported(_))
+        ));
+        assert!(matches!(
+            NonWindowsHost.read_file(r"C:\Users\a\x.dll"),
+            Err(SourceError::Unsupported(_))
+        ));
+        assert!(matches!(
+            NonWindowsHost.file_signature(r"C:\Users\a\x.dll"),
+            Err(SourceError::Unsupported(_))
+        ));
+        assert!(matches!(
+            NonWindowsHost.is_read_only(r"C:\Users\a\x.dll"),
+            Err(SourceError::Unsupported(_))
+        ));
+        assert!(matches!(
+            NonWindowsHost.channel_config_reader(),
+            Err(SourceError::Unsupported(_))
+        ));
+        assert_eq!(NonWindowsHost.env_var("LOCALAPPDATA"), None);
+    }
+
+    #[test]
+    fn non_windows_host_reads_no_registry_at_all() {
+        let key = r"HKLM\SYSTEM\CurrentControlSet\Services\bam\State\UserSettings";
+        assert!(matches!(
+            NonWindowsHost.read_u32(key, "Anything"),
+            Err(SourceError::Unsupported(_))
+        ));
+        assert!(matches!(
+            NonWindowsHost.subkeys(key),
+            Err(SourceError::Unsupported(_))
+        ));
+        assert!(matches!(
+            NonWindowsHost.value_names(key),
+            Err(SourceError::Unsupported(_))
+        ));
+        assert!(matches!(
+            NonWindowsHost.read_bytes(key, r"C:\x.exe"),
+            Err(SourceError::Unsupported(_))
+        ));
+        assert!(matches!(
+            NonWindowsHost.read_value(key, "Anything"),
+            Err(SourceError::Unsupported(_))
+        ));
+    }
+
+    #[test]
+    fn registry_text_is_bounded_like_registry_bytes() {
+        let limit = 4;
+        assert_eq!(
+            bound_registry_data(RegistryData::Text("1234".to_owned()), limit),
+            Ok(RegistryData::Text("1234".to_owned()))
+        );
+        assert_eq!(
+            bound_registry_data(RegistryData::Text("12345".to_owned()), limit),
+            Err(SourceError::TooLarge { limit })
+        );
+        // Numbers and a type whose data is not read have nothing to bound.
+        assert_eq!(
+            bound_registry_data(RegistryData::Qword(u64::MAX), limit),
+            Ok(RegistryData::Qword(u64::MAX))
+        );
+    }
+
+    #[test]
+    fn non_windows_host_reports_no_boot_time_rather_than_zero() {
+        assert!(matches!(
+            NonWindowsHost.since_boot(),
+            Err(SourceError::Unsupported(_))
+        ));
+    }
+
+    #[test]
+    fn non_windows_host_reports_no_code_integrity_no_tpm_and_no_firmware() {
+        assert!(matches!(
+            NonWindowsHost.code_integrity_options(),
+            Err(SourceError::Unsupported(_))
+        ));
+        assert!(matches!(
+            NonWindowsHost.tpm_info(),
+            Err(SourceError::Unsupported(_))
+        ));
+        assert!(matches!(
+            NonWindowsHost.firmware_secure_boot(),
+            Err(SourceError::Unsupported(_))
+        ));
+    }
+
+    /// Not an empty list: "nothing is running" would be a claim about the machine, and this host
+    /// cannot look at all.
+    #[test]
+    fn non_windows_host_lists_no_processes_rather_than_an_empty_list() {
+        assert!(matches!(
+            NonWindowsHost.running_processes(),
+            Err(SourceError::Unsupported(_))
+        ));
+    }
+
+    #[test]
+    fn io_errors_are_classified_for_every_host_the_same_way() {
+        use std::io::{Error, ErrorKind};
+
+        assert_eq!(
+            SourceError::from_io(&Error::from(ErrorKind::PermissionDenied)),
+            SourceError::AccessDenied
+        );
+        // A path that is gone is a fact for `list_dir`, which checks `NotFound` itself; anything that
+        // reaches this function is a read that failed.
+        for kind in [
+            ErrorKind::NotFound,
+            ErrorKind::InvalidData,
+            ErrorKind::UnexpectedEof,
+        ] {
+            assert!(matches!(
+                SourceError::from_io(&Error::from(kind)),
+                SourceError::Failed(_)
+            ));
+        }
+    }
+
+    /// A reader that fails on the first call, so the classification of a mid-read failure is covered
+    /// without a real file and without Windows.
+    struct FailingReader(std::io::ErrorKind);
+
+    impl std::io::Read for FailingReader {
+        fn read(&mut self, _buffer: &mut [u8]) -> std::io::Result<usize> {
+            Err(std::io::Error::from(self.0))
+        }
+    }
+
+    #[test]
+    fn a_bounded_read_returns_everything_up_to_and_including_the_limit() {
+        assert_eq!(read_bounded(&b""[..], 4), Ok(Vec::new()));
+        assert_eq!(read_bounded(&b"abc"[..], 4), Ok(b"abc".to_vec()));
+        // Exactly the limit is a file this host reads, not one it refuses.
+        assert_eq!(read_bounded(&b"abcd"[..], 4), Ok(b"abcd".to_vec()));
+    }
+
+    /// One byte over the limit is refused as a whole. Returning the first four bytes instead would
+    /// hand a parser a damaged artifact and let the report describe damage this program caused.
+    #[test]
+    fn a_file_over_the_limit_is_refused_rather_than_truncated() {
+        assert_eq!(
+            read_bounded(&b"abcde"[..], 4),
+            Err(SourceError::TooLarge { limit: 4 })
+        );
+        assert_eq!(
+            read_bounded(vec![b'a'; READ_BLOCK * 3].as_slice(), READ_BLOCK),
+            Err(SourceError::TooLarge { limit: READ_BLOCK })
+        );
+        // A limit of zero still reads: it refuses every file that has any bytes in it.
+        assert_eq!(read_bounded(&b""[..], 0), Ok(Vec::new()));
+        assert_eq!(
+            read_bounded(&b"a"[..], 0),
+            Err(SourceError::TooLarge { limit: 0 })
+        );
+    }
+
+    #[test]
+    fn a_bounded_read_classifies_its_failures_like_every_other_file_read() {
+        assert_eq!(
+            read_bounded(FailingReader(std::io::ErrorKind::PermissionDenied), 16),
+            Err(SourceError::AccessDenied)
+        );
+        assert!(matches!(
+            read_bounded(FailingReader(std::io::ErrorKind::InvalidData), 16),
+            Err(SourceError::Failed(_))
+        ));
+    }
+
+    /// The limit is a documented decision (ADR 0019), not an implementation detail: changing it
+    /// changes which artifacts this program can read at all, so it is pinned here.
+    #[test]
+    fn the_file_size_limit_is_the_one_the_adr_states() {
+        assert_eq!(MAX_FILE_BYTES, 64 * 1024 * 1024);
+    }
+
+    /// The same for the registry (ADR 0022), and the boundary itself: a value of exactly the limit
+    /// is read whole, one byte more is refused whole rather than trimmed to fit.
+    #[test]
+    fn a_registry_value_over_the_limit_is_refused_rather_than_truncated() {
+        assert_eq!(MAX_REGISTRY_VALUE_BYTES, 4 * 1024 * 1024);
+
+        assert_eq!(bound_registry_value(Vec::new(), 4), Ok(Vec::new()));
+        assert_eq!(
+            bound_registry_value(vec![1, 2, 3, 4], 4),
+            Ok(vec![1, 2, 3, 4])
+        );
+        assert_eq!(
+            bound_registry_value(vec![1, 2, 3, 4, 5], 4),
+            Err(SourceError::TooLarge { limit: 4 })
+        );
+        assert_eq!(
+            bound_registry_value(
+                vec![0; MAX_REGISTRY_VALUE_BYTES + 1],
+                MAX_REGISTRY_VALUE_BYTES
+            ),
+            Err(SourceError::TooLarge {
+                limit: MAX_REGISTRY_VALUE_BYTES
+            })
+        );
+    }
+
+    #[test]
+    fn sha256_of_a_reader_matches_the_known_digests() {
+        assert_eq!(
+            sha256_reader(&b""[..]).unwrap(),
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        );
+        assert_eq!(
+            sha256_reader(&b"abc"[..]).unwrap(),
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
+    }
+
+    #[test]
+    fn sha256_of_a_reader_spans_many_blocks() {
+        // More than one read buffer, so a bug that hashes only the first block shows up here.
+        let bytes = vec![b'a'; READ_BLOCK * 3 + 1];
+        assert_eq!(
+            sha256_reader(bytes.as_slice()).unwrap(),
+            sha256_reader(bytes.as_slice()).unwrap()
+        );
+        assert_ne!(
+            sha256_reader(bytes.as_slice()).unwrap(),
+            sha256_reader(&bytes[..READ_BLOCK]).unwrap()
+        );
+    }
+}

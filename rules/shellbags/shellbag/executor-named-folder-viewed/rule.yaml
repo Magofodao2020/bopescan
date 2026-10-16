@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: 1a7a3594-5b68-4142-8426-96aa0e0a2e90
+title: "Explorer remembers viewing a folder named like a Roblox executor or injector"
+description: >-
+  The account's ShellBags hold a folder path with a segment matching a Roblox executor or injector:
+  Explorer saved a view of that folder at some point. The folder may since have been deleted, renamed
+  or been on a drive that is no longer attached. Opening a folder is not running a program.
+status: experimental
+collector: shellbags
+strength: presence
+match:
+  list: "shellbag"
+  tool_kind: ["executor", "injector"]
+retention: >-
+  ShellBags last until the account's profile is deleted or the history is cleared; Windows keeps
+  thousands of folders.
+unmeasured_when: [access_denied]
+falsepositives:
+  - "A folder with an ordinary name that matches, such as a photo album called Wave or Solara"
+  - "Looking inside an archive or a folder shared by someone else without running anything"
+author: B.O.P.E Scanner contributors
+date: 2026-10-15
+tags: [roblox, shellbags]
+level: info
+category: execution

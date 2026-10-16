@@ -1,0 +1,18 @@
+{
+  "description": "Synthetic negative case for evtx/time/system-time-changed: 4624.",
+  "observations": [
+    {
+      "collector": "evtx",
+      "fields": {
+        "log": "Security.evtx",
+        "channel": "Security",
+        "provider": "Microsoft-Windows-Security-Auditing",
+        "event_id": 4624,
+        "level": 0,
+        "count": 30,
+        "first_seen": "2026-10-14T10:00:00Z",
+        "last_seen": "2026-10-15T09:00:00Z"
+      }
+    }
+  ]
+}

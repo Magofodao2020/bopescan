@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: 1182fdb3-a9bc-40d7-b42c-793498ea2a49
+title: "An unsigned program or DLL sits in an executor-style folder"
+description: >-
+  An .exe or .dll directly in a folder laid out like a Roblox script executor has no embedded
+  signature that verifies here. The hash is shown so it can be compared with known files.
+status: experimental
+collector: executor_footprint
+strength: presence
+match:
+  scope: "binary"
+  signature: ["no_embedded_signature", "invalid", "unverifiable_offline"]
+retention: >-
+  The folder as it is at scan time.
+unmeasured_when: [not_windows]
+falsepositives:
+  - "Unsigned helper tools kept in a folder that happens to have these subfolders"
+references:
+  - https://learn.microsoft.com/en-us/windows/win32/seccrypto/authenticode
+author: B.O.P.E Scanner contributors
+date: 2026-10-15
+tags: [roblox, executor]
+level: warn

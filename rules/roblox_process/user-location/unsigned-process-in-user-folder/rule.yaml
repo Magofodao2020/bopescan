@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: 719dca43-ca1f-4a18-b9c2-d5bd2a13b6a0
+title: "An unsigned program is running from Temp, Downloads, Desktop or the Recycle Bin"
+description: >-
+  A process running at scan time was started from Temp, Downloads, Desktop, the Public profile or
+  the Recycle Bin, and its file carries no embedded signature or one that does not verify. Loaders
+  and injectors are usually run this way; so are portable tools and freshly downloaded installers.
+status: experimental
+collector: roblox_process
+strength: presence
+match:
+  scope: "user_location_process"
+  location_kind: ["temp", "user_downloads", "user_desktop", "recycle_bin", "users_public"]
+  signature: ["no_embedded_signature", "invalid"]
+retention: >-
+  Processes running at the moment of the scan.
+unmeasured_when: [not_windows]
+falsepositives:
+  - "Portable tools, game mods and small utilities run straight from Downloads or the Desktop"
+  - "An installer still running from Downloads"
+references:
+  - https://learn.microsoft.com/en-us/windows/win32/seccrypto/authenticode
+author: B.O.P.E Scanner contributors
+date: 2026-10-15
+tags: [process, signature]
+level: warn
+category: processes_memory

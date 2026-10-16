@@ -1,0 +1,12 @@
+{
+  "description": "Synthetic negative case for fastflags/timeline/settings-file-times: none.",
+  "observations": [
+    {
+      "collector": "fastflags",
+      "fields": {
+        "name": "x.json",
+        "path": "C:\\Users\\fixtureuser\\x.json"
+      }
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: dbdc66d4-53ee-46cc-9f9f-ff13f5632917
+title: "The Security log records a change of the system time"
+description: >-
+  The Security log holds event 4616, "The system time was changed", with how many and the first and
+  last time. Windows' own time synchronisation also writes it, and this tool does not read who made
+  the change, so it is context for reading the other times in this report.
+status: experimental
+collector: evtx
+strength: context
+match:
+  provider: "Microsoft-Windows-Security-Auditing"
+  channel: "Security"
+  event_id: 4616
+retention: >-
+  Only what the Security log still holds; it keeps a limited window.
+unmeasured_when: [not_windows, not_admin]
+falsepositives:
+  - "Windows Time service synchronisation, daylight-saving changes and a CMOS battery reset"
+author: B.O.P.E Scanner contributors
+date: 2026-10-15
+tags: [evtx, time]
+level: info
+category: system_logs

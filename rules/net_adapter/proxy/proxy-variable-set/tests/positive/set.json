@@ -1,0 +1,14 @@
+{
+  "description": "Synthetic positive case for net_adapter/proxy/proxy-variable-set: set.",
+  "observations": [
+    {
+      "collector": "net_adapter",
+      "fields": {
+        "place": "proxy_variable",
+        "variable": "HTTPS_PROXY",
+        "set": true
+      }
+    }
+  ],
+  "expect_matches": 1
+}

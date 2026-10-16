@@ -1,0 +1,31 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: 7a7cebaa-f0ae-4e82-9234-4b53f853eacb
+title: "A permanent WMI subscription runs a command line or a script"
+description: >-
+  WMI holds a CommandLineEventConsumer or ActiveScriptEventConsumer that is not one Windows ships: when
+  its event filter fires, Windows starts the program or runs the script by itself, without a logged-in
+  user. The row names the program, the script file or the files the script mentions, and their hash and
+  signature when they exist; the script's text and the command's arguments are never kept. It is a way
+  to start something persistently, not proof of what it starts.
+status: experimental
+collector: wmi_subscription
+strength: presence
+match:
+  scope: "consumer"
+  consumer_kind: ["command_line", "active_script"]
+  known_default: false
+retention: >-
+  A subscription lasts until it is deleted; WMI's repository survives restarts.
+unmeasured_when: [access_denied, source_absent]
+falsepositives:
+  - "Hardware vendor and management software (Dell, HP, Lenovo utilities, SCCM/Intune agents) that use WMI subscriptions"
+  - "Scripts an IT department or the owner set up for maintenance"
+references:
+  - "https://learn.microsoft.com/en-us/windows/win32/wmisdk/receiving-events-at-all-times"
+author: B.O.P.E Scanner contributors
+date: 2026-10-15
+tags: [persistence, wmi]
+level: warn
+category: persistence

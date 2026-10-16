@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: 50882b33-a1aa-4e8c-bf59-7f4175c9b00f
+title: "Roblox client settings (FastFlags) are overridden"
+description: >-
+  A ClientAppSettings.json file in a Roblox version folder sets one or more engine settings
+  ("FastFlags"). Bootstrappers such as Bloxstrap write it to change graphics, frame-rate and
+  lighting options, and Roblox honours only an allow-list of flags. Only the count is read, never
+  the flags or values.
+status: experimental
+collector: roblox
+strength: context
+match:
+  location: "client_settings"
+  "flag_count|gte": 1
+retention: >-
+  The file as it is at scan time.
+unmeasured_when: [not_windows]
+falsepositives:
+  - "Bloxstrap, Fishstrap and similar launchers, whose settings screens write this file"
+  - "Frame-rate unlock guides that tell players to create it by hand"
+author: B.O.P.E Scanner contributors
+date: 2026-10-15
+tags: [roblox, settings]
+level: info

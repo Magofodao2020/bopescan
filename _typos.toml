@@ -1,0 +1,47 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+
+[files]
+# fuzz/corpus and fuzz/artifacts hold bytes libFuzzer invented; they are not prose and are not committed.
+extend-exclude = [
+  "LICENSES/",
+  "*.snap",
+  "Cargo.lock",
+  "pnpm-lock.yaml",
+  "fuzz/corpus/",
+  "fuzz/artifacts/",
+  # A parser fixture that is deliberately not UTF-8 (ADR 0064): bytes, not prose.
+  "fixtures/parsers/powershell-text/not-utf8.bin",
+  # third_party/evtx is upstream's source, vendored verbatim apart from one patch (ADR 0018).
+  # Correcting spelling in it would be a divergence from upstream that carries no benefit and makes
+  # the next re-sync harder to verify.
+  "third_party/evtx/",
+  # LOLDrivers' driver file names (ADR 0048): upstream data, not prose.
+  "rules/driver_service/vulnerable-driver/loldrivers-listed/loldrivers-vulnerable-drivers.csv",
+]
+
+[default.extend-words]
+# `.hve` is the registry hive file extension (`Amcache.hve`, ADR 0041), not a misspelling of "have".
+hve = "hve"
+# `notatin` is the name of a Rust registry-hive crate evaluated in ADR 0041.
+notatin = "notatin"
+# `OPTIN` is a value of the boot option `NOEXECUTE`, as Kernel-Boot 27 records it (ADR 0071).
+OPTIN = "OPTIN"
+
+[default.extend-identifiers]
+# `amd64fre` is part of Windows' own `BuildLabEx` string, measured on a real PC (ADR 0056): the build
+# lab, the architecture and a free (non-checked) build, written as Microsoft writes it.
+amd64fre = "amd64fre"
+
+# Windows driver and service names in baseline-elevated-win11's driver services (ADR 0048), read from a GitHub-hosted runner: data, not prose.
+NDProxy = "NDProxy"
+SerCx = "SerCx"
+SerCx2 = "SerCx2"
+# Windows task folder names in baseline-elevated-win11's scheduled tasks (ADR 0060), read from a GitHub-hosted runner: data, not prose.
+UPnP = "UPnP"
+UPnPHostConfig = "UPnPHostConfig"
+# Plug and Play, as Windows writes it: the `Microsoft-Windows-Kernel-PnP` event provider and WMI's `Win32_PnPEntity`
+# (ADR 0069). Not a misspelling of "On".
+PnP = "PnP"
+Win32_PnPEntity = "Win32_PnPEntity"

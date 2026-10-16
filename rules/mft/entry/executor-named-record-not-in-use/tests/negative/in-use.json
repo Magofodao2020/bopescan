@@ -1,0 +1,16 @@
+{
+  "description": "Synthetic negative case for mft/entry/executor-named-record-not-in-use: in-use.",
+  "observations": [
+    {
+      "collector": "mft",
+      "fields": {
+        "scope": "entry",
+        "in_use": true,
+        "name": "Fluxus.exe",
+        "tool_id": "fluxus",
+        "tool_kind": "executor",
+        "match_kind": "known_tool"
+      }
+    }
+  ]
+}

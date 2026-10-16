@@ -1,0 +1,20 @@
+{
+  "description": "Synthetic positive case for roblox_process/memory/private-executable-memory: regions.",
+  "observations": [
+    {
+      "collector": "roblox_process",
+      "fields": {
+        "scope": "roblox_memory",
+        "player_name": "RobloxPlayerBeta.exe",
+        "private_regions": 4,
+        "private_bytes": 16384,
+        "mapped_regions": 0,
+        "mapped_bytes": 0,
+        "image_regions": 50,
+        "regions_walked": 900,
+        "memory_walk_complete": true
+      }
+    }
+  ],
+  "expect_matches": 1
+}

@@ -1,0 +1,20 @@
+{
+  "description": "Synthetic positive case for user_files/lua/lua-script-calls-executor-api: markers.",
+  "observations": [
+    {
+      "collector": "user_files",
+      "fields": {
+        "kind": "lua_script",
+        "folder": "downloads",
+        "name": "hub.lua",
+        "path": "C:\\Users\\fixtureuser\\Downloads\\hub.lua",
+        "location_kind": "user_downloads",
+        "extension": "lua",
+        "distinct_markers": 3,
+        "markers": "getgenv, hookmetamethod, newcclosure",
+        "remote_loadstring": false
+      }
+    }
+  ],
+  "expect_matches": 1
+}

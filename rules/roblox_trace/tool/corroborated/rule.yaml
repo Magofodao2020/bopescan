@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: 73592699-8fc5-468d-a22d-17ccb6898b15
+title: "A Roblox executor or injector is corroborated by independent sources"
+description: >-
+  The correlation of every source this scan read found one Roblox script executor or DLL injector,
+  by name in a Roblox context, in two or more independent source families, with at least one showing
+  it ran (Prefetch, BAM, PCA, UserAssist, FeatureUsage, a running process), an executor folder
+  layout, executor-only scripts, or a module in the Roblox player. The row lists the families, the
+  evidence classes and the earliest and latest times. Names can be copied and files renamed; times
+  close together do not show cause.
+status: experimental
+collector: roblox_trace
+strength: presence
+match:
+  scope: "tool"
+  status: "corroborated"
+retention: >-
+  Whatever the sources read in this scan still hold; the sources table says which could not be read.
+falsepositives:
+  - "A name shared with unrelated software, or a file named this way on purpose; a legitimate tool renamed to match"
+  - "Files kept from the past, before the account or PC was used for play"
+author: B.O.P.E Scanner contributors
+date: 2026-10-15
+tags: [roblox, correlation]
+level: flag
+category: roblox_tools

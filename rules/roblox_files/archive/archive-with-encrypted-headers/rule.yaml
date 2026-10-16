@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: 40126502-5a4c-421d-9603-522ea7152433
+title: "An archive in Downloads, Desktop or Temp hides its file names (encrypted headers)"
+description: >-
+  A .rar or .7z archive in a place this scan lists has encrypted headers, so not even the names inside
+  it can be read without its password. Nothing inside was looked at; this only says the archive's
+  contents could not be checked.
+status: experimental
+collector: roblox_files
+strength: context
+match:
+  scope: "archive"
+  encrypted_headers: true
+retention: >-
+  The archive as it is at the time of the scan.
+falsepositives:
+  - "Any password-protected archive: backups, documents sent by work or school, game mods"
+author: B.O.P.E Scanner contributors
+date: 2026-10-15
+tags: [roblox, archive]
+level: info
+category: files

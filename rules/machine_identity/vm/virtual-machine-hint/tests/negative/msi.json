@@ -1,0 +1,14 @@
+{
+  "description": "Synthetic negative case for machine_identity/vm/virtual-machine-hint: msi.",
+  "observations": [
+    {
+      "collector": "machine_identity",
+      "fields": {
+        "manufacturer": "Micro-Star International Co., Ltd.",
+        "product": "MS-7C56",
+        "vm_hint": false,
+        "firmware_type": "uefi"
+      }
+    }
+  ]
+}

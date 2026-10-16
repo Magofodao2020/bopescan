@@ -1,0 +1,12 @@
+{
+  "description": "Synthetic negative case for process/memory-tool/memory-tool-running: explorer.",
+  "observations": [
+    {
+      "collector": "process",
+      "fields": {
+        "name": "explorer.exe",
+        "path": "C:\\Windows\\explorer.exe"
+      }
+    }
+  ]
+}

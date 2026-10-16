@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: 1488df5e-64af-4447-94c8-b13c81bb217f
+title: "A Lua script downloads and runs another script with game:HttpGet"
+description: >-
+  A .lua or .luau file contains loadstring(game:HttpGet(...)) on one line — the shape executor
+  script loaders take to fetch and run a remote script. game:HttpGet is not a Roblox API; only
+  executors provide it.
+status: experimental
+collector: user_files
+strength: presence
+match:
+  kind: "lua_script"
+  remote_loadstring: true
+retention: >-
+  The files as they are at scan time.
+unmeasured_when: [not_windows]
+falsepositives:
+  - "A loader script saved from a forum or video and never run"
+references:
+  - https://github.com/unified-naming-convention/NamingStandard
+author: B.O.P.E Scanner contributors
+date: 2026-10-15
+tags: [roblox, script]
+level: flag
+category: roblox

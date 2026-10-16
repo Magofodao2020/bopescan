@@ -1,0 +1,15 @@
+{
+  "description": "Synthetic negative case for shortcuts/timeline/tool-shortcut-times: program.",
+  "observations": [
+    {
+      "collector": "shortcuts",
+      "fields": {
+        "place": "desktop",
+        "name": "Thing.lnk",
+        "path": "C:\\Users\\fixtureuser\\Desktop\\Thing.lnk",
+        "why": "program_in_user_folder",
+        "target_modified": "2026-10-01T12:00:00Z"
+      }
+    }
+  ]
+}

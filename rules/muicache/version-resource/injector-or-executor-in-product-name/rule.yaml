@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: a10c08a6-2f00-40e2-838b-a874db8f7722
+title: "A program Explorer opened calls itself an injector, executor or exploit"
+description: >-
+  The product name Explorer cached from a program's version resource contains "Injector", "Executor"
+  or "Exploit". This name comes from the file itself, so a renamed file keeps it; it is also
+  whatever the author chose. A generic word is context, never proof.
+status: experimental
+collector: muicache
+strength: context
+match:
+  "friendly_name|contains": ["Injector", "Executor", "Exploit"]
+retention: >-
+  Entries since the account was created or a cleaner removed them; no time is stored.
+unmeasured_when: [not_windows, source_absent]
+falsepositives:
+  - "Legitimate DLL-injection tools used for modding single-player games, debugging or accessibility"
+  - "Security-testing tools whose names use these words"
+author: B.O.P.E Scanner contributors
+date: 2026-10-15
+tags: [execution, name]
+level: info
+category: execution

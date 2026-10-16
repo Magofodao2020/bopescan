@@ -1,0 +1,20 @@
+{
+  "description": "Synthetic positive case for usb_device/dev-board/dev-board-as-input-device: arduino.",
+  "observations": [
+    {
+      "collector": "usb_device",
+      "fields": {
+        "source": "device_list",
+        "bus": "hid",
+        "model_id": "HID\\VID_2341&PID_8036&MI_02",
+        "vid": "2341",
+        "pid": "8036",
+        "maker": "Arduino",
+        "dev_board_vendor": true,
+        "present": false,
+        "last_removal": "2026-10-14T22:00:00Z"
+      }
+    }
+  ],
+  "expect_matches": 1
+}

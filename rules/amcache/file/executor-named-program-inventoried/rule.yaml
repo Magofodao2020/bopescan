@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: cdb38cd6-af91-4636-a4b1-95c8aa54800c
+title: "Windows' program inventory (Amcache) lists a program named like a Roblox executor or injector"
+description: >-
+  Amcache.hve, read from an existing shadow copy, has an inventory entry for a program whose name
+  matches a Roblox executor or injector, with its path, SHA-1 and the time the entry was written. An
+  inventory entry is not proof the program ran.
+status: experimental
+collector: amcache
+strength: presence
+match:
+  scope: "file"
+  tool_kind: ["executor", "injector"]
+retention: >-
+  Amcache keeps entries for months; a shadow copy is as old as the snapshot.
+falsepositives:
+  - "A file inventoried after a download that was never opened; an unrelated program with the same name"
+author: B.O.P.E Scanner contributors
+date: 2026-10-15
+tags: [roblox, amcache]
+level: warn
+category: execution

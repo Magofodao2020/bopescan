@@ -1,0 +1,27 @@
+{
+  "description": "Synthetic negative case for fastflags/applied/network-physics-flags: render-only.",
+  "observations": [
+    {
+      "collector": "fastflags",
+      "fields": {
+        "location": "version_folder",
+        "owner": "roblox",
+        "name": "ClientAppSettings.json",
+        "path": "C:\\Users\\fixtureuser\\AppData\\Local\\Roblox\\Versions\\version-0123456789abcdef\\ClientSettings\\ClientAppSettings.json",
+        "applies_to_player": true,
+        "active_version": true,
+        "backup": false,
+        "parses": true,
+        "keys": 3,
+        "flag_count": 3,
+        "flags_network": 0,
+        "flags_fps": 1,
+        "flags_rendering": 2,
+        "flags_debug": 0,
+        "flags_other": 0,
+        "modified": "2026-10-14T19:00:00Z",
+        "location_kind": "appdata_local"
+      }
+    }
+  ]
+}

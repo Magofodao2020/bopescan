@@ -1,0 +1,15 @@
+{
+  "description": "Synthetic positive case for executor_footprint/named/executor-name-folder: named.",
+  "observations": [
+    {
+      "collector": "executor_footprint",
+      "fields": {
+        "scope": "named_folder",
+        "name": "Solara",
+        "path": "C:\\Users\\fixtureuser\\Downloads\\Solara",
+        "location_kind": "user_downloads"
+      }
+    }
+  ],
+  "expect_matches": 1
+}

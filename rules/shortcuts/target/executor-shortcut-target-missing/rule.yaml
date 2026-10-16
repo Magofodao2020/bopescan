@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: b497f8ad-b10f-49fb-8f5f-3f7b41aa09ca
+title: "A shortcut points at a Roblox executor or injector that is no longer at its path"
+description: >-
+  A shortcut on the Desktop, in the Start menu, the taskbar or Recent names a Roblox executor or
+  injector, and nothing is at its target path now. The shortcut keeps the target's times from when
+  it was saved.
+status: experimental
+collector: shortcuts
+strength: context
+match:
+  tool_kind: ["executor", "injector"]
+  target_exists: false
+retention: >-
+  As long as the shortcut file is kept; Recent trims its own list.
+falsepositives:
+  - "The program was moved or uninstalled long ago; the target is on a drive that is not connected"
+author: B.O.P.E Scanner contributors
+date: 2026-10-15
+tags: [roblox, shortcut]
+level: warn
+category: execution
