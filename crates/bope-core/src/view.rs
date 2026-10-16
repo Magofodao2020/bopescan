@@ -24,10 +24,13 @@ use crate::model::{
 /// The order collectors are shown in, by both front ends: the rows of one collector together, and
 /// entries of the timeline that carry the same time (ADR 0045, ADR 0051). A collector not named here
 /// follows the named ones.
-pub const COLLECTOR_ORDER: [&str; 42] = [
+pub const COLLECTOR_ORDER: [&str; 47] = [
     "roblox_trace",
     "roblox",
     "roblox_process",
+    "roblox_memory",
+    "roblox_monitor",
+    "roblox_flags",
     "executor_footprint",
     "roblox_files",
     "recycle_bin",
@@ -56,6 +59,8 @@ pub const COLLECTOR_ORDER: [&str; 42] = [
     "net_config",
     "net_adapter",
     "process",
+    "process_modules",
+    "file_inventory",
     "evtx",
     "powershell_text",
     "prefetch",
@@ -174,6 +179,35 @@ pub struct ReportView {
     /// The `recycle_bin` observations (B.O.P.E, ADR 0131).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub recycle_bin: Vec<Observation>,
+    /// The forensic collectors' rows, arranged for the Roblox forensic page (B.O.P.E, ADR 0133–0137).
+    #[serde(default)]
+    pub forensics: Forensics,
+}
+
+/// Every row of the forensic collectors, matched or not, by collector (B.O.P.E, ADR 0133–0137). Their
+/// summaries say whether each read finished; a page built from them must show that before any row.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct Forensics {
+    /// `roblox_memory`: each player, its modules, regions, code changes, hooks, strings and flag values.
+    pub roblox_memory: Vec<Observation>,
+    /// `roblox_flags`: the reference, the values in settings files, changes between copies, dumps.
+    pub roblox_flags: Vec<Observation>,
+    /// `roblox_monitor`: the monitoring session and its events.
+    pub roblox_monitor: Vec<Observation>,
+    /// `process_modules`: every process's modules and executable memory.
+    pub process_modules: Vec<Observation>,
+    /// `file_inventory`: the drive walk, its counts and the files it lists.
+    pub file_inventory: Vec<Observation>,
+}
+
+fn forensics_of(report: &Report) -> Forensics {
+    Forensics {
+        roblox_memory: all_observations_of(report, "roblox_memory"),
+        roblox_flags: all_observations_of(report, "roblox_flags"),
+        roblox_monitor: all_observations_of(report, "roblox_monitor"),
+        process_modules: all_observations_of(report, "process_modules"),
+        file_inventory: all_observations_of(report, "file_inventory"),
+    }
 }
 
 /// Every observation of `collector` in `report`, matched or not, without duplicates, in report order.
@@ -401,6 +435,7 @@ pub fn for_report(report: &Report) -> ReportView {
         roblox_tools: roblox_tools_of(report),
         services: services_of(report),
         recycle_bin: recycle_bin_of(report),
+        forensics: forensics_of(report),
     }
 }
 

@@ -9,6 +9,8 @@ import type {
   AgeText,
   AppInfo,
   CodeLinks,
+  MonitorStatus,
+  ReferenceStatus,
   ReportHeader,
   ReportView,
   RuleMeta,
@@ -16,6 +18,7 @@ import type {
   SavedFile,
   ScanStatus,
   ScanTier,
+  SyncResult,
 } from "./types";
 
 /** Facts for the start screen, read before any scan: version, rules, rights and the collectors. */
@@ -112,4 +115,37 @@ export function codeLinks(): Promise<CodeLinks> {
 /** A QR code of a link into the repository as SVG text, drawn in Rust; `null` for any other text. */
 export function codeLinkQr(url: string): Promise<string | null> {
   return invoke<string | null>("code_link_qr", { url });
+}
+
+/** The FastFlag reference copy held on this PC; `null` when there is no folder for it (ADR 0136). */
+export function fflagReferenceStatus(): Promise<ReferenceStatus | null> {
+  return invoke<ReferenceStatus | null>("fflag_reference_status");
+}
+
+/**
+ * Asks GitHub for a newer reference copy. The program's only network request; `automatic` is the
+ * window's own check, at most every six hours, which the person can turn off (ADR 0136).
+ */
+export function fflagReferenceSync(automatic: boolean): Promise<SyncResult> {
+  return invoke<SyncResult>("fflag_reference_sync", { automatic });
+}
+
+/** Where the monitoring mode is, with every change it saw (ADR 0137). */
+export function monitorStatus(): Promise<MonitorStatus> {
+  return invoke<MonitorStatus>("monitor_status");
+}
+
+/** Starts monitoring the Roblox player; `false` when a session is already running. */
+export function startMonitor(intervalSeconds: number): Promise<boolean> {
+  return invoke<boolean>("start_monitor", { intervalSeconds });
+}
+
+/** Stops monitoring after the current sample; what it saw stays for the next report. */
+export function stopMonitor(): Promise<void> {
+  return invoke<void>("stop_monitor");
+}
+
+/** Forgets the last session so the next report holds none; `false` while one runs. */
+export function clearMonitor(): Promise<boolean> {
+  return invoke<boolean>("clear_monitor");
 }

@@ -49,6 +49,7 @@ pub mod roblox;
 pub mod roblox_files;
 pub mod roblox_flags;
 pub mod roblox_memory;
+pub mod roblox_monitor;
 pub mod roblox_process;
 pub mod roblox_trace;
 pub mod scan;
@@ -407,7 +408,7 @@ pub fn all_with(
         Box::new(wmi_subscription::WmiSubscription),
         // The long reads run after the quick ones, so a stopped scan has had them (B.O.P.E, ADR 0133).
         Box::new(roblox_memory::RobloxMemory::new(reference)),
-        Box::new(monitor::RobloxMonitor::new(session)),
+        Box::new(roblox_monitor::RobloxMonitor::new(session)),
         Box::new(file_inventory::FileInventory),
         // Last: it correlates the runs before it (ADR 0123).
         Box::new(roblox_trace::RobloxTrace),

@@ -25,18 +25,15 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::time::{Duration, Instant};
 
-use bope_core::model::{CollectorRun, UnmeasuredReason};
-use bope_host::{Host, Platform, RegionKind};
+use bope_host::{Host, RegionKind};
 use bope_parsers::memory;
 use serde::{Deserialize, Serialize};
 
-use crate::common::{Fields, unmeasured};
 use crate::fastflags::settings_files;
 use crate::procmem::{
     ModuleMap, executable_allocations, hex_address, read_chunks, unlisted_images,
 };
 use crate::roblox_process::roblox_edition;
-use crate::{Collector, Field};
 
 /// Most bytes of one player's memory read for flag values in one sample.
 pub const MAX_SAMPLE_BYTES: u64 = 256 * 1024 * 1024;
@@ -461,108 +458,6 @@ impl Session {
         let mut copy = self.clone();
         copy.events.clear();
         serde_json::to_string(&copy).unwrap_or_default()
-    }
-}
-
-/// Collector id.
-pub const ID: &str = "roblox_monitor";
-const DISCRIMINATOR: &str = "scope";
-
-static FIELDS: [Field; 16] = [
-    Field::text("after"),
-    Field::timestamp("at").off_timeline(),
-    Field::text("before"),
-    Field::text("event"),
-    Field::number("events"),
-    Field::number("events_dropped"),
-    Field::text("first_seen_at"),
-    Field::number("interval_seconds"),
-    Field::text("origin"),
-    Field::number("partial_samples"),
-    Field::number("pid"),
-    Field::number("samples"),
-    Field::text("scope"),
-    Field::text("since"),
-    Field::text("source"),
-    Field::text("subject"),
-];
-
-static REASONS: [UnmeasuredReason; 2] =
-    [UnmeasuredReason::NotWindows, UnmeasuredReason::SourceAbsent];
-
-/// The `roblox_monitor` collector: the monitoring session, if the person ran one, in the report.
-#[derive(Debug, Clone, Default)]
-pub struct RobloxMonitor {
-    session: Option<std::sync::Arc<Session>>,
-}
-
-impl RobloxMonitor {
-    /// The collector, reporting `session` when there is one.
-    pub fn new(session: Option<std::sync::Arc<Session>>) -> Self {
-        Self { session }
-    }
-}
-
-impl Collector for RobloxMonitor {
-    fn id(&self) -> &'static str {
-        ID
-    }
-
-    fn fields(&self) -> &'static [Field] {
-        &FIELDS
-    }
-
-    fn unmeasured_reasons(&self) -> &'static [UnmeasuredReason] {
-        &REASONS
-    }
-
-    fn discriminator(&self) -> Option<&'static str> {
-        Some(DISCRIMINATOR)
-    }
-
-    fn collect(&self, host: &dyn Host) -> CollectorRun {
-        if host.platform() != Platform::Windows {
-            return unmeasured(ID, UnmeasuredReason::NotWindows);
-        }
-        // No session: the person did not run the monitoring mode, so nothing was watched.
-        let Some(session) = &self.session else {
-            return unmeasured(ID, UnmeasuredReason::SourceAbsent);
-        };
-        let mut observations = vec![
-            Fields::new()
-                .with(DISCRIMINATOR, "session")
-                .time("at", session.started_at.parse().ok())
-                .maybe("since", session.last_sample_at.clone())
-                .with("interval_seconds", session.interval_seconds)
-                .with("samples", session.samples)
-                .with("partial_samples", session.partial_samples)
-                .with("events", session.events.len())
-                .with("events_dropped", session.events_dropped)
-                .with("origin", session.origin.clone())
-                .observe(ID),
-        ];
-        for event in &session.events {
-            observations.push(
-                Fields::new()
-                    .with(DISCRIMINATOR, "event")
-                    .time("at", event.at.parse().ok())
-                    .maybe("since", event.since.clone())
-                    .with("event", event.event.clone())
-                    .maybe("pid", event.pid)
-                    .with("subject", event.subject.clone())
-                    .maybe("source", event.source.clone())
-                    .maybe("before", event.before.clone())
-                    .maybe("after", event.after.clone())
-                    .maybe("first_seen_at", event.first_seen_at.clone())
-                    .observe(ID),
-            );
-        }
-        CollectorRun::Measured {
-            collector: ID.to_owned(),
-            observations,
-            gaps: BTreeMap::new(),
-            discriminator_gaps: Vec::new(),
-        }
     }
 }
 

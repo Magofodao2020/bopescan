@@ -9,7 +9,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { appInfo, ruleMeta, ruleTexts, startScan } from "./api";
+import { appInfo, fflagReferenceSync, ruleMeta, ruleTexts, startScan } from "./api";
 import logo from "./assets/bope-logo.png";
 import { languageNames, supportedLanguages } from "./i18n";
 import { type ScanResult, useReportData } from "./reportData";
@@ -23,6 +23,7 @@ import { type EvidenceFocus, EvidencePage } from "./views/pages/EvidencePage";
 import { OverviewPage } from "./views/pages/OverviewPage";
 import { RecycleBinPage } from "./views/pages/RecycleBinPage";
 import { ReportsPage } from "./views/pages/ReportsPage";
+import { autoSyncEnabled, RobloxPage } from "./views/pages/RobloxPage";
 import { type Flow, ScannerPage } from "./views/pages/ScannerPage";
 import { ServicesPage } from "./views/pages/ServicesPage";
 import { SettingsPage } from "./views/pages/SettingsPage";
@@ -32,6 +33,7 @@ export type Page =
   | "overview"
   | "scanner"
   | "evidence"
+  | "roblox"
   | "services"
   | "recycle"
   | "timeline"
@@ -42,6 +44,7 @@ const NAV: { page: Page; icon: IconName; needsReport: boolean }[] = [
   { page: "overview", icon: "overview", needsReport: true },
   { page: "scanner", icon: "scanner", needsReport: false },
   { page: "evidence", icon: "evidence", needsReport: true },
+  { page: "roblox", icon: "shield", needsReport: false },
   { page: "services", icon: "services", needsReport: true },
   { page: "recycle", icon: "recycle", needsReport: true },
   { page: "timeline", icon: "timeline", needsReport: true },
@@ -100,6 +103,11 @@ export function App() {
     void ruleMeta()
       .then(setMeta)
       .catch(() => {});
+    // The FastFlag reference's automatic check (ADR 0136): spaced to six hours in Rust, shown on the
+    // Roblox page, and off when the person turned it off there.
+    if (autoSyncEnabled()) {
+      void fflagReferenceSync(true).catch(() => {});
+    }
   }, []);
 
   useEffect(() => {
@@ -262,7 +270,8 @@ export function App() {
                 onOpenReport={() => go("overview")}
               />
             )}
-            {page !== "scanner" && page !== "settings" && hasReport && (
+            {page === "roblox" && <RobloxPage view={hasReport ? (data.view ?? null) : null} />}
+            {page !== "scanner" && page !== "settings" && page !== "roblox" && hasReport && (
               <ResultPage page={page} data={data} focus={focus} go={go} />
             )}
             {page === "settings" && (

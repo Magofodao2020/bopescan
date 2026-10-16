@@ -2,11 +2,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
 
-// The services and Recycle Bin pages over synthetic observations shaped as the Rust collectors emit
+// The services, Recycle Bin and Roblox forensic pages over synthetic observations shaped as the Rust collectors emit
 // them (`windows_service`, `recycle_bin`); nothing here comes from a real PC.
 
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { clearMocks, mockIPC } from "@tauri-apps/api/mocks";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
@@ -15,6 +16,7 @@ import { showTime } from "../../time";
 import type { Observation, ReportView } from "../../types";
 import { TimeSettingsContext, timeLine } from "../../ui/TimeValue";
 import { RecycleBinPage } from "./RecycleBinPage";
+import { RobloxPage } from "./RobloxPage";
 import { ServicesPage } from "./ServicesPage";
 
 const raw = readFileSync(
@@ -323,5 +325,78 @@ describe("Recycle Bin page", () => {
     expect(screen.getByText("The Recycle Bin could not be read.")).toBeTruthy();
     expect(screen.getByText("this PC has no such record to read")).toBeTruthy();
     expect(document.querySelector("time")).toBeNull();
+  });
+});
+
+describe("Roblox forensic page", () => {
+  afterEach(() => {
+    cleanup();
+    clearMocks();
+  });
+
+  const memory = (fields: Record<string, unknown>): Observation => ({
+    collector: "roblox_memory",
+    fields,
+  });
+
+  function forensicView(): ReportView {
+    return {
+      ...base,
+      forensics: {
+        roblox_memory: [
+          memory({ scope: "players", players_running: 1, complete: false, stopped_by: "budget" }),
+          memory({
+            scope: "player",
+            pid: 1200,
+            path: "C:\\R\\RobloxPlayerBeta.exe",
+            identity_confidence: "high",
+            access: "opened",
+          }),
+          memory({
+            scope: "flag_value",
+            pid: 1200,
+            flag: "DFIntS2PhysicsSenderRate",
+            value: "1",
+            reference_value: "15",
+            comparison: "differs",
+          }),
+        ],
+        roblox_flags: [
+          {
+            collector: "roblox_flags",
+            fields: {
+              scope: "reference",
+              available: false,
+              version_correspondence: "unavailable",
+              unavailable_reason: "no_reference_copy",
+            },
+          },
+        ],
+        roblox_monitor: [],
+        process_modules: [],
+        file_inventory: [],
+      },
+    };
+  }
+
+  it("says a read that stopped early is incomplete before its rows, and shows the comparison", () => {
+    mockIPC((cmd) => {
+      if (cmd === "monitor_status") {
+        return { running: false, started_at: null, events: [], samples: 0 };
+      }
+      return null;
+    });
+    renderWith(<RobloxPage view={forensicView()} />);
+    expect(screen.getByText(/stopped before it finished \(budget\)/)).toBeTruthy();
+    expect(screen.getByText("DFIntS2PhysicsSenderRate")).toBeTruthy();
+    expect(screen.getByText("differs")).toBeTruthy();
+    expect(screen.getByText(/none — the comparison is unavailable/)).toBeTruthy();
+  });
+
+  it("before any check it offers the reference and monitoring and says the sections come later", () => {
+    mockIPC(() => null);
+    renderWith(<RobloxPage view={null} />);
+    expect(screen.getByText("No check has run in this window yet.")).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Start/ })).toBeTruthy();
   });
 });

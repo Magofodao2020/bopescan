@@ -311,7 +311,18 @@ export interface RobloxTools {
   sources: Observation[];
 }
 
+/** Every row of the forensic collectors, by collector (B.O.P.E, ADR 0133–0137). */
+export interface Forensics {
+  roblox_memory: Observation[];
+  roblox_flags: Observation[];
+  roblox_monitor: Observation[];
+  process_modules: Observation[];
+  file_inventory: Observation[];
+}
+
 export interface ReportView {
+  /** The forensic collectors' rows (B.O.P.E, ADR 0133–0137); absent from older snapshots. */
+  forensics?: Forensics;
   /** The Roblox tool correlation; absent from upstream snapshots. */
   roblox_tools?: RobloxTools;
   /** `windows_service` observations, current state first (B.O.P.E, ADR 0130); absent when none. */
@@ -463,6 +474,72 @@ export interface ScanStatus {
   current?: string | null;
   /** A stop was asked for and the scan has not stopped yet. */
   cancel_requested?: boolean;
+  /** What the running collector says it is reading now, when it says (B.O.P.E, ADR 0133). */
+  detail?: string | null;
+}
+
+/** How the last reference update ended (B.O.P.E, ADR 0136). */
+export type SyncOutcome = "updated" | "not_modified" | "rejected" | "failed" | "too_soon";
+
+/** What is known about the FastFlag reference copy held. */
+export interface ReferenceMetadata {
+  file: string;
+  sha256: string;
+  entries: number;
+  source_url: string;
+  revision: string;
+  revision_kind: "commit" | "content" | "import";
+  commit_date?: string | null;
+  commit_message?: string | null;
+  fetched_at: string;
+}
+
+/** The FastFlag reference panel's facts. */
+export interface ReferenceStatus {
+  available: boolean;
+  unavailable_reason: string | null;
+  metadata: ReferenceMetadata | null;
+  reference_client_version: string | null;
+  state: {
+    last_attempt_at?: string | null;
+    last_outcome?: SyncOutcome | null;
+    last_detail?: string | null;
+    last_success_at?: string | null;
+    last_import_at?: string | null;
+  };
+  folder: string;
+}
+
+/** What one reference update did. */
+export interface SyncResult {
+  outcome: SyncOutcome;
+  detail: string;
+  status: ReferenceStatus | null;
+}
+
+/** One change the monitoring mode saw (B.O.P.E, ADR 0137). */
+export interface MonitorEvent {
+  at: string;
+  since: string | null;
+  event: string;
+  pid: number | null;
+  subject: string;
+  source: string | null;
+  before: string | null;
+  after: string | null;
+  first_seen_at: string | null;
+}
+
+/** Where the monitoring mode is. */
+export interface MonitorStatus {
+  running: boolean;
+  started_at: string | null;
+  last_sample_at: string | null;
+  interval_seconds: number;
+  samples: number;
+  partial_samples: number;
+  events: MonitorEvent[];
+  events_dropped: number;
 }
 
 export interface RuleMeta {

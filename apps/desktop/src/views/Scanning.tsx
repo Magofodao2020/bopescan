@@ -93,6 +93,11 @@ export function Scanning({ info, meta, texts, onFinished }: Props) {
           elapsed={elapsed}
           building={running && steps.length === total && total > 0}
         />
+        {running && status?.detail && (
+          <p className="small muted scan-detail" aria-live="polite">
+            {status.detail}
+          </p>
+        )}
       </div>
 
       <div className="grid-2">
