@@ -14,7 +14,7 @@ description: >-
   Enhanced loads anything from this folder is not established.
 status: experimental
 collector: usn
-# ADR 0047, amendment of 2026-09-30: `context`, so a `not_found` is counted in SS mode, never listed.
+# ADR 0047, amendment of 2026-09-30: `context`, so its `not_found` reads as context, not as a finding.
 strength: context
 match:
   location: enhanced_asi

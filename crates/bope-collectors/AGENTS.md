@@ -15,7 +15,7 @@ Collectors are the part of this project that reads a player's machine, so the bo
     PowerShell — its history file and two kinds of PowerShell event — because the line that downloads a
     cheat and runs it is visible nowhere else. It hands each text straight to
     `bope_parsers::powershell_text`, keeps which kinds of words it held and how many, and no substring of
-    it, except a download's host behind its own SS-mode question. No other collector may read typed text
+    it, except a download's host. No other collector may read typed text
     or a program's arguments without an ADR that amends this line.
 - **No network, no child processes.** Do not shell out to other programs. Restarting the program itself with
   administrator rights (`bope_host_windows::elevate`, ADR 0012) is application lifecycle rather than a

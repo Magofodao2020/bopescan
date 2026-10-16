@@ -14,7 +14,7 @@ description: >-
   deleted a file, so this does not say who did it, or that anything was hidden.
 status: experimental
 collector: usn
-# ADR 0063 §2: `context`, as the plugin folders' rules are, so a `not_found` is counted in SS mode.
+# ADR 0063 §2: `context`, as the plugin folders' rules are, so its `not_found` reads as context, not as a finding.
 strength: context
 match:
   location: psreadline

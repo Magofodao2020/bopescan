@@ -6,7 +6,7 @@ This is the single source of agent instructions for this repository. `CLAUDE.md`
 
 ## What this project is
 
-**B.O.P.E Scanner** is a modified version of aeterna-rongroi 0.9.0 for Roblox (and FiveM) screenshares
+**B.O.P.E Scanner** is a modified version of aeterna-rongroi 0.9.0, a forensic PC check for Roblox (and FiveM)
 (ADR 0100). Keep NOTICE, the SPDX headers and `UNOFFICIAL BUILD`; never use the upstream names to
 identify this version and never set the upstream official-build marker. The text below is upstream's
 description and still applies.
@@ -57,8 +57,9 @@ see [`SECURITY.md`](SECURITY.md). Do not write bypass details into issues, PRs, 
    into it. No conclusion may say clean, innocent or guilty.
 4. **Environment problems are `Unmeasured`, not errors.** Missing admin rights, an absent log, or an
    unsupported OS must produce `Unmeasured { reason }`.
-5. **Privacy lives in the core.** SS-mode filtering and path redaction happen in
-   `bope-core::view`, never only in the UI.
+5. **The view lives in the core.** What the report shows is built in `bope-core::view`, never only in
+   the UI, so the CLI and the desktop cannot disagree. (The screenshare mode and its redaction were
+   removed in B.O.P.E 0.11.)
 6. **Rules with `status: test` or `stable` need a positive and a negative fixture.**
    `allow` entries are by hash or signer — never by file name.
 7. **Every source file carries an SPDX header** (`reuse lint`). No zero-width or bidi control
@@ -76,7 +77,7 @@ cargo xtask check-baseline     # quiet on an ordinary machine, and every rule co
 cargo xtask rules-reference --check   # docs/rules-reference*.md match the rules; without --check, rewrites them
 cargo xtask check-locales
 cargo xtask check-unicode
-cargo xtask check-versions     # README Status, the screenshare guides and the desktop manifests name Cargo.toml's version
+cargo xtask check-versions     # README Status, the PC check guide and the desktop manifests name Cargo.toml's version
 uvx --with chardet reuse lint   # chardet: see CONTRIBUTING.md
 pnpm -C apps/desktop typecheck && pnpm -C apps/desktop lint && pnpm -C apps/desktop test
 ```

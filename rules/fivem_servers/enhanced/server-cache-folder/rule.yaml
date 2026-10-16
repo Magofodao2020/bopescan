@@ -7,8 +7,8 @@ description: >-
   FiveM for GTA V Enhanced keeps one cache folder per server it joined, and this row is one of them:
   the folder's name, and when it was created and last changed. What the name is made from is not known;
   it stays the same for that server on this PC, so the same name in two reports of this PC is the same
-  server. Whether another PC gets the same name for that server is not known. SS mode shows
-  the name only if the player agreed to show server identities. Read only in a full scan. This says that
+  server. Whether another PC gets the same name for that server is not known. Read only in a full
+  scan. This says that
   the game joined a server, not what anyone did on it.
 status: experimental
 collector: fivem_servers

@@ -319,7 +319,7 @@ const EN: Words = Words {
     ],
     selectors_heading: "Timeline selectors",
     selectors_intro: "A timeline selector is written like a rule and produces no evidence: the observations it matches put \
-        their times on the report's timeline, in Self and SS mode, each with the text and the ordinary causes \
+        their times on the report's timeline, each with the text and the ordinary causes \
         below. It is never Found, Not found or Not measured, and never counted (ADR 0051). A timeline selector \
         may choose Prefetch, BAM and Program Compatibility Assistant records by name, which a rule may not \
         (ADR 0034): a name says nothing about which program it was, and each one says so.",
@@ -404,7 +404,7 @@ const TH: Words = Words {
     related_kinds: ["เปลี่ยนชื่อมาจาก", "ใช้แทน", "ดัดแปลงมาจาก", "รวมมาจาก", "คล้ายกับ"],
     selectors_heading: "timeline selector",
     selectors_intro: "timeline selector เขียนแบบเดียวกับ rule แต่ไม่สร้างหลักฐาน สิ่งที่เห็นที่มันเลือกจะเอาเวลาของตัวเองไปวางบน \
-        timeline ของรายงาน ทั้งโหมด Self และ SS พร้อมข้อความและเรื่องปกติด้านล่าง มันไม่เคยเป็น เจอ ไม่เจอ หรือ \
+        timeline ของรายงาน พร้อมข้อความและเรื่องปกติด้านล่าง มันไม่เคยเป็น เจอ ไม่เจอ หรือ \
         ยังไม่ได้วัด และไม่ถูกนับ (ADR 0051) timeline selector เลือกบันทึกของ Prefetch, BAM และ Program \
         Compatibility Assistant ตามชื่อได้ ซึ่ง rule ทำไม่ได้ (ADR 0034) ชื่อไม่ได้บอกว่าเป็นโปรแกรมไหน และทุกตัวเขียนบอกไว้",
     role: "บทบาท",
@@ -460,13 +460,12 @@ program with a different set of rules: read this page at the commit that program
 - If the collector could not read a field a condition names, the rule is **Not measured**, never Not
   found.
 - **Not measured, and named by the rule as ordinary on some machines** lists the reasons the rule's
-  author said carry no information on such a machine. SS mode counts them instead of listing them (ADR 0027).
+  author said carry no information on such a machine (ADR 0027).
 - **Strength** says what the evidence can show: `execution`, a program ran; `presence`, a file or
   program existed; `tamper`, traces were removed or altered; `posture`, a machine setting that makes
   cheating easier; `context`, background for the reviewer.
 
-Writing or changing a rule: [rules-authoring.md](rules-authoring.md). Checking a PC over a
-screenshare: [screenshare-guide.md](screenshare-guide.md).
+Writing or changing a rule: [rules-authoring.md](rules-authoring.md).
 ",
         comment = generated_comment(),
         schema = info.schema_version,
@@ -506,12 +505,11 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
   ASCII เว้นแต่เงื่อนไขนั้นบอกว่าเทียบตรงทุกตัว
 - ถ้า collector อ่านฟิลด์ที่เงื่อนไขพูดถึงไม่ได้ rule นั้นจะเป็น **ยังไม่ได้วัด** ไม่ใช่ ไม่เจอ
 - **ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง** คือเหตุผลที่ผู้เขียน rule บอกว่าไม่ได้บอกอะไรเลยบนบางเครื่อง
-  โหมด SS นับจำนวนไว้แทนที่จะแสดงเป็นรายการ (ADR 0027)
+  (ADR 0027)
 - **strength** บอกว่าหลักฐานแสดงอะไรได้: `execution` มีโปรแกรมรัน · `presence` มีไฟล์หรือโปรแกรมอยู่ ·
   `tamper` ร่องรอยถูกล้างหรือแก้ · `posture` การตั้งค่าเครื่องที่ทำให้โกงง่ายขึ้น · `context` ข้อมูลประกอบให้ผู้ตรวจ
 
-เขียนหรือแก้ rule: [rules-authoring.md](rules-authoring.md) (ภาษาอังกฤษ) · ตรวจเครื่องผ่านการแชร์หน้าจอ:
-[screenshare-guide.th.md](screenshare-guide.th.md)
+เขียนหรือแก้ rule: [rules-authoring.md](rules-authoring.md) (ภาษาอังกฤษ)
 ",
         comment = generated_comment(),
         schema = info.schema_version,

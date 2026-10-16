@@ -19,26 +19,25 @@ repository; if the idea already has a name, use it. A new term is a PR to this t
 | **Found** | The Rule matched; the matching Observations are attached | `EvidenceState::Found` |
 | **NotFound** | The Collector ran and nothing matched; carries the **retention window** | `EvidenceState::NotFound` |
 | **Unmeasured** | The Collector could not look; carries a **reason** and whether the Rule **expected** it | `EvidenceState::Unmeasured` |
-| **expected unmeasured** | An Unmeasured result whose reason the Rule named in `unmeasured_when`; SS mode counts it. One whose reason it did not name is **unexpected** and SS mode lists it (ADR 0027) | `EvidenceState::Unmeasured::expected` |
+| **expected unmeasured** | An Unmeasured result whose reason the Rule named in `unmeasured_when`: one the author said happens on ordinary machines. One whose reason it did not name is **unexpected** (ADR 0027) | `EvidenceState::Unmeasured::expected` |
 | **source absent** / **source empty** | Opposite Unmeasured reasons: the place the artifact is kept is not on this PC, versus it is there and holds nothing. One word until ADR 0030 | `UnmeasuredReason::SourceAbsent`, `::SourceEmpty` |
 | **scope statement** | An Unmeasured reason that is one fact about the **scan** — `not_admin`, `not_attempted`, `not_consented` — stated once above the evidence and never as a row per Rule | `UnmeasuredReason::is_scope_statement`, `view::ScopeNotes` |
 | **scope statement** | A fact about the **scan** rather than about the machine, said once above the evidence in both modes. Today: how many Rules missing administrator rights left unanswered | `bope_core::view::ScopeNotes` |
-| **unmatched observation** | Something a Collector saw that no Rule matched; shown in Self mode only, counted in SS mode | `bope_core::model::UnmatchedGroup` |
+| **unmatched observation** | Something a Collector saw that no Rule matched; listed apart from the evidence (ADR 0014) | `bope_core::model::UnmatchedGroup` |
 | **strength** | What the evidence can show: `execution`, `presence`, `tamper`, `posture`, `context` | `Strength` |
 | **retention window** | How far back a source can see, in words shown to the user | `Rule::retention` |
 | **cased** | A `match` field a Rule compares byte for byte; every other string folds ASCII case (ADR 0025) | `Rule::cased` |
 | **operator** | How one `match` entry compares its value, written `field\|operator`: `gt`, `gte`, `lt`, `lte`, `startswith`, `endswith`, `contains`, `exists`. A key with no `\|` compares for equality, and a list value means **or** (ADR 0029) | `bope_core::rules::Operator` |
 | **field kind** | What a Collector declares one of its observation fields holds — text, a number, a boolean or a timestamp — so that `check-rules` can refuse an operator the field cannot take | `bope_collectors::FieldKind` |
 | **boot time** | Report-header context: when the running Windows kernel started counting — the scan's clock minus `GetTickCount64` — or why there is no value. Never evidence and never read by a rule. Not "when the PC was last turned on": a "Shut down" with Fast Startup, sleep and hibernation do not reset it (ADR 0039) | `bope_core::model::BootTime`, `bope_host::BootTimeSource`, header field `boot_time` |
-| **profile root** | A folder SS-mode redaction treats as holding user profiles: `Users`, `Documents and Settings` or its 8.3 short name on any drive, or the machine's `ProfilesDirectory` on its own drive. The folder after it is the name that `%USERPROFILE%` replaces. Report-header field `profiles_directory` carries the machine's own one; never evidence and never read by a rule (ADR 0049) | `bope_core::view::redact_profile_paths`, header field `profiles_directory` |
-| **Self mode / SS mode** | Full local view / screenshare view with consent, matches only, redacted paths | `Mode::SelfCheck`, `Mode::Ss` |
+| **profile root** | A folder that holds user profiles: `Users`, `Documents and Settings` or its 8.3 short name on any drive, or the machine's `ProfilesDirectory` on its own drive. `autostart` reads a path under one as `user_profile` (ADR 0049) | `bope_collectors::paths::is_under_profile_root` |
 | **rules bundle** | All rules compiled and embedded in the executable, identified by its SHA-256 | `bope_core::bundle` |
 | **listed counts** | How many pieces of the evidence a view lists are in each state — found, not found, unmeasured. Three numbers, never added into one: not a pass/fail total (ADR 0045) | `bope_core::view::ListedCounts` |
 | **rule files** | Where a Rule's `rule.yaml`, its fixtures folder and its Collector's file are in the repository, with its references | `bope_core::rules::RuleFiles` |
 | **code link** | Where to read this binary's code: the commit of an official build, the repository otherwise | `Provenance::code_url`, `REPOSITORY_URL` |
 | **official build** | A binary built by the upstream release workflow; anything else is **unofficial** | `bope_core::provenance` |
 | **build marker** | The text `aeterna-rongroi build marker: official=<flag>;commit=<sha>;` embedded in every binary; the report's provenance is read from it | `bope_core::provenance::build_marker` |
-| **path** | Observation field: the full path of the file the observation is about, as it was read. Redacted to `%USERPROFILE%` in SS mode | observation field `path` |
+| **path** | Observation field: the full path of the file the observation is about, as it was read | observation field `path` |
 | **sha256** | Observation field: SHA-256 of that file, 64 lowercase hex characters. The only file hash, and one of the two things `allow` may compare | observation field `sha256` |
 | **signature** | Observation field: what Windows says about the Authenticode signature **embedded** in that file — `valid`, `no_embedded_signature`, `invalid` or `unverifiable_offline` — checked without the network. Never "unsigned": a catalog signature is not looked at (ADR 0035) | `bope_host::SignatureCheck`, observation field `signature` |
 | **discriminator** | The observation field a collector that reads several places uses to say which one an observation is about — today `fivem_dir`, `usn`, `net_config` and `autostart`'s `location`. A place that could not be read is a gap for that place's observations only, and a baseline observation that differs from a rule in the discriminator alone does not confront it (ADR 0044, ADR 0033) | `bope_collectors::Collector::discriminator`, `bope_core::model::DiscriminatorGaps` |
@@ -73,14 +72,13 @@ repository; if the idea already has a name, use it. A new term is a PR to this t
 | **other_volume** | The Unmeasured reason of a `usn` place on another drive than the one whose change journal is read: declarable, not a scope statement, and never `read_failed`, because nothing failed. Also the value of that place's `folder` field (ADR 0047, amendment of 2026-09-30) | `UnmeasuredReason::OtherVolume`, `usn::FOLDER_OTHER_VOLUME` |
 | **row band** | The coverage band of the one place a collector's coverage names — `usn`'s journal — paired with each `found` and `not_found` row of that collector, so a count is read as a count for that span; or the statement that the source held no record (ADR 0047, amendment of 2026-09-30) | `bope_core::view::RowBand`, `ReportView::row_bands` |
 | **not_consented** | The Unmeasured reason of a `full` collector's rules in a standard scan; a scope statement, expected by every rule, declarable by none (ADR 0052) | `UnmeasuredReason::NotConsented`, `ScopeNotes.not_consented` |
-| **sensitive field** | A field a `full` collector declares as carrying a server identity, an account identifier or a download host; SS mode shows its placeholder unless the player agreed to show that kind (ADR 0052) | `Field::sensitive`, `SensitiveKind`, `Report.sensitive_fields`, `view::SsOptions`, `%SERVER_IDENTITY%`, `%ACCOUNT_IDENTIFIER%`, `%DOWNLOAD_HOST%` |
 | **server_folder** / **server_folders** | Observation fields of `fivem_servers`: the name of one Enhanced server cache folder, a sensitive server identity; and how many such folders the server cache holds (ADR 0055) | observation fields `server_folder`, `server_folders` |
-| **host_name** / **address** / **address_kind** | Observation fields of `net_config`'s `hosts`: a name on a line in effect that is `cfx.re`, `fivem.net` or `rockstargames.com` or a subdomain of one, as the line spells it; the address the line gives it, as written; and that address's kind — `loopback`, `unspecified`, `private`, `public` or `not_an_address`. SS mode never shows `address` (ADR 0054) | observation fields `host_name`, `address`, `address_kind`; `bope_core::view::SS_WITHHELD_FIELDS` |
+| **host_name** / **address** / **address_kind** | Observation fields of `net_config`'s `hosts`: a name on a line in effect that is `cfx.re`, `fivem.net` or `rockstargames.com` or a subdomain of one, as the line spells it; the address the line gives it, as written; and that address's kind — `loopback`, `unspecified`, `private`, `public` or `not_an_address`. (ADR 0054) | observation fields `host_name`, `address`, `address_kind` |
 | **lines_in_effect** / **present** / **line** | Observation fields of `net_config`'s `hosts`: how many lines are not blank once a `#` and what follows it are removed; whether the file is there; and a reported line's number, from 1 (ADR 0054) | observation fields `lines_in_effect`, `present`, `line` |
 | **proxy_enabled** / **proxy_server_set** / **auto_config_url_set** | Observation fields of `net_config`'s `proxy`: whether `ProxyEnable` is a non-zero `REG_DWORD`, and whether a `ProxyServer` and an `AutoConfigURL` value exist — never their data (ADR 0054) | observation fields of the same names |
 | **firewall_rules** / **unparsed_rules** | Observation fields of `net_config`'s `firewall`: how many values the local firewall rule store holds, and how many of them this program could not read as a rule (ADR 0054) | observation fields of the same names |
 | **action** / **enabled** / **direction** / **protocol** / **profiles** | Observation fields of a Windows Firewall rule for a program in a FiveM folder: `Action` (`Allow`, `Block`), `Active` as a boolean, `Dir` (`In`, `Out`), `Protocol` as a number (6 TCP, 17 UDP), and every `Profile` joined with `,` (ADR 0054). `autostart` reuses `enabled` for a scheduled task's `Settings/Enabled`, true when the element is absent (ADR 0060) | observation fields of the same names |
-| **entry** / **hive** / **run_once** | Observation fields of `autostart`: a `Run` value's name or a scheduled task's path below `%SystemRoot%\System32\Tasks` (`\Folder\Name`), as read — SS mode never shows it; which key a `Run` value is under — `machine`, `machine_32` (`WOW6432Node`) or `user`; and whether it is in `RunOnce` (ADR 0060) | observation fields of the same names; `bope_core::view::SS_WITHHELD_FIELDS` |
+| **entry** / **hive** / **run_once** | Observation fields of `autostart`: a `Run` value's name or a scheduled task's path below `%SystemRoot%\System32\Tasks` (`\Folder\Name`), as read; which key a `Run` value is under — `machine`, `machine_32` (`WOW6432Node`) or `user`; and whether it is in `RunOnce` (ADR 0060) | observation fields of the same names |
 | **trigger_start** / **service_dll** / **triggers** | Observation fields of `autostart`: whether a service has a `TriggerInfo` key; whether `path` is the service's `ServiceDll` rather than its `ImagePath`; and the kinds of a task's triggers — `boot`, `logon`, `time`, `calendar`, `event`, `idle`, `registration`, `session_change`, `wnf`, `other` — sorted and joined with `,`, empty when it has none (ADR 0060) | observation fields of the same names |
 | **starts_by_itself** | Observation field of `autostart`: whether Windows starts the entry without being asked — a service whose `Start` is 0, 1 or 2, or 3 with a trigger; every `Run` value; an enabled task with a trigger. Explorer's `StartupApproved` switch is not read (ADR 0060) | observation field `starts_by_itself` |
 | **path_kind** | Observation field of `autostart`: the kind of folder `path` is in — `windows` (under `%SystemRoot%`, except its `Temp`), `program_files`, `program_data`, `user_profile` (under a profile root) or `other`. A file of kind `windows` is not hashed or checked (ADR 0060) | observation field `path_kind` |
@@ -119,7 +117,7 @@ Never introduce a score, a "clean" flag, a pass/fail total, or synonyms such as 
 
 ## 4. Privacy in code
 
-- Never print or log a raw user path outside Self mode. Redaction goes through `bope_core::view`.
+- Never print or log a user path anywhere but the report itself; logging (when added) goes to local stderr only.
 - Logging (when added) goes to local stderr only. No telemetry, no crash upload, no network.
 - Test fixtures never contain a real person's user name, host name or SID. Nothing checks this
   automatically: `cargo xtask scrub-check` has been named here since M1 and was never written, so what
@@ -180,8 +178,8 @@ Never introduce a score, a "clean" flag, a pass/fail total, or synonyms such as 
 
 ## 8. Docs and comments
 
-- Source docs are written in English. `README` and the screenshare guide (`docs/screenshare-guide.md`)
-  also exist in Thai, and a change to either language's copy changes the other in the same pull request.
+- Source docs are written in English. The B.O.P.E user-facing pages — `README.md` and `docs/bope/` — are in
+  Portuguese.
 - Comments explain *why*, not *what*.
 - Changing the architecture, the rule format or adding a new kind of source needs an ADR in `docs/adr/`.
 

@@ -18,7 +18,7 @@ beside every Found row the program shows the ordinary things that also produce i
 |---|---|
 | Rule format | 4 |
 | Rules | 152 |
-| SHA-256 | `2c0d778913af501d5153fe98dfc69746b41e3e553e03e09206567ae20000f973` |
+| SHA-256 | `51a6d97b7eb0f0f66f2492585e7e37ad4b06f913a817b2e1011a8f3a012280e3` |
 
 A report header shows its rule count and bundle SHA-256. A report with a different SHA-256 came from a
 program with a different set of rules: read this page at the commit that program was built from.
@@ -31,13 +31,12 @@ program with a different set of rules: read this page at the commit that program
 - If the collector could not read a field a condition names, the rule is **Not measured**, never Not
   found.
 - **Not measured, and named by the rule as ordinary on some machines** lists the reasons the rule's
-  author said carry no information on such a machine. SS mode counts them instead of listing them (ADR 0027).
+  author said carry no information on such a machine (ADR 0027).
 - **Strength** says what the evidence can show: `execution`, a program ran; `presence`, a file or
   program existed; `tamper`, traces were removed or altered; `posture`, a machine setting that makes
   cheating easier; `context`, background for the reviewer.
 
-Writing or changing a rule: [rules-authoring.md](rules-authoring.md). Checking a PC over a
-screenshare: [screenshare-guide.md](screenshare-guide.md).
+Writing or changing a rule: [rules-authoring.md](rules-authoring.md).
 
 ## Contents
 
@@ -1482,7 +1481,7 @@ Only the files present when the scan ran, and only the attempt made during it. A
 
 **About this check**
 
-FiveM for GTA V Enhanced keeps one cache folder per server it joined, and this row is one of them: the folder's name, and when it was created and last changed. What the name is made from is not known; it stays the same for that server on this PC, so the same name in two reports of this PC is the same server. Whether another PC gets the same name for that server is not known. SS mode shows the name only if the player agreed to show server identities. Read only in a full scan. This says that the game joined a server, not what anyone did on it.
+FiveM for GTA V Enhanced keeps one cache folder per server it joined, and this row is one of them: the folder's name, and when it was created and last changed. What the name is made from is not known; it stays the same for that server on this PC, so the same name in two reports of this PC is the same server. Whether another PC gets the same name for that server is not known. Read only in a full scan. This says that the game joined a server, not what anyone did on it.
 
 **Matches when all of these hold for one observation**
 
@@ -2327,7 +2326,7 @@ The configuration at scan time.
 
 **About this check**
 
-A line in effect in this PC's hosts file gives a name under roblox.com, rbxcdn.com, robloxlabs.com, cfx.re, fivem.net or rockstargames.com an address of its own, so Windows uses that address for the name instead of asking a DNS server. The row shows the name, the line and the kind of address: loopback or unspecified sends the name nowhere, which is how blocklists block a service; private or public sends it to another machine. SS mode shows only the kind, because the address itself can name the player's own server. This does not say what wrote the line, when, or whether any program used it.
+A line in effect in this PC's hosts file gives a name under roblox.com, rbxcdn.com, robloxlabs.com, cfx.re, fivem.net or rockstargames.com an address of its own, so Windows uses that address for the name instead of asking a DNS server. The row shows the name, the line and the kind of address: loopback or unspecified sends the name nowhere, which is how blocklists block a service; private or public sends it to another machine. This does not say what wrote the line, when, or whether any program used it.
 
 **Matches when all of these hold for one observation**
 
@@ -5235,7 +5234,7 @@ A subscription lasts until it is deleted.
 
 ## Timeline selectors
 
-A timeline selector is written like a rule and produces no evidence: the observations it matches put their times on the report's timeline, in Self and SS mode, each with the text and the ordinary causes below. It is never Found, Not found or Not measured, and never counted (ADR 0051). A timeline selector may choose Prefetch, BAM and Program Compatibility Assistant records by name, which a rule may not (ADR 0034): a name says nothing about which program it was, and each one says so.
+A timeline selector is written like a rule and produces no evidence: the observations it matches put their times on the report's timeline, each with the text and the ordinary causes below. It is never Found, Not found or Not measured, and never counted (ADR 0051). A timeline selector may choose Prefetch, BAM and Program Compatibility Assistant records by name, which a rule may not (ADR 0034): a name says nothing about which program it was, and each one says so.
 
 ### `amcache` / `timeline`
 

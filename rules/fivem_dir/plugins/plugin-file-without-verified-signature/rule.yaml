@@ -28,7 +28,7 @@ retention: >-
   Only the files in the folder when the scan ran. A file removed before then leaves nothing here, and
   this check cannot say what the folder held earlier.
 # Left out deliberately: `access_denied`. The folder is inside the player's own profile, and a plugins
-# folder its owner cannot list is not the state of an ordinary install, so SS mode lists it.
+# folder its owner cannot list is not the state of an ordinary install, so it stays unexpected.
 unmeasured_when: [not_windows]
 falsepositives:
   - Graphics mods — ReShade's dxgi.dll or d3d11.dll, ENB — installed here as the Cfx.re forum guides

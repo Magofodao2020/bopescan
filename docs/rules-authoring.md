@@ -29,7 +29,7 @@ a fresh UUID. The placeholders fail `cargo xtask check-rules` until you fill the
 | `cased` | no | **field** names compared byte for byte instead; everything left out folds case. One entry covers every comparison the rule makes against that field |
 | `allow` | no | legitimate software excluded by `sha256` (the file) or `signer_cert_sha256` (the certificate that signed it) — exactly one per entry, never a file's or a signer's name: certificates stolen from a real publisher carry its name (ADR 0035). Revocation is not checked, so an allowed certificate that is later stolen and revoked stays allowed until the entry is removed. `prefetch`, `bam` and `pca` emit neither, so a rule on them has nothing to allow by, and no rule on them names a program by `name` or `path` (ADR 0034). The bundle loader refuses such a rule since ADR 0051; a timeline selector may |
 | `retention` | yes | how far back the source can see, in words for the user |
-| `unmeasured_when` | no | reason codes you expect on some machines. A reason named here is **counted** in SS mode; one that is not is **listed**, because it means something you did not anticipate stopped the measurement (ADR 0027). Every entry must be a reason the collector can report — `check-rules` rejects the rest and names what it does report. `partial`, `budget_spent` and `read_failed` may not be named at all: a view lists them whatever you declare, so `check-rules` refuses the line (ADR 0030, ADR 0032) |
+| `unmeasured_when` | no | reason codes you expect on some machines. A reason named here reads as expected; one that is not reads as unexpected, because it means something you did not anticipate stopped the measurement (ADR 0027). Every entry must be a reason the collector can report — `check-rules` rejects the rest and names what it does report. `partial`, `budget_spent` and `read_failed` may not be named at all: a view lists them whatever you declare, so `check-rules` refuses the line (ADR 0030, ADR 0032) |
 | `falsepositives` | yes | what legitimately produces this evidence; never empty. Shown to the reader beside every `found` row (ADR 0027), so write it for them |
 | `references`, `tags`, `related`, `modified` | no | |
 | `author`, `date` | yes | `date` is `YYYY-MM-DD` |
@@ -114,7 +114,7 @@ never "no match" — ADR 0002 is what that protects, and ADR 0029 has the table 
 A file with `role: timeline` is a **timeline selector** (rule format version 4, ADR 0051). It is written,
 fixtured, translated and reviewed like a rule, and it makes no evidence: it is never `found`, `not_found` or
 `unmeasured`, it is never counted, and the observations it matches stay unmatched. What it does is put the
-timestamp fields of those observations on the report's timeline — in Self mode and **in SS mode** — each
+timestamp fields of those observations on the report's timeline, each
 shown with the selector's title, description and `falsepositives`.
 
 - `strength` is `context`, and `unmeasured_when` is left out: there is no row for it to count. A source
@@ -122,8 +122,6 @@ shown with the selector's title, description and `falsepositives`.
 - It may select `prefetch`, `bam` and `pca` records by `name` or `path`, which a rule may not (ADR 0034).
   Its text says "Windows recorded a program named …", never that the program ran, and its
   `falsepositives` say that a rename defeats it and that a missing time is not evidence.
-- It widens what SS mode shows. The consent text (`crates/bope-cli/src/output.rs`, the desktop's
-  `consent.shows`) and `PRIVACY.md` name what it selects, in the same change.
 - Its fixtures are checked as a rule's are: the positive one must match, the negative one must not.
   `check-baseline` asks whether a baseline confronts it, and does not ask whether it is quiet, because a
   selection is not a `found`.
@@ -187,9 +185,8 @@ also carries `falsepositives` — a finding shown without what else produces it 
 accusation (NIST SP 800-86 section 3.4). A `not_found` row does not: nothing was found, so there is
 nothing to explain.
 
-An `unmeasured` row says whether its reason was one this rule named in `unmeasured_when`. SS mode lists
-the ones no rule expected and counts the rest, so `unmeasured_when` is the difference between a line a
-reviewer should ask about and a number they can move past. There are exceptions in each direction
+An `unmeasured` row says whether its reason was one this rule named in `unmeasured_when`, so
+`unmeasured_when` is the difference between a line a reviewer should ask about and one they can move past. There are exceptions in each direction
 (ADR 0030, ADR 0032): `not_admin` and `not_attempted` are never a row at all — each is one fact about
 the scan, said once above the evidence — and `partial`, `budget_spent` and `read_failed` are always a
 row, declared or not, because each says the artifact was reachable and the read of it did not finish.

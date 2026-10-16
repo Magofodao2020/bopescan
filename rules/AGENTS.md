@@ -8,9 +8,9 @@ Adds to the root [`AGENTS.md`](../AGENTS.md); read that first. Authoring guide:
   reader** beside every `found` row, in their language (ADR 0027) — a finding shown without its
   alternatives is a finding shown as an accusation. `description` is shown beside every row whatever
   the state, so its "what this does not prove" clause is written for the reader, not for a maintainer.
-- `unmeasured_when` decides what an SS view lists: a reason named there is **counted**, one that is not
-  is **listed**, because an undeclared reason means something the author did not anticipate stopped the
-  measurement (ADR 0027). Every entry must be a reason that collector can report — `check-rules`
+- `unmeasured_when` decides whether an unmeasured row reads as expected: a reason named there is one the
+  author said happens on ordinary machines; one that is not means something the author did not anticipate
+  stopped the measurement (ADR 0027). Every entry must be a reason that collector can report — `check-rules`
   rejects the rest and names what the collector does report. Since ADR 0030 every reason has a
   producer, so the check is entirely about *which* collector: `not_on_this_os` is `pca` alone,
   `service_disabled` is `prefetch` alone, `not_attempted` is `evtx` alone, `other_volume` is `usn` alone
@@ -39,14 +39,12 @@ Adds to the root [`AGENTS.md`](../AGENTS.md); read that first. Authoring guide:
   collectors emit identifies software, so such a rule cannot `allow` the legitimate program with that name
   and a rename defeats it. Since ADR 0051 the bundle loader, and so `check-rules`, refuses such a rule.
 - **A timeline selector** (`role: timeline`, ADR 0051) is written like a rule and makes no evidence: what
-  it matches puts its times on the timeline, in SS mode too. It is the one kind of file that may select
+  it matches puts its times on the timeline. It is the one kind of file that may select
   `prefetch`, `bam` or `pca` records by `name` or `path`, it is `strength: context`, and it has no
   `unmeasured_when`. Its `falsepositives` are shown beside its times, so they must say that a name does
-  not identify a program and that a missing time is not evidence. **A new selector on those three
-  collectors widens what SS mode shows**, so the consent text in `crates/bope-cli/src/output.rs`, the
-  desktop's `consent.shows` and `PRIVACY.md` must name what it selects, in the same change.
+  not identify a program and that a missing time is not evidence.
 - **`rules/ages/<collector>.yaml` says what a source ordinarily keeps** (ADR 0061), shown under its
-  trace-age rows in both modes. It is a fact with a reference, never a verdict: say "not documented by
+  trace-age rows. It is a fact with a reference, never a verdict: say "not documented by
   Microsoft" and what the statement rests on where that is so, give no number the measurements disagree
   about, and never describe how a source could be made to look older or newer. `documented: true` needs
   a Microsoft Learn reference; `check-rules` requires one file for each collector that declares an age.
@@ -123,10 +121,10 @@ Adds to the root [`AGENTS.md`](../AGENTS.md); read that first. Authoring guide:
   `event_id: [1102, 104]` with `channel: [Security, System]` also asks for a 1102 on `System`. Where the
   pairs are what you mean and the cross product is not, that is two rules, not one — and two findings a
   reader can tell apart usually turn out to be the reason (ADR 0031).
-- **`strength` decides whether a rule's `not_found` reaches an SS reviewer**: `posture` is listed,
-  everything else is counted (`view::ss_lists`). So a rule whose negative result means almost nothing —
-  a log-clearing rule, whose record a later clearing removes — must not be `posture`, or the report
-  grows a row that reads as "we looked and it is clean", which is the closest this program can come to a
+- **`strength` says how a `not_found` reads**: a `posture` `not_found` reads as "the setting is as
+  Windows ships it". So a rule whose negative result means almost nothing — a log-clearing rule, whose
+  record a later clearing removes — must not be `posture`, or the report grows a row that reads as "we
+  looked and it is clean", which is the closest this program can come to a
   verdict (ADR 0002, ADR 0031).
 - `status: test` or `stable` needs a positive and a negative fixture in `tests/`. Every rule,
   `experimental` included, needs a `tests/` folder holding at least one fixture file, because the report

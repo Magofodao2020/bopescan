@@ -1,5 +1,7 @@
 # Guia manual de PC Check — Roblox
 
+Versão do programa descrita: B.O.P.E Scanner **0.10.0**.
+
 Guia prático para uma sessão de PC Check por screenshare, com ou sem o B.O.P.E Scanner. Cada passo diz
 **onde olhar**, **o que é normal**, **o que merece pergunta** e **o que não se pode concluir**. Tudo é
 somente leitura: nada aqui pede para apagar, mover, renomear ou executar arquivos do jogador.
@@ -22,8 +24,8 @@ locais na tela e UTC nos relatórios do B.O.P.E.
    compartilhamento **com aviso em voz**. Registre na ata quais capturas foram feitas e por quê.
 4. Anote: data, hora e fuso horário do PC (canto da barra de tarefas), versão do Windows
    (`winver`), nome da conta Windows usada.
-5. Se for usar o B.O.P.E Scanner: confira o SHA-256 do executável antes (veja
-   [guia-screenshare.md](guia-screenshare.md)). Ele mostra o consentimento antes de ler qualquer coisa.
+5. Se for usar o B.O.P.E Scanner: confira o SHA-256 do executável antes, contra o valor que a sua
+   comunidade publica. Ele mostra o que será lido antes de ler qualquer coisa.
 
 ## 2. Identificar o cliente Roblox em execução
 

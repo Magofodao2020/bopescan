@@ -1275,9 +1275,8 @@ c402aedc-1ed7-49a6-998c-0762e17e9bd0:
     O FiveM para GTA V Enhanced guarda uma pasta de cache por servidor em que entrou, e esta linha é uma
     delas: o nome da pasta e quando foi criada e alterada por último. Não se sabe de que o nome é
     feito; ele permanece o mesmo para aquele servidor neste PC, então o mesmo nome em dois relatórios
-    deste PC é o mesmo servidor. Não se sabe se outro PC recebe o mesmo nome para aquele servidor. O
-    modo SS mostra o nome só se o jogador concordou em mostrar identidades de servidores. Lido só na
-    verificação avançada. Diz que o jogo entrou num servidor, não o que alguém fez nele.
+    deste PC é o mesmo servidor. Não se sabe se outro PC recebe o mesmo nome para aquele servidor.
+    Lido só na verificação avançada. Diz que o jogo entrou num servidor, não o que alguém fez nele.
   retention: >-
     As pastas de cache de servidor presentes no momento da verificação. Uma pasta que o jogador, um
     limpador ou uma reinstalação removeu não é vista, e não se sabe se o FiveM remove as antigas
@@ -1335,9 +1334,8 @@ f47de6d4-05ef-4f33-9aca-2307170fd5ab:
     robloxlabs.com, cfx.re, fivem.net ou rockstargames.com um endereço próprio, então o Windows usa
     esse endereço para o nome em vez de perguntar a um servidor DNS. A linha mostra o nome, a linha do
     arquivo e o tipo de endereço: loopback ou unspecified não manda o nome a lugar nenhum, que é como
-    listas de bloqueio bloqueiam um serviço; private ou public o manda para outra máquina. O modo SS
-    mostra só o tipo, porque o próprio endereço pode identificar o servidor do jogador. Isto não diz o
-    que escreveu a linha, quando, nem se algum programa a usou.
+    listas de bloqueio bloqueiam um serviço; private ou public o manda para outra máquina. Isto não
+    diz o que escreveu a linha, quando, nem se algum programa a usou.
   retention: >-
     O arquivo hosts como estava no momento da verificação. Uma linha removida antes da verificação
     não é vista.

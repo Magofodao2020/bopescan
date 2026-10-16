@@ -7,9 +7,8 @@ description: >-
   A line in effect in this PC's hosts file gives a name under roblox.com, rbxcdn.com, robloxlabs.com, cfx.re,
   fivem.net or rockstargames.com an address of its own, so Windows uses that address for the name instead of asking a DNS server. The row
   shows the name, the line and the kind of address: loopback or unspecified sends the name nowhere, which
-  is how blocklists block a service; private or public sends it to another machine. SS mode shows only
-  the kind, because the address itself can name the player's own server. This does not say what wrote
-  the line, when, or whether any program used it.
+  is how blocklists block a service; private or public sends it to another machine. This does not say
+  what wrote the line, when, or whether any program used it.
 status: experimental
 collector: net_config
 strength: posture

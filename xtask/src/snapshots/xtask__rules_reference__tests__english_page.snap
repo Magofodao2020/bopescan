@@ -35,13 +35,12 @@ program with a different set of rules: read this page at the commit that program
 - If the collector could not read a field a condition names, the rule is **Not measured**, never Not
   found.
 - **Not measured, and named by the rule as ordinary on some machines** lists the reasons the rule's
-  author said carry no information on such a machine. SS mode counts them instead of listing them (ADR 0027).
+  author said carry no information on such a machine (ADR 0027).
 - **Strength** says what the evidence can show: `execution`, a program ran; `presence`, a file or
   program existed; `tamper`, traces were removed or altered; `posture`, a machine setting that makes
   cheating easier; `context`, background for the reviewer.
 
-Writing or changing a rule: [rules-authoring.md](rules-authoring.md). Checking a PC over a
-screenshare: [screenshare-guide.md](screenshare-guide.md).
+Writing or changing a rule: [rules-authoring.md](rules-authoring.md).
 
 ## Contents
 

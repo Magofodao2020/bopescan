@@ -20,11 +20,11 @@ const WORKSPACE_VERSION: &str = env!("CARGO_PKG_VERSION");
 /// Text each page must contain, with `{v}` standing for the version.
 const MARKERS: [(&str, &str); 2] = [
     ("README.md", "**Versão atual: {v}**"),
-    ("docs/bope/guia-screenshare.md", "B.O.P.E Scanner **{v}**"),
+    ("docs/bope/guia-pc-check-roblox.md", "B.O.P.E Scanner **{v}**"),
 ];
 
 /// Pages whose release file names (`bope-scanner[-cli]-X.Y.Z-windows-x64.exe`) must name the version.
-const FILE_NAME_PAGES: [&str; 2] = ["README.md", "docs/bope/guia-screenshare.md"];
+const FILE_NAME_PAGES: [&str; 2] = ["README.md", "docs/bope/guia-pc-check-roblox.md"];
 
 pub fn run(root: &Path) -> anyhow::Result<()> {
     let version = WORKSPACE_VERSION;
