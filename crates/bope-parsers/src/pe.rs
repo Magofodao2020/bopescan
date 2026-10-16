@@ -1262,7 +1262,7 @@ pub(crate) mod tests {
         // .rdata at 0x400 (RVA 0x2000): import descriptor, ILT, name, dll name; export directory.
         let mut rdata = vec![0_u8; 0x400];
         let put32 = |buf: &mut Vec<u8>, at: usize, v: u32| {
-            buf[at..at + 4].copy_from_slice(&v.to_le_bytes())
+            buf[at..at + 4].copy_from_slice(&v.to_le_bytes());
         };
         put32(&mut rdata, 0x00, 0x2040); // OriginalFirstThunk
         put32(&mut rdata, 0x0c, 0x2080); // Name

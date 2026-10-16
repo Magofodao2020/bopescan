@@ -204,6 +204,243 @@ fn walk_regions(handle: windows::Win32::Foundation::HANDLE) -> bope_host::Execut
     summary
 }
 
+/// One process opened for reading its memory (B.O.P.E, ADR 0134); the handle is closed on drop.
+#[cfg(windows)]
+pub struct LiveProcessMemory {
+    pid: u32,
+    handle: windows::Win32::Foundation::HANDLE,
+}
+
+#[cfg(windows)]
+impl Drop for LiveProcessMemory {
+    fn drop(&mut self) {
+        close(self.handle);
+    }
+}
+
+#[cfg(windows)]
+impl bope_host::MemorySource for crate::LiveHost {
+    fn open_process_memory(
+        &self,
+        pid: u32,
+    ) -> Result<Box<dyn bope_host::ProcessMemory + '_>, bope_host::SourceError> {
+        let handle = open_for_reading(pid)?;
+        Ok(Box::new(LiveProcessMemory { pid, handle }))
+    }
+}
+
+/// Reads a `GetMappedFileNameW` answer for `address`, or `None`.
+#[cfg(windows)]
+#[allow(unsafe_code)]
+fn mapped_file(handle: windows::Win32::Foundation::HANDLE, address: u64) -> Option<String> {
+    use windows::Win32::System::ProcessStatus::GetMappedFileNameW;
+    let mut buffer = vec![0_u16; 1024];
+    // SAFETY: `buffer` is writable for its whole length; the address is only a value the call looks
+    // up in the process's own mapping list.
+    let written = unsafe {
+        GetMappedFileNameW(
+            handle,
+            usize::try_from(address).unwrap_or(0) as *const core::ffi::c_void,
+            &mut buffer,
+        )
+    } as usize;
+    (written > 0 && written <= buffer.len()).then(|| String::from_utf16_lossy(&buffer[..written]))
+}
+
+#[cfg(windows)]
+impl bope_host::ProcessMemory for LiveProcessMemory {
+    #[allow(unsafe_code)]
+    fn pointer_width(&self) -> Option<bope_host::PointerWidth> {
+        use windows::Win32::System::SystemInformation::{
+            IMAGE_FILE_MACHINE, IMAGE_FILE_MACHINE_UNKNOWN,
+        };
+        use windows::Win32::System::Threading::IsWow64Process2;
+        let mut process = IMAGE_FILE_MACHINE::default();
+        let mut native = IMAGE_FILE_MACHINE::default();
+        // SAFETY: both out-pointers are valid locals; the handle has `PROCESS_QUERY_INFORMATION`.
+        unsafe { IsWow64Process2(self.handle, &raw mut process, Some(&raw mut native)) }.ok()?;
+        // `IMAGE_FILE_MACHINE_UNKNOWN` means "not under WOW64": the process is native.
+        let machine = if process == IMAGE_FILE_MACHINE_UNKNOWN {
+            native
+        } else {
+            process
+        };
+        match machine.0 {
+            0x014c | 0x01c4 => Some(bope_host::PointerWidth::Bits32),
+            0x8664 | 0xaa64 => Some(bope_host::PointerWidth::Bits64),
+            _ => None,
+        }
+    }
+
+    #[allow(unsafe_code)]
+    fn modules(&self) -> Result<Vec<bope_host::LoadedModule>, bope_host::SourceError> {
+        use windows::Win32::Foundation::HMODULE;
+        use windows::Win32::System::ProcessStatus::{
+            EnumProcessModulesEx, GetModuleFileNameExW, GetModuleInformation, LIST_MODULES_ALL,
+            MODULEINFO,
+        };
+        let pid = self.pid;
+        let mut modules = vec![HMODULE::default(); 1024];
+        loop {
+            let capacity = u32::try_from(modules.len() * size_of::<HMODULE>()).map_err(|_| {
+                bope_host::SourceError::Failed("module buffer does not fit in a u32".to_owned())
+            })?;
+            let mut needed = 0_u32;
+            // SAFETY: as in `list_modules`: a buffer of `capacity` bytes and a valid out-pointer.
+            unsafe {
+                EnumProcessModulesEx(
+                    self.handle,
+                    modules.as_mut_ptr(),
+                    capacity,
+                    &raw mut needed,
+                    LIST_MODULES_ALL,
+                )
+            }
+            .map_err(|error| {
+                bope_host::SourceError::Failed(format!(
+                    "EnumProcessModulesEx({pid}) failed: {error}"
+                ))
+            })?;
+            let count = needed as usize / size_of::<HMODULE>();
+            if count <= modules.len() {
+                modules.truncate(count);
+                break;
+            }
+            if count > MAX_MODULES {
+                return Err(bope_host::SourceError::Failed(format!(
+                    "process {pid} lists {count} modules, more than the {MAX_MODULES} this program reads"
+                )));
+            }
+            modules.resize(count, HMODULE::default());
+        }
+        let mut loaded = Vec::with_capacity(modules.len());
+        let mut buffer = vec![0_u16; 32_768];
+        let info_size = u32::try_from(size_of::<MODULEINFO>()).unwrap_or(0);
+        for module in modules {
+            let mut info = MODULEINFO::default();
+            // SAFETY: `info` is a writable `MODULEINFO` of the size passed; the module handle came
+            // from the list above. A module unloaded since is skipped.
+            if unsafe { GetModuleInformation(self.handle, module, &raw mut info, info_size) }
+                .is_err()
+            {
+                continue;
+            }
+            // SAFETY: as in `list_modules`.
+            let written =
+                unsafe { GetModuleFileNameExW(Some(self.handle), Some(module), &mut buffer) }
+                    as usize;
+            if written == 0 || written > buffer.len() {
+                continue;
+            }
+            loaded.push(bope_host::LoadedModule {
+                base: info.lpBaseOfDll as usize as u64,
+                size: info.SizeOfImage,
+                path: String::from_utf16_lossy(&buffer[..written]),
+            });
+        }
+        Ok(loaded)
+    }
+
+    #[allow(unsafe_code)]
+    fn regions(
+        &self,
+        max: usize,
+    ) -> Result<(Vec<bope_host::MemoryRegion>, bool), bope_host::SourceError> {
+        use windows::Win32::System::Memory::{
+            MEM_COMMIT, MEM_IMAGE, MEM_MAPPED, MEMORY_BASIC_INFORMATION, VirtualQueryEx,
+        };
+        let mut regions = Vec::new();
+        let mut address: usize = 0;
+        let mut walked = 0_u32;
+        loop {
+            if regions.len() >= max || walked >= MAX_REGIONS {
+                return Ok((regions, false));
+            }
+            let mut info = MEMORY_BASIC_INFORMATION::default();
+            // SAFETY: as in `walk_regions`: only a descriptor is written, nothing is dereferenced.
+            let size = unsafe {
+                VirtualQueryEx(
+                    self.handle,
+                    Some(address as *const core::ffi::c_void),
+                    &raw mut info,
+                    size_of::<MEMORY_BASIC_INFORMATION>(),
+                )
+            };
+            if size == 0 {
+                return Ok((regions, true));
+            }
+            walked += 1;
+            let base = info.BaseAddress as usize as u64;
+            if info.State == MEM_COMMIT {
+                let kind = if info.Type == MEM_IMAGE {
+                    bope_host::RegionKind::Image
+                } else if info.Type == MEM_MAPPED {
+                    bope_host::RegionKind::Mapped
+                } else {
+                    bope_host::RegionKind::Private
+                };
+                let mapped = if kind == bope_host::RegionKind::Private {
+                    None
+                } else {
+                    mapped_file(self.handle, base)
+                };
+                regions.push(bope_host::MemoryRegion {
+                    base,
+                    size: info.RegionSize as u64,
+                    allocation_base: info.AllocationBase as usize as u64,
+                    protect: info.Protect.0,
+                    allocation_protect: info.AllocationProtect.0,
+                    kind,
+                    mapped_file: mapped,
+                });
+            }
+            let Some(next) = (info.BaseAddress as usize).checked_add(info.RegionSize) else {
+                return Ok((regions, true));
+            };
+            if next <= address {
+                return Ok((regions, true));
+            }
+            address = next;
+        }
+    }
+
+    #[allow(unsafe_code)]
+    fn read(&self, address: u64, len: usize) -> Result<Vec<u8>, bope_host::SourceError> {
+        use windows::Win32::System::Diagnostics::Debug::ReadProcessMemory;
+        if len > bope_host::MAX_MEMORY_READ {
+            return Err(bope_host::SourceError::TooLarge {
+                limit: bope_host::MAX_MEMORY_READ,
+            });
+        }
+        let Ok(start) = usize::try_from(address) else {
+            return Err(bope_host::SourceError::Failed(
+                "address beyond this program's pointer width".to_owned(),
+            ));
+        };
+        let mut buffer = vec![0_u8; len];
+        let mut read = 0_usize;
+        // SAFETY: `buffer` holds `len` writable bytes; the call copies from the other process into
+        // it and writes nothing there. The handle has `PROCESS_VM_READ`.
+        unsafe {
+            ReadProcessMemory(
+                self.handle,
+                start as *const core::ffi::c_void,
+                buffer.as_mut_ptr().cast(),
+                len,
+                Some(&raw mut read),
+            )
+        }
+        .map_err(|error| {
+            bope_host::SourceError::Failed(format!(
+                "ReadProcessMemory({}, {address:#x}, {len}) failed: {error}",
+                self.pid
+            ))
+        })?;
+        buffer.truncate(read);
+        Ok(buffer)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -150,6 +150,9 @@ pub struct DirEntryInfo {
     pub name: String,
     /// `true` for a regular file; `false` for a directory or anything else.
     pub is_file: bool,
+    /// `true` when the entry is a reparse point — a junction, a symbolic link or a mount point — which
+    /// a walk must not follow: it can lead back up the tree or onto another volume (B.O.P.E, ADR 0133).
+    pub is_link: bool,
     /// Size in bytes as the listing reports it. `None` for anything that is not a file, and when the
     /// listing did not provide one.
     pub size: Option<u64>,
@@ -166,6 +169,7 @@ impl DirEntryInfo {
         Self {
             name: name.into(),
             is_file,
+            is_link: false,
             size: None,
             created: None,
             modified: None,
@@ -247,6 +251,32 @@ pub trait FilesystemSource {
     fn times(&self, path: &str) -> Result<Option<EntryTimes>, SourceError>;
 }
 
+/// Whether a file's hash is listed in a Windows catalog file this machine trusts, and who signed that
+/// catalog (B.O.P.E, ADR 0133).
+///
+/// Most of Windows' own files carry no embedded signature: they are signed through the catalogs under
+/// `%SystemRoot%\System32\CatRoot`, which list the hash of every file a Windows build ships. A file
+/// whose hash is in a valid catalog is the file that build of Windows installed — the trusted
+/// reference for that version and architecture — whatever its embedded signature says.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CatalogCheck {
+    /// The file's hash is in a catalog whose signature verified offline.
+    Signed {
+        /// The catalog file's name, e.g. `Package_…~amd64~~10.0.26100.1.cat`.
+        catalog: String,
+        /// The catalog signer's display name.
+        signer: String,
+        /// SHA-256 of the catalog signer's certificate.
+        signer_cert_sha256: String,
+    },
+    /// No catalog on this machine lists the file's hash.
+    NotInCatalog,
+    /// A catalog lists the hash and its signature did not verify.
+    Invalid,
+    /// A catalog lists the hash and the check needed something this machine does not hold offline.
+    UnverifiableOffline,
+}
+
 /// What Windows says about the Authenticode signature **embedded in** one file, checked without the
 /// network (ADR 0035).
 ///
@@ -288,6 +318,192 @@ pub trait SignatureSource {
     /// The error is about that one file, like [`FilesystemSource::file_sha256`]: a collector that
     /// cannot check one file still reports the file.
     fn file_signature(&self, path: &str) -> Result<SignatureCheck, SourceError>;
+
+    /// Whether a Windows catalog lists the file's hash, checked without the network (B.O.P.E,
+    /// ADR 0133).
+    fn catalog_signature(&self, path: &str) -> Result<CatalogCheck, SourceError>;
+
+    /// When the file's embedded signature was timestamped by a timestamping authority, when it was:
+    /// the time the signature attests it existed. `Ok(None)` for a signature without a timestamp, or
+    /// no signature (B.O.P.E, ADR 0133).
+    fn signing_time(&self, path: &str) -> Result<Option<jiff::Timestamp>, SourceError>;
+}
+
+/// What kind of drive a volume is, as `GetDriveTypeW` reports it (B.O.P.E, ADR 0133).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "fixture", derive(serde::Deserialize))]
+#[cfg_attr(feature = "fixture", serde(rename_all = "snake_case"))]
+pub enum DriveKind {
+    /// A local fixed disk.
+    Fixed,
+    /// A removable disk (USB stick, card reader).
+    Removable,
+    /// A network share mapped to a letter.
+    Network,
+    /// An optical drive.
+    CdRom,
+    /// A RAM disk.
+    RamDisk,
+    /// Anything else.
+    Unknown,
+}
+
+impl DriveKind {
+    /// Stable identifier used in observations.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Fixed => "fixed",
+            Self::Removable => "removable",
+            Self::Network => "network",
+            Self::CdRom => "cdrom",
+            Self::RamDisk => "ramdisk",
+            Self::Unknown => "unknown",
+        }
+    }
+}
+
+/// One volume mounted at a drive letter.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Volume {
+    /// Its root, `X:\`.
+    pub root: String,
+    /// What kind of drive it is.
+    pub kind: DriveKind,
+    /// The file system name (`NTFS`, `ReFS`, `FAT32`, `exFAT`), when Windows gave one.
+    pub filesystem: Option<String>,
+}
+
+/// Read-only access to which volumes are mounted (B.O.P.E, ADR 0133).
+pub trait VolumeSource {
+    /// Every drive letter in use, in letter order.
+    fn volumes(&self) -> Result<Vec<Volume>, SourceError>;
+}
+
+/// One module the loader lists in a process (B.O.P.E, ADR 0134).
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "fixture", derive(serde::Deserialize))]
+#[cfg_attr(feature = "fixture", serde(deny_unknown_fields))]
+pub struct LoadedModule {
+    /// Where it is mapped.
+    pub base: u64,
+    /// `SizeOfImage` as the loader recorded it.
+    pub size: u32,
+    /// The full path of the file it was loaded from.
+    pub path: String,
+}
+
+/// What kind of memory a region is (`MEMORY_BASIC_INFORMATION.Type`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "fixture", derive(serde::Deserialize))]
+#[cfg_attr(feature = "fixture", serde(rename_all = "snake_case"))]
+pub enum RegionKind {
+    /// `MEM_PRIVATE`: allocated by the process (heaps, stacks, `VirtualAlloc`).
+    Private,
+    /// `MEM_MAPPED`: a view of a section that is not an image.
+    Mapped,
+    /// `MEM_IMAGE`: a view of an executable image the loader mapped.
+    Image,
+}
+
+impl RegionKind {
+    /// Stable identifier used in observations.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Private => "private",
+            Self::Mapped => "mapped",
+            Self::Image => "image",
+        }
+    }
+}
+
+/// One committed region of a process's address space (B.O.P.E, ADR 0134).
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "fixture", derive(serde::Deserialize))]
+#[cfg_attr(feature = "fixture", serde(deny_unknown_fields))]
+pub struct MemoryRegion {
+    /// First address.
+    pub base: u64,
+    /// Size in bytes.
+    pub size: u64,
+    /// The base of the allocation it belongs to.
+    #[cfg_attr(feature = "fixture", serde(default))]
+    pub allocation_base: u64,
+    /// The current `PAGE_*` protection.
+    pub protect: u32,
+    /// The protection the allocation was made with.
+    #[cfg_attr(feature = "fixture", serde(default))]
+    pub allocation_protect: u32,
+    /// Private, mapped or image.
+    pub kind: RegionKind,
+    /// The file a mapped or image region is a view of, as `GetMappedFileNameW` names it (a
+    /// `\Device\HarddiskVolumeN\…` path), when Windows names one.
+    #[cfg_attr(feature = "fixture", serde(default))]
+    pub mapped_file: Option<String>,
+}
+
+impl MemoryRegion {
+    /// Whether the protection allows execution.
+    pub fn is_executable(&self) -> bool {
+        matches!(self.protect & 0xff, 0x10 | 0x20 | 0x40 | 0x80)
+    }
+
+    /// Whether the protection allows reading (and is not a guard page).
+    pub fn is_readable(&self) -> bool {
+        self.protect & 0x100 == 0
+            && matches!(self.protect & 0xff, 0x02 | 0x04 | 0x08 | 0x20 | 0x40 | 0x80)
+    }
+
+    /// Whether the protection allows writing.
+    pub fn is_writable(&self) -> bool {
+        matches!(self.protect & 0xff, 0x04 | 0x08 | 0x40 | 0x80)
+    }
+
+    /// `"rwx"`-style protection.
+    pub fn permissions(&self) -> String {
+        let mut text = String::with_capacity(3);
+        text.push(if self.is_readable() { 'r' } else { '-' });
+        text.push(if self.is_writable() { 'w' } else { '-' });
+        text.push(if self.is_executable() { 'x' } else { '-' });
+        text
+    }
+}
+
+/// The most bytes one [`ProcessMemory::read`] copies.
+pub const MAX_MEMORY_READ: usize = 16 * 1024 * 1024;
+
+/// The pointer width of a process, which decides how its memory's pointers are read.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PointerWidth {
+    /// A 32-bit process (on 64-bit Windows, one running under WOW64).
+    Bits32,
+    /// A 64-bit process.
+    Bits64,
+}
+
+/// One process opened for reading its memory (B.O.P.E, ADR 0134). The handle is held for as long as
+/// the value lives and closed when it is dropped; it is opened with
+/// `PROCESS_QUERY_INFORMATION | PROCESS_VM_READ` and nothing else, so nothing in the process can be
+/// written, suspended, injected or debugged through it.
+pub trait ProcessMemory {
+    /// The process's pointer width, when Windows says.
+    fn pointer_width(&self) -> Option<PointerWidth>;
+    /// The modules the loader lists, with where each is mapped.
+    fn modules(&self) -> Result<Vec<LoadedModule>, SourceError>;
+    /// The committed regions, at most `max` of them, and whether the walk reached the end of the
+    /// address space.
+    fn regions(&self, max: usize) -> Result<(Vec<MemoryRegion>, bool), SourceError>;
+    /// A copy of `len` bytes from `address`, `len` at most [`MAX_MEMORY_READ`]. A range that is not all
+    /// readable is an error: the caller reads region by region.
+    fn read(&self, address: u64, len: usize) -> Result<Vec<u8>, SourceError>;
+}
+
+/// Read-only access to the memory of running processes (B.O.P.E, ADR 0134).
+///
+/// A protected process, or one whose anti-cheat strips the rights from handles, is
+/// [`SourceError::AccessDenied`]: that is the answer, and nothing here works around it.
+pub trait MemorySource {
+    /// Opens process `pid` for reading.
+    fn open_process_memory(&self, pid: u32) -> Result<Box<dyn ProcessMemory + '_>, SourceError>;
 }
 
 /// What the Windows Event Log service states about one channel's log file (ADR 0042).
@@ -1191,6 +1407,8 @@ pub trait Host:
     + RandomReadSource
     + WmiSubscriptionSource
     + ServiceSource
+    + VolumeSource
+    + MemorySource
 {
     /// Operating system family.
     fn platform(&self) -> Platform;
@@ -1287,6 +1505,34 @@ impl SignatureSource for NonWindowsHost {
     fn file_signature(&self, _path: &str) -> Result<SignatureCheck, SourceError> {
         Err(SourceError::Unsupported(
             "no Authenticode verification on this platform".to_owned(),
+        ))
+    }
+
+    fn catalog_signature(&self, _path: &str) -> Result<CatalogCheck, SourceError> {
+        Err(SourceError::Unsupported(
+            "no Windows catalogs on this platform".to_owned(),
+        ))
+    }
+
+    fn signing_time(&self, _path: &str) -> Result<Option<jiff::Timestamp>, SourceError> {
+        Err(SourceError::Unsupported(
+            "no Authenticode verification on this platform".to_owned(),
+        ))
+    }
+}
+
+impl VolumeSource for NonWindowsHost {
+    fn volumes(&self) -> Result<Vec<Volume>, SourceError> {
+        Err(SourceError::Unsupported(
+            "no drive letters on this platform".to_owned(),
+        ))
+    }
+}
+
+impl MemorySource for NonWindowsHost {
+    fn open_process_memory(&self, _pid: u32) -> Result<Box<dyn ProcessMemory + '_>, SourceError> {
+        Err(SourceError::Unsupported(
+            "process memory is read only on Windows".to_owned(),
         ))
     }
 }

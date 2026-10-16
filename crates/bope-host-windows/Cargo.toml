@@ -56,6 +56,10 @@ windows-registry.workspace = true
 # are under `Win32_System_Wmi`; the `VARIANT` `Get` fills and `VariantClear` under `Win32_System_Variant`, which
 # gates them on `Win32_System_Ole` as well; `RPC_C_AUTHN_WINNT` and `RPC_C_AUTHZ_NONE` under `Win32_System_Rpc`
 # (read from the `windows` 0.62.2 sources).
+# B.O.P.E (ADR 0134): `ReadProcessMemory` is under `Win32_System_Diagnostics_Debug`; `GetModuleInformation` and
+# `GetMappedFileNameW` under `Win32_System_ProcessStatus`, `IsWow64Process2` under `Win32_System_Threading`, all
+# listed (read from the `windows` 0.62.2 sources). B.O.P.E (ADR 0133): `GetLogicalDrives`, `GetDriveTypeW` and
+# `GetVolumeInformationW` under `Win32_Storage_FileSystem`, listed.
 # B.O.P.E (ADR 0130): `OpenSCManagerW`, `OpenServiceW`, `QueryServiceStatusEx`, `QueryServiceConfigW` and
 # `CloseServiceHandle` are under `Win32_System_Services` (read from the same sources).
 windows = { workspace = true, features = [
@@ -69,6 +73,7 @@ windows = { workspace = true, features = [
   "Win32_Security_Cryptography_Sip",
   "Win32_Security_WinTrust",
   "Win32_Storage_FileSystem",
+  "Win32_System_Diagnostics_Debug",
   "Win32_System_Diagnostics_ToolHelp",
   "Win32_System_Com",
   "Win32_System_EventLog",

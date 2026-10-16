@@ -165,6 +165,25 @@ impl bope_host::SignatureSource for crate::LiveHost {
     ) -> Result<bope_host::SignatureCheck, bope_host::SourceError> {
         verify(path, OFFLINE)
     }
+
+    fn catalog_signature(
+        &self,
+        path: &str,
+    ) -> Result<bope_host::CatalogCheck, bope_host::SourceError> {
+        catalog::check(path)
+    }
+
+    fn signing_time(&self, path: &str) -> Result<Option<jiff::Timestamp>, bope_host::SourceError> {
+        let (_, outcome, time) = verify_full(path, OFFLINE);
+        outcome.map(|_| time)
+    }
+}
+
+/// A `FILETIME` value as a timestamp in whole seconds.
+#[cfg(windows)]
+fn filetime_timestamp(filetime: windows::Win32::Foundation::FILETIME) -> Option<jiff::Timestamp> {
+    let value = (u64::from(filetime.dwHighDateTime) << 32) | u64::from(filetime.dwLowDateTime);
+    bope_host::process_started_at(value)
 }
 
 /// Runs `WinVerifyTrust` on the file at `path` with `settings`, reads the signer when it verified, and
@@ -177,14 +196,41 @@ fn verify(
     verify_with_code(path, settings).1
 }
 
+/// [`verify_with_code`], with the signature's timestamp.
+#[cfg(windows)]
+fn verify_full(
+    path: &str,
+    settings: TrustSettings,
+) -> (
+    Option<u32>,
+    Result<bope_host::SignatureCheck, bope_host::SourceError>,
+    Option<jiff::Timestamp>,
+) {
+    let mut time = None;
+    let (code, outcome) = verify_inner(path, settings, &mut time);
+    (code, outcome, time)
+}
+
 /// [`verify`], also returning the code `WinVerifyTrust` gave, or `None` when the call was not made. The
 /// live tests print it: ADR 0035's table maps codes, and the mapped answer alone cannot say which code
 /// produced it.
 #[cfg(windows)]
-#[allow(unsafe_code)]
 fn verify_with_code(
     path: &str,
     settings: TrustSettings,
+) -> (
+    Option<u32>,
+    Result<bope_host::SignatureCheck, bope_host::SourceError>,
+) {
+    verify_inner(path, settings, &mut None)
+}
+
+#[cfg(windows)]
+#[allow(unsafe_code)]
+fn verify_inner(
+    path: &str,
+    settings: TrustSettings,
+    signed_at: &mut Option<jiff::Timestamp>,
 ) -> (
     Option<u32>,
     Result<bope_host::SignatureCheck, bope_host::SourceError>,
@@ -246,7 +292,7 @@ fn verify_with_code(
     let verdict = classify(result.cast_unsigned());
 
     let outcome = match verdict {
-        Verdict::Verified => read_signer(data.hWVTStateData),
+        Verdict::Verified => read_signer(data.hWVTStateData, signed_at),
         Verdict::NoEmbeddedSignature => Ok(SignatureCheck::NoEmbeddedSignature),
         Verdict::Invalid => Ok(SignatureCheck::Invalid),
         Verdict::UnverifiableOffline => Ok(SignatureCheck::UnverifiableOffline),
@@ -273,6 +319,7 @@ fn verify_with_code(
 #[allow(unsafe_code)]
 fn read_signer(
     state: windows::Win32::Foundation::HANDLE,
+    signed_at: &mut Option<jiff::Timestamp>,
 ) -> Result<bope_host::SignatureCheck, bope_host::SourceError> {
     use bope_host::{SignatureCheck, SourceError};
     use windows::Win32::Security::Cryptography::{
@@ -295,6 +342,12 @@ fn read_signer(
     let Some(signer) = (unsafe { signer.as_ref() }) else {
         return Err(missing("signer"));
     };
+    // `sftVerifyAsOf` is the time the signature was verified as of: the countersigner's
+    // (timestamping authority's) time when there is one, and the current time otherwise, which is not
+    // a signing time and is not reported.
+    if signer.csCounterSigners > 0 {
+        *signed_at = filetime_timestamp(signer.sftVerifyAsOf);
+    }
     if signer.csCertChain == 0 || signer.pasCertChain.is_null() {
         return Err(missing("certificate chain"));
     }
@@ -342,6 +395,225 @@ fn read_signer(
         signer: signer_name,
         signer_cert_sha256,
     })
+}
+
+/// Windows catalog membership: whether a catalog under `CatRoot` lists the file's hash, and whether
+/// that catalog's signature verifies offline (B.O.P.E, ADR 0133).
+///
+/// The file is opened with `std::fs::File::open` — read access, every share mode — so nothing is
+/// locked and no banned call is needed.
+#[cfg(windows)]
+mod catalog {
+    use std::os::windows::io::AsRawHandle;
+
+    use bope_host::{CatalogCheck, SignatureCheck, SourceError};
+    use windows::Win32::Foundation::HANDLE;
+
+    use super::{OFFLINE, Verdict, classify, flags, read_signer};
+
+    /// `WTD_CHOICE_CATALOG`.
+    const WTD_CHOICE_CATALOG: u32 = 2;
+
+    /// An admin context and the catalog context found with it, released in that order.
+    struct Admin {
+        admin: isize,
+        catalog: isize,
+    }
+
+    impl Drop for Admin {
+        #[allow(unsafe_code)]
+        fn drop(&mut self) {
+            use windows::Win32::Security::Cryptography::Catalog::{
+                CryptCATAdminReleaseCatalogContext, CryptCATAdminReleaseContext,
+            };
+            if self.catalog != 0 {
+                // SAFETY: a catalog context enumerated with `admin`, released once.
+                let _ = unsafe { CryptCATAdminReleaseCatalogContext(self.admin, self.catalog, 0) };
+            }
+            if self.admin != 0 {
+                // SAFETY: an admin context acquired here, released once.
+                let _ = unsafe { CryptCATAdminReleaseContext(self.admin, 0) };
+            }
+        }
+    }
+
+    fn wide(text: &str) -> Vec<u16> {
+        text.encode_utf16().chain(std::iter::once(0)).collect()
+    }
+
+    /// Hashes the file with a catalog admin context for `algorithm` (`SHA256`, or `None` for the
+    /// legacy SHA-1 context older catalogs use) and finds a catalog listing that hash.
+    #[allow(unsafe_code)]
+    fn find(file: HANDLE, algorithm: Option<&str>) -> Result<(Admin, Vec<u8>), SourceError> {
+        use windows::Win32::Security::Cryptography::Catalog::{
+            CryptCATAdminAcquireContext2, CryptCATAdminCalcHashFromFileHandle2,
+            CryptCATAdminEnumCatalogFromHash,
+        };
+        use windows::core::PCWSTR;
+
+        let name = algorithm.map(wide);
+        let mut admin = Admin {
+            admin: 0,
+            catalog: 0,
+        };
+        // SAFETY: `admin.admin` is a valid out-pointer; default subsystem, no strong-hash policy;
+        // `name` outlives the call.
+        unsafe {
+            CryptCATAdminAcquireContext2(
+                &raw mut admin.admin,
+                None,
+                name.as_ref().map_or(PCWSTR::null(), |n| PCWSTR(n.as_ptr())),
+                None,
+                None,
+            )
+        }
+        .map_err(|error| SourceError::Failed(format!("CryptCATAdminAcquireContext2: {error}")))?;
+        let mut size = 0_u32;
+        // SAFETY: a size query with no buffer; `size` receives the length.
+        let _ = unsafe {
+            CryptCATAdminCalcHashFromFileHandle2(admin.admin, file, &raw mut size, None, None)
+        };
+        if size == 0 || size > 64 {
+            return Err(SourceError::Failed(
+                "the catalog hash of the file could not be computed".to_owned(),
+            ));
+        }
+        let mut hash = vec![0_u8; size as usize];
+        // SAFETY: `hash` holds `size` writable bytes; the file handle is open for reading.
+        unsafe {
+            CryptCATAdminCalcHashFromFileHandle2(
+                admin.admin,
+                file,
+                &raw mut size,
+                Some(hash.as_mut_ptr()),
+                None,
+            )
+        }
+        .map_err(|error| {
+            SourceError::Failed(format!("CryptCATAdminCalcHashFromFileHandle2: {error}"))
+        })?;
+        // SAFETY: `hash` is the digest just computed; no previous catalog context.
+        admin.catalog = unsafe { CryptCATAdminEnumCatalogFromHash(admin.admin, &hash, None, None) };
+        Ok((admin, hash))
+    }
+
+    pub(super) fn check(path: &str) -> Result<CatalogCheck, SourceError> {
+        let file = std::fs::File::open(path).map_err(|error| SourceError::from_io(&error))?;
+        let handle = HANDLE(file.as_raw_handle());
+        let (mut admin, mut hash) = find(handle, Some("SHA256"))?;
+        if admin.catalog == 0 {
+            drop(admin);
+            (admin, hash) = find(handle, None)?;
+        }
+        if admin.catalog == 0 {
+            return Ok(CatalogCheck::NotInCatalog);
+        }
+        let outcome = verify_member(path, handle, &admin, &mut hash);
+        drop(admin);
+        drop(file);
+        outcome
+    }
+
+    /// Verifies the catalog membership `admin` found, offline.
+    #[allow(unsafe_code)]
+    fn verify_member(
+        path: &str,
+        file: HANDLE,
+        admin: &Admin,
+        hash: &mut [u8],
+    ) -> Result<CatalogCheck, SourceError> {
+        use std::fmt::Write as _;
+
+        use windows::Win32::Foundation::{HWND, INVALID_HANDLE_VALUE};
+        use windows::Win32::Security::Cryptography::Catalog::{
+            CATALOG_INFO, CryptCATCatalogInfoFromContext,
+        };
+        use windows::Win32::Security::WinTrust::{
+            WINTRUST_ACTION_GENERIC_VERIFY_V2, WINTRUST_CATALOG_INFO, WINTRUST_DATA,
+            WINTRUST_DATA_PROVIDER_FLAGS, WINTRUST_DATA_REVOCATION_CHECKS,
+            WINTRUST_DATA_STATE_ACTION, WINTRUST_DATA_UICHOICE, WINTRUST_DATA_UNION_CHOICE,
+            WinVerifyTrust,
+        };
+        use windows::core::PCWSTR;
+
+        let mut info = CATALOG_INFO {
+            cbStruct: u32::try_from(size_of::<CATALOG_INFO>()).unwrap_or(0),
+            ..Default::default()
+        };
+        // SAFETY: `info` is a `CATALOG_INFO` whose `cbStruct` is its size; the context is live.
+        unsafe { CryptCATCatalogInfoFromContext(admin.catalog, &raw mut info, 0) }.map_err(
+            |error| SourceError::Failed(format!("CryptCATCatalogInfoFromContext: {error}")),
+        )?;
+        let catalog_path = info.wszCatalogFile;
+        let length = catalog_path
+            .iter()
+            .position(|unit| *unit == 0)
+            .unwrap_or(catalog_path.len());
+        let catalog_file = String::from_utf16_lossy(&catalog_path[..length]);
+        let tag = hash.iter().fold(String::new(), |mut out, byte| {
+            let _ = write!(out, "{byte:02X}");
+            out
+        });
+        let tag_wide = wide(&tag);
+        let path_wide = wide(path);
+        let mut member = WINTRUST_CATALOG_INFO {
+            cbStruct: u32::try_from(size_of::<WINTRUST_CATALOG_INFO>()).unwrap_or(0),
+            dwCatalogVersion: 0,
+            pcwszCatalogFilePath: PCWSTR(catalog_path.as_ptr()),
+            pcwszMemberTag: PCWSTR(tag_wide.as_ptr()),
+            pcwszMemberFilePath: PCWSTR(path_wide.as_ptr()),
+            hMemberFile: file,
+            pbCalculatedFileHash: hash.as_mut_ptr(),
+            cbCalculatedFileHash: u32::try_from(hash.len()).unwrap_or(0),
+            pcCatalogContext: std::ptr::null_mut(),
+            hCatAdmin: admin.admin,
+        };
+        let mut data = WINTRUST_DATA {
+            cbStruct: u32::try_from(size_of::<WINTRUST_DATA>()).unwrap_or(0),
+            dwUIChoice: WINTRUST_DATA_UICHOICE(flags::WTD_UI_NONE),
+            fdwRevocationChecks: WINTRUST_DATA_REVOCATION_CHECKS(OFFLINE.revocation_checks),
+            dwUnionChoice: WINTRUST_DATA_UNION_CHOICE(WTD_CHOICE_CATALOG),
+            dwStateAction: WINTRUST_DATA_STATE_ACTION(flags::WTD_STATEACTION_VERIFY),
+            dwProvFlags: WINTRUST_DATA_PROVIDER_FLAGS(OFFLINE.provider_flags),
+            ..Default::default()
+        };
+        data.Anonymous.pCatalog = &raw mut member;
+        let mut action = WINTRUST_ACTION_GENERIC_VERIFY_V2;
+        let no_window = HWND(INVALID_HANDLE_VALUE.0);
+        // SAFETY: every structure is a live local; the union holds the `pCatalog` its choice names;
+        // the state is closed below on every path.
+        let result = unsafe { WinVerifyTrust(no_window, &raw mut action, (&raw mut data).cast()) };
+        let outcome = match classify(result.cast_unsigned()) {
+            Verdict::Verified => match read_signer(data.hWVTStateData, &mut None)? {
+                SignatureCheck::Valid {
+                    signer,
+                    signer_cert_sha256,
+                } => Ok(CatalogCheck::Signed {
+                    catalog: catalog_file
+                        .rsplit('\\')
+                        .next()
+                        .unwrap_or(&catalog_file)
+                        .to_owned(),
+                    signer,
+                    signer_cert_sha256,
+                }),
+                _ => Ok(CatalogCheck::Invalid),
+            },
+            Verdict::NoEmbeddedSignature | Verdict::Invalid => Ok(CatalogCheck::Invalid),
+            Verdict::UnverifiableOffline => Ok(CatalogCheck::UnverifiableOffline),
+            Verdict::AccessDenied => Err(SourceError::AccessDenied),
+            Verdict::Failed => Err(SourceError::Failed(format!(
+                "WinVerifyTrust (catalog) returned {:#010x}",
+                result.cast_unsigned()
+            ))),
+        };
+        data.dwStateAction = WINTRUST_DATA_STATE_ACTION(flags::WTD_STATEACTION_CLOSE);
+        // SAFETY: closes the state the verify call opened; the structures are still live.
+        unsafe {
+            WinVerifyTrust(no_window, &raw mut action, (&raw mut data).cast());
+        }
+        outcome
+    }
 }
 
 #[cfg(test)]

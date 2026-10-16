@@ -103,6 +103,56 @@ struct HostFile {
     /// modelled it, which the accessor reports as `Unsupported`.
     #[serde(default)]
     services: Option<FixtureServices>,
+    /// The drive letters in use (B.O.P.E, ADR 0133). Absent means the fixture never modelled them,
+    /// which the accessor reports as `Unsupported`.
+    #[serde(default)]
+    drives: Option<Vec<FixtureDrive>>,
+}
+
+/// One drive letter, for the fixture host (B.O.P.E, ADR 0133).
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FixtureDrive {
+    root: String,
+    kind: crate::DriveKind,
+    #[serde(default)]
+    filesystem: Option<String>,
+}
+
+/// A catalog check, for the fixture host (B.O.P.E, ADR 0133).
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FixtureCatalog {
+    state: FixtureCatalogState,
+    #[serde(default)]
+    catalog: Option<String>,
+    #[serde(default)]
+    signer: Option<String>,
+    #[serde(default)]
+    signer_cert_sha256: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum FixtureCatalogState {
+    Signed,
+    NotInCatalog,
+    Invalid,
+    UnverifiableOffline,
+}
+
+/// Bytes a process's memory holds at one address, for the fixture host (B.O.P.E, ADR 0134). Written
+/// as `text:` or `hex:`, never both.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FixtureMemoryBytes {
+    address: u64,
+    #[serde(default)]
+    text: Option<String>,
+    #[serde(default)]
+    hex: Option<String>,
+    #[serde(default)]
+    from: Option<String>,
 }
 
 /// The Service Control Manager, for the fixture host (B.O.P.E, ADR 0130).
@@ -413,6 +463,18 @@ struct FixtureProcess {
     /// What a walk of the address space returns; absent describes one that was not modelled.
     #[serde(default)]
     memory: Option<FixtureMemory>,
+    /// The loader's modules with base and size (B.O.P.E, ADR 0134).
+    #[serde(default)]
+    loaded: Option<Vec<crate::LoadedModule>>,
+    /// The committed regions (B.O.P.E, ADR 0134).
+    #[serde(default)]
+    regions: Option<Vec<crate::MemoryRegion>>,
+    /// 32 or 64 (B.O.P.E, ADR 0134).
+    #[serde(default)]
+    pointer_width: Option<u32>,
+    /// What memory reads return (B.O.P.E, ADR 0134); an address no block covers is unreadable.
+    #[serde(default)]
+    bytes: Vec<FixtureMemoryBytes>,
 }
 
 /// What a fixture says one walk of a process's address space found executable (B.O.P.E, ADR 0102).
@@ -445,6 +507,11 @@ struct ProcessInternals {
     modules: Option<Vec<String>>,
     denied: bool,
     memory: Option<crate::ExecutableMemory>,
+    loaded: Option<Vec<crate::LoadedModule>>,
+    regions: Option<Vec<crate::MemoryRegion>>,
+    pointer_width: Option<crate::PointerWidth>,
+    /// `(address, bytes)`, sorted by address.
+    bytes: Vec<(u64, Vec<u8>)>,
 }
 
 /// Turns one described process into the record a live host returns, parsing `started_at` now so that
@@ -580,6 +647,15 @@ struct FixtureFile {
     signature: Option<FixtureSignature>,
     #[serde(default)]
     directory: bool,
+    /// A reparse point — junction or symbolic link — which a walk must not follow (B.O.P.E, ADR 0133).
+    #[serde(default)]
+    link: bool,
+    /// What a catalog check answers (B.O.P.E, ADR 0133); absent describes a check that fails.
+    #[serde(default)]
+    catalog: Option<FixtureCatalog>,
+    /// The signature's timestamp, RFC 3339 (B.O.P.E, ADR 0133); absent is "no timestamp".
+    #[serde(default)]
+    signed_at: Option<String>,
     #[serde(default)]
     content: Option<String>,
     /// The bytes as lowercase hex, for binary artifacts written inline (B.O.P.E: shortcuts, hives,
@@ -675,6 +751,44 @@ fn resolve_signature(
     }
 }
 
+/// Turns a described catalog check into what a host reports, refusing a signer on anything but
+/// `signed`.
+fn resolve_catalog(
+    described: FixtureCatalog,
+    file: &str,
+    origin: &str,
+) -> Result<crate::CatalogCheck, FixtureError> {
+    let invalid = |message: &str| FixtureError::Parse {
+        path: origin.to_owned(),
+        message: format!("file `{file}`: {message}"),
+    };
+    let names = described.catalog.is_some()
+        || described.signer.is_some()
+        || described.signer_cert_sha256.is_some();
+    match described.state {
+        FixtureCatalogState::Signed => match (
+            described.catalog,
+            described.signer,
+            described.signer_cert_sha256,
+        ) {
+            (Some(catalog), Some(signer), Some(cert)) if cert.len() == 64 => {
+                Ok(crate::CatalogCheck::Signed {
+                    catalog,
+                    signer,
+                    signer_cert_sha256: cert.to_ascii_lowercase(),
+                })
+            }
+            _ => Err(invalid(
+                "a signed catalog needs `catalog`, `signer` and a 64-character `signer_cert_sha256`",
+            )),
+        },
+        _ if names => Err(invalid("only a signed catalog names a catalog or a signer")),
+        FixtureCatalogState::NotInCatalog => Ok(crate::CatalogCheck::NotInCatalog),
+        FixtureCatalogState::Invalid => Ok(crate::CatalogCheck::Invalid),
+        FixtureCatalogState::UnverifiableOffline => Ok(crate::CatalogCheck::UnverifiableOffline),
+    }
+}
+
 /// One entry in a fixture directory with its `from:` already read from disk, so that a fixture with a
 /// path that does not resolve fails when it is loaded rather than looking like an unreadable file.
 #[derive(Debug, Clone)]
@@ -684,6 +798,9 @@ struct FixtureEntry {
     /// `None` describes a file whose signature cannot be checked.
     signature: Option<SignatureCheck>,
     directory: bool,
+    link: bool,
+    catalog: Option<crate::CatalogCheck>,
+    signed_at: Option<jiff::Timestamp>,
     /// The file's bytes. `None` describes a file that exists and cannot be read.
     content: Option<Vec<u8>>,
     /// Whether the file carries the read-only attribute. `None` describes a fixture that never said,
@@ -787,11 +904,19 @@ fn resolve_file(
     }
     let created = listed_time_of(described.created.as_deref(), &described.name, origin)?;
     let modified = listed_time_of(described.modified.as_deref(), &described.name, origin)?;
+    let signed_at = listed_time_of(described.signed_at.as_deref(), &described.name, origin)?;
+    let catalog = described
+        .catalog
+        .map(|catalog| resolve_catalog(catalog, &described.name, origin))
+        .transpose()?;
     Ok(FixtureEntry {
         name: described.name,
         sha256: described.sha256,
         signature,
         directory: described.directory,
+        link: described.link,
+        catalog,
+        signed_at,
         content,
         read_only: described.read_only,
         size: described.size,
@@ -1259,6 +1384,7 @@ pub struct FixtureHost {
     volumes: BTreeMap<char, Option<Vec<u8>>>,
     wmi: Option<FixtureWmi>,
     services: Option<FixtureServices>,
+    drives: Option<Vec<crate::Volume>>,
 }
 
 impl FixtureHost {
@@ -1336,6 +1462,29 @@ impl FixtureHost {
             }
             filesystem.insert(normalise_path(&dir), entries);
         }
+        let mut process_bytes: BTreeMap<u32, Vec<(u64, Vec<u8>)>> = BTreeMap::new();
+        for process in file.processes.iter().flatten() {
+            let mut blocks = Vec::new();
+            for block in &process.bytes {
+                let what = format!("process {} bytes at {:#x}", process.pid, block.address);
+                let bytes = match (&block.text, &block.hex) {
+                    (Some(_), Some(_)) => {
+                        return Err(FixtureError::Parse {
+                            path: origin.to_owned(),
+                            message: format!("{what} uses both `text:` and `hex:`"),
+                        });
+                    }
+                    (None, Some(hex)) => decode_hex(hex, &what, origin)?,
+                    (text, None) => {
+                        resolve_content(text.clone(), block.from.clone(), &what, origin, base)?
+                            .unwrap_or_default()
+                    }
+                };
+                blocks.push((block.address, bytes));
+            }
+            blocks.sort_by_key(|(address, _)| *address);
+            process_bytes.insert(process.pid, blocks);
+        }
         Ok(Self {
             platform: file.platform,
             os_build: file.os_build,
@@ -1371,6 +1520,14 @@ impl FixtureHost {
                                 regions_walked: m.regions_walked,
                                 complete: m.complete,
                             }),
+                            loaded: process.loaded.clone(),
+                            regions: process.regions.clone(),
+                            pointer_width: match process.pointer_width {
+                                Some(32) => Some(crate::PointerWidth::Bits32),
+                                Some(64) => Some(crate::PointerWidth::Bits64),
+                                _ => None,
+                            },
+                            bytes: process_bytes.remove(&process.pid).unwrap_or_default(),
                         },
                     )
                 })
@@ -1399,6 +1556,16 @@ impl FixtureHost {
             volumes,
             wmi: file.wmi,
             services: file.services,
+            drives: file.drives.map(|drives| {
+                drives
+                    .into_iter()
+                    .map(|drive| crate::Volume {
+                        root: drive.root,
+                        kind: drive.kind,
+                        filesystem: drive.filesystem,
+                    })
+                    .collect()
+            }),
             event_log_channels: file
                 .event_log_channels
                 .map(|channels| {
@@ -1637,7 +1804,8 @@ impl FilesystemSource for FixtureHost {
                 .iter()
                 .map(|file| DirEntryInfo {
                     name: file.name.clone(),
-                    is_file: !file.directory,
+                    is_file: !file.directory && !file.link,
+                    is_link: file.link,
                     size: file.size,
                     created: file.created,
                     modified: file.modified,
@@ -2024,6 +2192,122 @@ impl SignatureSource for FixtureHost {
         file.signature
             .clone()
             .ok_or_else(|| SourceError::Failed(format!("no signature recorded for {path}")))
+    }
+
+    /// What the fixture wrote under `catalog:` for that file.
+    fn catalog_signature(&self, path: &str) -> Result<crate::CatalogCheck, SourceError> {
+        self.windows_filesystem()?;
+        let file = self.described_file(path)?;
+        file.catalog
+            .clone()
+            .ok_or_else(|| SourceError::Failed(format!("no catalog check recorded for {path}")))
+    }
+
+    /// What the fixture wrote under `signed_at:`; a file with a signature and none has no timestamp.
+    fn signing_time(&self, path: &str) -> Result<Option<jiff::Timestamp>, SourceError> {
+        self.windows_filesystem()?;
+        let file = self.described_file(path)?;
+        if file.signature.is_none() {
+            return Err(SourceError::Failed(format!(
+                "no signature recorded for {path}"
+            )));
+        }
+        Ok(file.signed_at)
+    }
+}
+
+impl crate::VolumeSource for FixtureHost {
+    fn volumes(&self) -> Result<Vec<crate::Volume>, SourceError> {
+        self.drives.clone().ok_or_else(|| {
+            SourceError::Unsupported("this fixture host does not describe drives".to_owned())
+        })
+    }
+}
+
+/// The memory of one fixture process, answered from what its `host.yaml` described.
+struct FixtureProcessMemory<'h> {
+    pid: u32,
+    internals: &'h ProcessInternals,
+}
+
+impl crate::ProcessMemory for FixtureProcessMemory<'_> {
+    fn pointer_width(&self) -> Option<crate::PointerWidth> {
+        self.internals.pointer_width
+    }
+
+    fn modules(&self) -> Result<Vec<crate::LoadedModule>, SourceError> {
+        self.internals.loaded.clone().ok_or_else(|| {
+            SourceError::Unsupported(format!(
+                "this fixture does not describe process {}'s loaded modules",
+                self.pid
+            ))
+        })
+    }
+
+    fn regions(&self, max: usize) -> Result<(Vec<crate::MemoryRegion>, bool), SourceError> {
+        let regions = self.internals.regions.as_ref().ok_or_else(|| {
+            SourceError::Unsupported(format!(
+                "this fixture does not describe process {}'s regions",
+                self.pid
+            ))
+        })?;
+        Ok((
+            regions.iter().take(max).cloned().collect(),
+            regions.len() <= max,
+        ))
+    }
+
+    fn read(&self, address: u64, len: usize) -> Result<Vec<u8>, SourceError> {
+        if len > crate::MAX_MEMORY_READ {
+            return Err(SourceError::TooLarge {
+                limit: crate::MAX_MEMORY_READ,
+            });
+        }
+        let readable = self.internals.regions.iter().flatten().any(|region| {
+            region.is_readable()
+                && address >= region.base
+                && address.saturating_add(len as u64) <= region.base.saturating_add(region.size)
+        });
+        if !readable {
+            return Err(SourceError::Failed(format!(
+                "{address:#x}+{len} is not inside one readable region"
+            )));
+        }
+        // Zero-filled, with every described block that overlaps copied in.
+        let mut out = vec![0_u8; len];
+        let end = address.saturating_add(len as u64);
+        for (start, bytes) in &self.internals.bytes {
+            let block_end = start.saturating_add(bytes.len() as u64);
+            if *start >= end || block_end <= address {
+                continue;
+            }
+            let from = (*start).max(address);
+            let to = block_end.min(end);
+            let (Ok(dest), Ok(src), Ok(count)) = (
+                usize::try_from(from - address),
+                usize::try_from(from - start),
+                usize::try_from(to - from),
+            ) else {
+                continue;
+            };
+            out[dest..dest + count].copy_from_slice(&bytes[src..src + count]);
+        }
+        Ok(out)
+    }
+}
+
+impl crate::MemorySource for FixtureHost {
+    fn open_process_memory(
+        &self,
+        pid: u32,
+    ) -> Result<Box<dyn crate::ProcessMemory + '_>, SourceError> {
+        let internals = self.internals.get(&pid).ok_or_else(|| {
+            SourceError::Failed(format!("no process {pid} is running on this fixture host"))
+        })?;
+        if internals.denied {
+            return Err(SourceError::AccessDenied);
+        }
+        Ok(Box::new(FixtureProcessMemory { pid, internals }))
     }
 }
 
@@ -2836,6 +3120,7 @@ processes:
                 DirEntryInfo {
                     name: "a.log".to_owned(),
                     is_file: true,
+                    is_link: false,
                     size: Some(42),
                     created: at("2026-09-01T10:00:00Z"),
                     modified: at("2025-01-02T03:04:05Z"),

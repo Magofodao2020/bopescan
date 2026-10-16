@@ -47,4 +47,6 @@ pub mod random_read;
 
 pub mod services;
 
+pub mod volumes;
+
 pub mod wmi;

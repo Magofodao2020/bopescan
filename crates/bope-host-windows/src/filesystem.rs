@@ -30,6 +30,10 @@ impl FilesystemSource for LiveHost {
             // An entry whose type cannot be read is reported as not-a-file: the collector only
             // observes what it could confirm is a file.
             let is_file = entry.file_type().is_ok_and(|kind| kind.is_file());
+            // A junction is not a symbolic link to `FileType`, so the attribute bit itself is read
+            // (FILE_ATTRIBUTE_REPARSE_POINT): a walk follows neither (B.O.P.E, ADR 0133).
+            let is_link = entry.file_type().is_ok_and(|kind| kind.is_symlink())
+                || reparse_point(entry.metadata().ok().as_ref());
             // On Windows, `DirEntry::metadata` converts the `WIN32_FIND_DATAW` the listing already
             // holds: no second system call, and the entry is not opened (ADR 0050). Unlike
             // `std::fs::metadata`, it describes the entry itself and does not follow a link. An
@@ -50,7 +54,8 @@ impl FilesystemSource for LiveHost {
                 },
                 created: time(std::fs::Metadata::created),
                 modified: time(std::fs::Metadata::modified),
-                is_file,
+                is_file: is_file && !is_link,
+                is_link,
                 // A name that is not valid Unicode is kept in lossy form. It is still shown to the
                 // reviewer; hashing it will fail and the observation then carries only the path.
                 name: entry.file_name().to_string_lossy().into_owned(),
@@ -105,6 +110,19 @@ impl FilesystemSource for LiveHost {
             Err(error) => Err(SourceError::from_io(&error)),
         }
     }
+}
+
+/// Whether listed metadata carries `FILE_ATTRIBUTE_REPARSE_POINT`.
+#[cfg(windows)]
+fn reparse_point(metadata: Option<&std::fs::Metadata>) -> bool {
+    use std::os::windows::fs::MetadataExt;
+    const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x400;
+    metadata.is_some_and(|m| m.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0)
+}
+
+#[cfg(not(windows))]
+fn reparse_point(_metadata: Option<&std::fs::Metadata>) -> bool {
+    false
 }
 
 impl EnvironmentSource for LiveHost {
