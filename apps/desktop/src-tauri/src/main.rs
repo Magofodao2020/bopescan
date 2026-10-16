@@ -17,6 +17,7 @@
 
 mod commands;
 mod qr;
+mod reference;
 mod scan_task;
 mod webview_hardening;
 
@@ -69,7 +70,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             commands::code_link_qr,
             commands::default_export_dir,
             commands::pick_export_dir,
-            commands::export_report
+            commands::export_report,
+            reference::fflag_reference_status,
+            reference::fflag_reference_sync
         ])
         .setup(move |app| {
             webview_hardening::build_main_window(app, &window_dir)?;

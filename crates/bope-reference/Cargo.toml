@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+
+[package]
+name = "bope-reference"
+description = "B.O.P.E Scanner: the FastFlag reference copy — when to ask for a new one, how to check it, and where the last valid one is kept (ADR 0136). It opens no connection itself."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+# The one network call, `https_get::get` (WinHTTP; an error on other platforms), wrapped as a `Transport`.
+bope-host-windows.workspace = true
+bope-parsers.workspace = true
+jiff.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+thiserror.workspace = true
+
+[lints]
+workspace = true

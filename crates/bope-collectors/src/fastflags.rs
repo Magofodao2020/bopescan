@@ -240,6 +240,118 @@ impl Look<'_> {
     }
 }
 
+/// One `FastFlag` settings file found.
+#[derive(Debug, Clone)]
+pub struct SettingsFile {
+    /// Where it was found: `version_folder`, `bootstrapper` or `tool_folder`.
+    pub location: &'static str,
+    /// Whose folder: `roblox`, a bootstrapper, or the tool folder's name, lower-cased.
+    pub owner: String,
+    /// Full path.
+    pub path: String,
+    /// What the listing said of it.
+    pub entry: DirEntryInfo,
+    /// In a version folder holding the player: the player reads it when started from there.
+    pub applies_to_player: bool,
+    /// In the newest version folder holding the player.
+    pub active_version: bool,
+    /// Named like a backup copy.
+    pub backup: bool,
+}
+
+/// Every settings file found, and whether the look stopped before it was done.
+#[derive(Debug, Clone, Default)]
+pub struct Found {
+    /// The files, in the order found.
+    pub files: Vec<SettingsFile>,
+    /// The budget ran out before every folder was listed.
+    pub stopped: bool,
+}
+
+/// Finds the `FastFlag` settings files of the player, the bootstrappers and folders named like a
+/// `FastFlag` tool, within [`BUDGET`].
+pub fn settings_files(host: &dyn Host) -> Found {
+    let mut look = Look {
+        host,
+        deadline: Instant::now() + BUDGET,
+        found: Vec::new(),
+        stopped: false,
+    };
+    let local = env_folder(host, "LOCALAPPDATA");
+    if let Some(local) = &local {
+        look.versions(&join(local, r"Roblox\Versions"), "roblox");
+        for name in BOOTSTRAPPERS {
+            let folder = join(local, name);
+            look.versions(&join(&folder, "Versions"), &name.to_ascii_lowercase());
+            look.settings_files(
+                "bootstrapper",
+                &name.to_ascii_lowercase(),
+                &folder,
+                3,
+                false,
+            );
+        }
+    }
+    for var in ["ProgramFiles(x86)", "ProgramFiles"] {
+        if let Some(pf) = env_folder(host, var) {
+            look.versions(&join(&pf, r"Roblox\Versions"), "roblox");
+        }
+    }
+    // Folders named like a FastFlag tool.
+    let mut tool_roots = Vec::new();
+    tool_roots.extend(local.clone());
+    tool_roots.extend(env_folder(host, "APPDATA"));
+    if let Some(profile) = user_profile(host) {
+        for sub in ["Downloads", "Desktop", "Documents"] {
+            tool_roots.push(join(&profile, sub));
+        }
+    }
+    for root in tool_roots {
+        for entry in look.list(&root) {
+            if entry.is_file {
+                continue;
+            }
+            let is_tool = catalog::match_name(&entry.name).iter().any(|m| {
+                m.tool.kind == ToolKind::FflagManager || m.tool.id == "client_settings_term"
+            });
+            if is_tool {
+                let owner = entry.name.to_ascii_lowercase();
+                look.settings_files("tool_folder", &owner, &join(&root, &entry.name), 2, true);
+            }
+        }
+    }
+
+    // The newest version folder holding the player is the active one.
+    let active = look
+        .found
+        .iter()
+        .filter(|c| c.applies)
+        .filter_map(|c| c.version_folder.as_ref())
+        .max_by_key(|(_, t)| *t)
+        .map(|(f, _)| f.clone());
+    let files = look
+        .found
+        .into_iter()
+        .map(|c| {
+            let lower = c.entry.name.to_ascii_lowercase();
+            SettingsFile {
+                active_version: c.applies
+                    && c.version_folder.as_ref().map(|(f, _)| f) == active.as_ref(),
+                backup: has_suffix(&lower, ".bak") || lower.contains("backup"),
+                location: c.location,
+                owner: c.owner,
+                path: c.path,
+                entry: c.entry,
+                applies_to_player: c.applies,
+            }
+        })
+        .collect();
+    Found {
+        files,
+        stopped: look.stopped,
+    }
+}
+
 fn analyse(bytes: &[u8]) -> Option<(usize, usize, [usize; 5], Vec<String>)> {
     let value: serde_json::Value = serde_json::from_slice(bytes).ok()?;
     let object = value.as_object()?;
@@ -284,92 +396,26 @@ impl Collector for FastFlags {
         Some(DISCRIMINATOR)
     }
 
-    #[allow(clippy::too_many_lines)]
     fn collect(&self, host: &dyn Host) -> CollectorRun {
         if host.platform() != Platform::Windows {
             return unmeasured(ID, UnmeasuredReason::NotWindows);
         }
-        let mut look = Look {
-            host,
-            deadline: Instant::now() + BUDGET,
-            found: Vec::new(),
-            stopped: false,
-        };
-        let local = env_folder(host, "LOCALAPPDATA");
-        if let Some(local) = &local {
-            look.versions(&join(local, r"Roblox\Versions"), "roblox");
-            for name in BOOTSTRAPPERS {
-                let folder = join(local, name);
-                look.versions(&join(&folder, "Versions"), &name.to_ascii_lowercase());
-                look.settings_files(
-                    "bootstrapper",
-                    &name.to_ascii_lowercase(),
-                    &folder,
-                    3,
-                    false,
-                );
-            }
-        }
-        for var in ["ProgramFiles(x86)", "ProgramFiles"] {
-            if let Some(pf) = env_folder(host, var) {
-                look.versions(&join(&pf, r"Roblox\Versions"), "roblox");
-            }
-        }
-        // Folders named like a FastFlag tool.
-        let mut tool_roots = Vec::new();
-        tool_roots.extend(local.clone());
-        tool_roots.extend(env_folder(host, "APPDATA"));
-        if let Some(profile) = user_profile(host) {
-            for sub in ["Downloads", "Desktop", "Documents"] {
-                tool_roots.push(join(&profile, sub));
-            }
-        }
-        for root in tool_roots {
-            for entry in look.list(&root) {
-                if entry.is_file {
-                    continue;
-                }
-                let is_tool = catalog::match_name(&entry.name).iter().any(|m| {
-                    m.tool.kind == ToolKind::FflagManager || m.tool.id == "client_settings_term"
-                });
-                if is_tool {
-                    let owner = entry.name.to_ascii_lowercase();
-                    look.settings_files("tool_folder", &owner, &join(&root, &entry.name), 2, true);
-                }
-            }
-        }
-
-        // The newest version folder holding the player is the active one.
-        let active = look
-            .found
-            .iter()
-            .filter(|c| c.applies)
-            .filter_map(|c| c.version_folder.as_ref())
-            .max_by_key(|(_, t)| *t)
-            .map(|(f, _)| f.clone());
-
+        let found = settings_files(host);
         let mut observations: Vec<Observation> = Vec::new();
         let mut seen = std::collections::BTreeSet::new();
-        for c in look.found.iter().take(MAX_FILES) {
+        for c in found.files.iter().take(MAX_FILES) {
             if !seen.insert(c.path.to_ascii_lowercase()) {
                 continue;
             }
-            let lower = c.entry.name.to_ascii_lowercase();
             let mut fields = Fields::new()
                 .with(DISCRIMINATOR, c.location)
                 .with("owner", c.owner.clone())
                 .with("name", c.entry.name.clone())
                 .with("path", c.path.clone())
                 .with(location::FIELD, location::classify(&c.path).as_str())
-                .with("applies_to_player", c.applies)
-                .with(
-                    "active_version",
-                    c.version_folder.as_ref().map(|(f, _)| f) == active.as_ref() && c.applies,
-                )
-                .with(
-                    "backup",
-                    has_suffix(&lower, ".bak") || lower.contains("backup"),
-                )
+                .with("applies_to_player", c.applies_to_player)
+                .with("active_version", c.active_version)
+                .with("backup", c.backup)
                 .maybe("size", c.entry.size)
                 .time("created", c.entry.created)
                 .time("modified", c.entry.modified);
@@ -402,7 +448,7 @@ impl Collector for FastFlags {
             observations.push(fields.observe(ID));
         }
         let mut gaps = std::collections::BTreeMap::new();
-        if look.stopped || look.found.len() > MAX_FILES {
+        if found.stopped || found.files.len() > MAX_FILES {
             gaps.insert("path".to_owned(), UnmeasuredReason::BudgetSpent);
         }
         CollectorRun::Measured {

@@ -246,6 +246,7 @@ dependencies = [
  "bope-core",
  "bope-host",
  "bope-host-windows",
+ "bope-reference",
  "clap",
  "jiff",
  "serde_json",
@@ -285,6 +286,7 @@ dependencies = [
  "bope-core",
  "bope-host",
  "bope-host-windows",
+ "bope-reference",
  "jiff",
  "qrcode",
  "serde",
@@ -326,6 +328,19 @@ dependencies = [
  "prefetch-core",
  "quick-xml",
  "serde_json",
+ "thiserror 2.0.20",
+]
+
+[[package]]
+name = "bope-reference"
+version = "0.10.0"
+dependencies = [
+ "bope-host-windows",
+ "bope-parsers",
+ "jiff",
+ "serde",
+ "serde_json",
+ "sha2 0.11.0",
  "thiserror 2.0.20",
 ]
 

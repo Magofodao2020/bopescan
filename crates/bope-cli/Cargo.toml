@@ -24,6 +24,7 @@ serde_json.workspace = true
 bope-collectors.workspace = true
 bope-core.workspace = true
 bope-host.workspace = true
+bope-reference.workspace = true
 
 [target.'cfg(windows)'.dependencies]
 bope-host-windows.workspace = true

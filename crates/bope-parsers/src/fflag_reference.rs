@@ -218,6 +218,17 @@ impl FlagReference {
     }
 }
 
+/// A Roblox client version (`0.695.0.6950777`) named in a commit message, when there is one.
+pub fn client_version_in(message: &str) -> Option<String> {
+    message
+        .split(|c: char| !(c.is_ascii_digit() || c == '.'))
+        .find(|word| {
+            let parts: Vec<&str> = word.split('.').collect();
+            parts.len() == 4 && parts.iter().all(|p| !p.is_empty()) && parts[0] == "0"
+        })
+        .map(str::to_owned)
+}
+
 #[cfg(test)]
 mod tests {
     use std::fmt::Write as _;

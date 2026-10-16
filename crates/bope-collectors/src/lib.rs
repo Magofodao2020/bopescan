@@ -46,6 +46,7 @@ pub mod procmem;
 pub mod recycle_bin;
 pub mod roblox;
 pub mod roblox_files;
+pub mod roblox_flags;
 pub mod roblox_memory;
 pub mod roblox_process;
 pub mod roblox_trace;
@@ -387,6 +388,7 @@ pub fn all_with(
         Box::new(recycle_bin::RecycleBin),
         Box::new(roblox::Roblox),
         Box::new(roblox_files::RobloxFiles),
+        Box::new(roblox_flags::RobloxFlags::new(reference.clone())),
         Box::new(roblox_process::RobloxProcess),
         Box::new(shell_mru::ShellMru),
         Box::new(shellbags::ShellBags),

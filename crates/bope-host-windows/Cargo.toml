@@ -60,6 +60,11 @@ windows-registry.workspace = true
 # `GetMappedFileNameW` under `Win32_System_ProcessStatus`, `IsWow64Process2` under `Win32_System_Threading`, all
 # listed (read from the `windows` 0.62.2 sources). B.O.P.E (ADR 0133): `GetLogicalDrives`, `GetDriveTypeW` and
 # `GetVolumeInformationW` under `Win32_Storage_FileSystem`, listed.
+# B.O.P.E (ADR 0136): `WinHttpOpen`, `WinHttpConnect`, `WinHttpOpenRequest`, `WinHttpSendRequest`,
+# `WinHttpReceiveResponse`, `WinHttpQueryHeaders`, `WinHttpQueryDataAvailable`, `WinHttpReadData`,
+# `WinHttpSetOption`, `WinHttpSetTimeouts` and `WinHttpCloseHandle` are under `Win32_Networking_WinHttp`, gated
+# on nothing else. They are the program's one network call, in `https_get`, and banned everywhere else in
+# `clippy.toml` (read from the `windows` 0.62.2 sources).
 # B.O.P.E (ADR 0130): `OpenSCManagerW`, `OpenServiceW`, `QueryServiceStatusEx`, `QueryServiceConfigW` and
 # `CloseServiceHandle` are under `Win32_System_Services` (read from the same sources).
 windows = { workspace = true, features = [
@@ -67,6 +72,7 @@ windows = { workspace = true, features = [
   "Win32_Devices_DeviceAndDriverInstallation",
   "Win32_Devices_Properties",
   "Win32_Foundation",
+  "Win32_Networking_WinHttp",
   "Win32_Security",
   "Win32_Security_Cryptography",
   "Win32_Security_Cryptography_Catalog",

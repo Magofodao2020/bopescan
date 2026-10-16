@@ -25,6 +25,7 @@ qrcode = { version = "0.14.1", default-features = false, features = ["svg"] }
 bope-collectors.workspace = true
 bope-core.workspace = true
 bope-host.workspace = true
+bope-reference.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 tauri = { version = "2.11.5", features = [] }

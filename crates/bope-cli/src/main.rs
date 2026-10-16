@@ -4,6 +4,7 @@
 
 //! `bope-scanner-cli`: scan this PC and print evidence. Never prints a verdict.
 
+mod fflags;
 mod output;
 mod pt;
 mod trace_ages;
@@ -38,6 +39,17 @@ struct Cli {
 enum Command {
     /// Scan this PC and print the report.
     Scan(ScanArgs),
+    /// The `FastFlag` reference copy the scan compares flag values with (ADR 0136).
+    Fflags {
+        #[command(subcommand)]
+        action: fflags::Action,
+        /// Folder of the reference copy (default: `%LOCALAPPDATA%\BOPE Scanner\fflag-reference`).
+        #[arg(long, value_name = "FOLDER")]
+        dir: Option<std::path::PathBuf>,
+        /// Language of the messages.
+        #[arg(long, value_enum, default_value_t = Lang::Pt)]
+        lang: Lang,
+    },
 }
 
 // Each of these is an independent command-line switch, which is what a bool is for; the lint's
@@ -68,11 +80,25 @@ struct ScanArgs {
     /// Windows closes as soon as that copy exits (ADR 0012, amended); not meant to be typed.
     #[arg(long, hide = true)]
     pause_at_exit: bool,
+    /// Folder of the `FastFlag` reference copy the scan compares with (default: the one `fflags` keeps).
+    /// The scan only reads it; it never downloads.
+    #[arg(long, value_name = "FOLDER")]
+    fflag_reference_dir: Option<std::path::PathBuf>,
+    /// Compare with no reference, even if a copy is held.
+    #[arg(long)]
+    no_fflag_reference: bool,
 }
 
 fn main() -> ExitCode {
     let cli = Cli::parse();
     match cli.command {
+        Command::Fflags { action, dir, lang } => match fflags::run(&action, dir.as_deref(), lang) {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(error) => {
+                eprintln!("Error: {error:?}");
+                ExitCode::FAILURE
+            }
+        },
         Command::Scan(args) => {
             let outcome = scan(&args);
             // Printed here rather than by returning the error from `main`, because that would print
@@ -128,8 +154,21 @@ fn scan(args: &ScanArgs) -> anyhow::Result<()> {
         generated_at: jiff::Timestamp::now().to_string(),
         self_identity,
         tier,
-        flag_reference: None,
+        flag_reference: if args.no_fflag_reference {
+            None
+        } else {
+            fflags::store(args.fflag_reference_dir.as_deref())
+                .ok()
+                .and_then(|store| fflags::snapshot(&store))
+        },
     };
+    match &context.flag_reference {
+        Some(reference) => eprintln!(
+            "FastFlag reference: {} ({})",
+            reference.revision, reference.fetched_at
+        ),
+        None => eprintln!("FastFlag reference: none"),
+    }
     let report = scan::run(host.as_ref(), &bundle, context);
     let view = view::for_report(&report).with_assessment(&report, &bundle);
 

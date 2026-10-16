@@ -1145,6 +1145,53 @@ pub fn parse_version_resource(data: &[u8]) -> Option<VersionInfo> {
     Some(info)
 }
 
+/// The version resource of an image too large to read whole: `headers` are its first bytes (enough
+/// for the section table), and `read(offset, len)` reads more of the file. Only the `.rsrc` section is
+/// read — at most `max_section` bytes — and parsed as if it followed the headers.
+pub fn version_of_large(
+    headers: &[u8],
+    max_section: usize,
+    read: &mut dyn FnMut(u64, usize) -> Option<Vec<u8>>,
+) -> Option<VersionInfo> {
+    let pe = parse(headers).ok()?;
+    if let Some(version) = pe.version {
+        return Some(version);
+    }
+    let index = pe.sections.iter().position(|s| s.name == ".rsrc")?;
+    let section = &pe.sections[index];
+    let size = usize::try_from(section.raw_size).ok()?.min(max_section);
+    let mut data = Vec::with_capacity(size);
+    while data.len() < size {
+        let chunk = (size - data.len()).min(1024 * 1024);
+        let bytes = read(u64::from(section.raw_offset) + data.len() as u64, chunk)?;
+        if bytes.is_empty() {
+            break;
+        }
+        data.extend_from_slice(&bytes);
+    }
+    let nt = usize::try_from(u32_at(headers, 0x3c)?).ok()?;
+    let optional_size = usize::from(u16::from_le_bytes([
+        *headers.get(nt + 20)?,
+        *headers.get(nt + 21)?,
+    ]));
+    let header = nt + 24 + optional_size + index * 40;
+    // A compact copy: the headers up to the end of the section table, then the `.rsrc` bytes, with
+    // that section's file offset moved to where they now are.
+    let table_end = nt + 24 + optional_size + pe.sections.len() * 40;
+    let mut compact = headers.get(..table_end)?.to_vec();
+    compact.resize(table_end.next_multiple_of(0x200), 0);
+    let moved = u32::try_from(compact.len()).ok()?;
+    compact
+        .get_mut(header + 20..header + 24)?
+        .copy_from_slice(&moved.to_le_bytes());
+    let raw = u32::try_from(data.len()).ok()?;
+    compact
+        .get_mut(header + 16..header + 20)?
+        .copy_from_slice(&raw.to_le_bytes());
+    compact.extend_from_slice(&data);
+    parse(&compact).ok()?.version
+}
+
 /// `bytes` laid out as the loader maps them at `image_base`, before relocation: headers, then each
 /// section's raw bytes at its virtual address, the rest zero. `None` when `SizeOfImage` exceeds
 /// `max_image` — the caller's bound, so a crafted header cannot ask for gigabytes.
@@ -1491,5 +1538,17 @@ mod tests {
         let _ = parse(&noise);
         assert!(!is_pe(b"MZ"));
         assert!(parse(b"not a pe at all, but long enough to have a header field........").is_err());
+    }
+
+    #[test]
+    fn the_version_of_a_large_image_is_read_from_its_resource_section_alone() {
+        let full = synthetic_dll();
+        let headers = &full[..0x400.min(full.len())];
+        let mut read = |offset: u64, len: usize| {
+            let start = usize::try_from(offset).ok()?;
+            Some(full.get(start..(start + len).min(full.len()))?.to_vec())
+        };
+        let version = version_of_large(headers, 1 << 20, &mut read).unwrap();
+        assert_eq!(version, parse(&full).unwrap().version.unwrap());
     }
 }

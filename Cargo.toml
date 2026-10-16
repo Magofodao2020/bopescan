@@ -30,6 +30,7 @@ bope-host = { path = "crates/bope-host" }
 bope-host-windows = { path = "crates/bope-host-windows" }
 bope-collectors = { path = "crates/bope-collectors" }
 bope-parsers = { path = "crates/bope-parsers" }
+bope-reference = { path = "crates/bope-reference" }
 
 anyhow = "1.0.104"
 clap = { version = "4.6", features = ["derive"] }

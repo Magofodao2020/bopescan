@@ -22,6 +22,35 @@ pub struct ReferenceSnapshot {
     pub fetched_at: String,
     /// The address it came from.
     pub source_url: String,
+    /// How the revision was obtained: `commit`, `content` or `import`.
+    pub revision_kind: String,
+    /// The Roblox client version the commit's message names, when it names one.
+    pub reference_client_version: Option<String>,
+}
+
+impl ReferenceSnapshot {
+    /// A snapshot of a copy the caller loaded and validated, with the client version its commit
+    /// message names, if any.
+    pub fn new(
+        reference: FlagReference,
+        revision: String,
+        revision_kind: String,
+        commit_date: Option<String>,
+        commit_message: Option<&str>,
+        fetched_at: String,
+        source_url: String,
+    ) -> Self {
+        Self {
+            reference,
+            revision,
+            commit_date,
+            fetched_at,
+            source_url,
+            revision_kind,
+            reference_client_version: commit_message
+                .and_then(bope_parsers::fflag_reference::client_version_in),
+        }
+    }
 }
 
 /// The fields a comparison with the reference adds to an observation about one flag value.

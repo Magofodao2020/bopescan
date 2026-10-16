@@ -28,6 +28,8 @@ pub mod event_log;
 
 pub mod firmware;
 
+pub mod https_get;
+
 pub mod modules;
 
 pub mod process;

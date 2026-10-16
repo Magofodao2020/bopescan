@@ -961,6 +961,8 @@ mod tests {
             commit_date: None,
             fetched_at: "2026-10-16T00:00:00Z".to_owned(),
             source_url: "https://example.invalid".to_owned(),
+            revision_kind: "commit".to_owned(),
+            reference_client_version: None,
         };
         let run = RobloxMemory::new(Some(Arc::new(snapshot))).collect(&fixture());
         let (observations, _) = observations(&run);
