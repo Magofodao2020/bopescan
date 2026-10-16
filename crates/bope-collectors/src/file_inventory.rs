@@ -55,7 +55,7 @@ pub const ID: &str = "file_inventory";
 const DISCRIMINATOR: &str = "scope";
 
 /// How long the walk and the assessments may run before they stop and say so.
-pub const BUDGET: Duration = Duration::from_secs(25 * 60);
+pub const BUDGET: Duration = Duration::from_mins(25);
 /// Most files listed.
 pub const MAX_FILES_LISTED: u64 = 10_000_000;
 /// Most images assessed.
@@ -468,53 +468,50 @@ impl Collector for FileInventory {
         let mut volume_rows = Vec::new();
         let mut walk_roots: Vec<String> = Vec::new();
         let mut later_roots: Vec<String> = Vec::new();
-        match host.volumes() {
-            Ok(volumes) => {
-                for volume in volumes {
-                    let walked = matches!(
-                        volume.kind,
-                        DriveKind::Fixed | DriveKind::Removable | DriveKind::RamDisk
+        if let Ok(volumes) = host.volumes() {
+            for volume in volumes {
+                let walked = matches!(
+                    volume.kind,
+                    DriveKind::Fixed | DriveKind::Removable | DriveKind::RamDisk
+                );
+                let mut row = Fields::new()
+                    .with(DISCRIMINATOR, "volume")
+                    .with("volume", volume.root.clone())
+                    .with("drive_kind", volume.kind.as_str())
+                    .maybe("filesystem", volume.filesystem.clone())
+                    .with("walked", walked);
+                if !walked {
+                    row = row.with(
+                        "reason",
+                        match volume.kind {
+                            DriveKind::Network => "network_share_not_walked",
+                            DriveKind::CdRom => "optical_drive_not_walked",
+                            _ => "unknown_drive_not_walked",
+                        },
                     );
-                    let mut row = Fields::new()
-                        .with(DISCRIMINATOR, "volume")
-                        .with("volume", volume.root.clone())
-                        .with("drive_kind", volume.kind.as_str())
-                        .maybe("filesystem", volume.filesystem.clone())
-                        .with("walked", walked);
-                    if !walked {
-                        row = row.with(
-                            "reason",
-                            match volume.kind {
-                                DriveKind::Network => "network_share_not_walked",
-                                DriveKind::CdRom => "optical_drive_not_walked",
-                                _ => "unknown_drive_not_walked",
-                            },
-                        );
-                    }
-                    volume_rows.push((volume.root.clone(), row));
-                    if walked {
-                        if volume.kind == DriveKind::Fixed {
-                            walk_roots.push(volume.root);
-                        } else {
-                            later_roots.push(volume.root);
-                        }
+                }
+                volume_rows.push((volume.root.clone(), row));
+                if walked {
+                    if volume.kind == DriveKind::Fixed {
+                        walk_roots.push(volume.root);
+                    } else {
+                        later_roots.push(volume.root);
                     }
                 }
             }
-            Err(_) => {
-                // Without the drive list the system drive is still walked, and the summary says the
-                // other drives were not enumerated.
-                let drive = env_folder(host, "SystemDrive").unwrap_or_else(|| "C:".to_owned());
-                walk_roots.push(format!("{drive}\\"));
-                volume_rows.push((
-                    format!("{drive}\\"),
-                    Fields::new()
-                        .with(DISCRIMINATOR, "volume")
-                        .with("volume", format!("{drive}\\"))
-                        .with("walked", true)
-                        .with("reason", "drive_list_unreadable_system_drive_only"),
-                ));
-            }
+        } else {
+            // Without the drive list the system drive is still walked, and the summary says the
+            // other drives were not enumerated.
+            let drive = env_folder(host, "SystemDrive").unwrap_or_else(|| "C:".to_owned());
+            walk_roots.push(format!("{drive}\\"));
+            volume_rows.push((
+                format!("{drive}\\"),
+                Fields::new()
+                    .with(DISCRIMINATOR, "volume")
+                    .with("volume", format!("{drive}\\"))
+                    .with("walked", true)
+                    .with("reason", "drive_list_unreadable_system_drive_only"),
+            ));
         }
         let mut walk = Walk {
             host,
