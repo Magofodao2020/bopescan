@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: f77a8580-bed0-44a7-bfdf-be13e2a1116a
+title: "During monitoring a FastFlag changed and later returned to its earlier value"
+description: >-
+  The monitoring session the person ran saw a FastFlag value in the Roblox player's memory or
+  settings file change and later come back to a value it had held earlier in the session. The times
+  of the samples on either side of each change are on the row. Only what the samples saw is
+  reported; a change undone between two samples is not seen.
+status: test
+collector: roblox_monitor
+strength: context
+match:
+  scope: "event"
+  event: "flag_value_restored"
+retention: >-
+  Only the monitoring session included in this report.
+unmeasured_when: [not_windows, source_absent]
+falsepositives:
+  - "The server delivering a new value and then the old one again"
+  - "A bootstrapper rewriting the settings file each time it launches the player"
+references:
+  - https://github.com/MaximumADHD/Roblox-FFlag-Tracker
+author: B.O.P.E Scanner contributors
+date: 2026-10-16
+tags: [roblox, fastflags, monitoring]
+level: warn
+category: fastflags

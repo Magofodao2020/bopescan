@@ -1,0 +1,18 @@
+{
+  "description": "Synthetic positive case for process_modules/memory/image-in-private-memory.",
+  "observations": [
+    {
+      "collector": "process_modules",
+      "fields": {
+        "scope": "allocation",
+        "pid": 900,
+        "process_name": "game.exe",
+        "address": "0x7ff600000000",
+        "size": 8192,
+        "permissions": "rwx",
+        "holds_image": true
+      }
+    }
+  ],
+  "expect_matches": 1
+}

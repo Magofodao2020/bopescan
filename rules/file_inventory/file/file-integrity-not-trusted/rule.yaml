@@ -1,0 +1,31 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: d55afe49-df1d-4c4b-9c0e-9c3ea54d30b0
+title: "A DLL or executable on a drive is suspicious or its integrity is compromised"
+description: >-
+  The full scan walked the accessible drives and classified a DLL, executable or driver as
+  suspicious or integrity compromised: for example an executable disguised with another extension, a
+  system DLL name outside Windows, a signature or catalog entry that does not verify, or imports of
+  the functions used to write into other processes. The reasons and limitations are on the row. No
+  file is executed.
+status: test
+collector: file_inventory
+strength: presence
+match:
+  scope: "file"
+  integrity_class: ["suspicious", "integrity_compromised"]
+retention: >-
+  Files present at the moment of the scan.
+unmeasured_when: [not_windows]
+falsepositives:
+  - "Debuggers, memory editors and modding tools, which import the same functions"
+  - "Old or repacked installers whose signatures no longer verify"
+  - "Developer build outputs in a projects folder"
+references:
+  - https://learn.microsoft.com/en-us/windows/win32/seccrypto/authenticode
+author: B.O.P.E Scanner contributors
+date: 2026-10-16
+tags: [files, integrity]
+level: warn
+category: files

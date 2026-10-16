@@ -1,0 +1,31 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: 5e3c39ce-bb82-4237-9a0f-460f1b3b6f96
+title: "A network or physics FastFlag value in the Roblox player's memory differs from the reference"
+description: >-
+  A FastFlag assignment written as JSON text in the running Roblox player's memory sets a network or
+  physics flag (for example PhysicsSenderRate) to a value different from the one the FFlag tracker
+  reference records for the live channel. That text may be a settings file the client read, a copy
+  it did not apply, or the server's own delivery; the reference changes over time and may not match
+  this client version. Read it with the reference row of roblox_flags.
+status: test
+collector: roblox_memory
+strength: context
+match:
+  scope: "flag_value"
+  flag_kind: "network"
+  comparison: "differs"
+retention: >-
+  The memory at the moment of the scan.
+unmeasured_when: [not_windows, access_denied, source_absent]
+falsepositives:
+  - "A reference copy from a different client version or channel than this client"
+  - "A flag the server sets per place or per user, which the live-channel reference does not show"
+references:
+  - https://github.com/MaximumADHD/Roblox-FFlag-Tracker
+author: B.O.P.E Scanner contributors
+date: 2026-10-16
+tags: [roblox, fastflags, memory]
+level: warn
+category: fastflags

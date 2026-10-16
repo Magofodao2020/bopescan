@@ -1,0 +1,19 @@
+{
+  "description": "Synthetic negative case for roblox_monitor/event/flag-value-restored-during-monitoring.",
+  "observations": [
+    {
+      "collector": "roblox_monitor",
+      "fields": {
+        "scope": "event",
+        "at": "2026-10-16T10:00:30Z",
+        "since": "2026-10-16T10:00:00Z",
+        "event": "flag_value_changed",
+        "pid": 1200,
+        "subject": "DFIntS2PhysicsSenderRate",
+        "source": "memory",
+        "before": "15",
+        "after": "1"
+      }
+    }
+  ]
+}

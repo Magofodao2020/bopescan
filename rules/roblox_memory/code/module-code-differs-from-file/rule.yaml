@@ -1,0 +1,32 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: 917fecbb-4032-4fae-9091-4ccd4417b0bd
+title: "Code of a module in the Roblox player differs from its file"
+description: >-
+  The executable sections of a module loaded in the running Roblox player were compared with its
+  file, laid out and relocated as Windows loads it, with the tables the loader fills skipped, and
+  some bytes differ. Patched code looks like this; so do hooks placed by overlays, capture tools and
+  security software. Roblox's own image is excluded because its anti-cheat changes it at run time.
+  The row gives how many bytes differ and where.
+status: test
+collector: roblox_memory
+strength: context
+match:
+  scope: "code_change"
+  expected_runtime_change: false
+  "bytes_differing|gte": 1
+retention: >-
+  The code in memory at the moment of the scan.
+unmeasured_when: [not_windows, access_denied, source_absent]
+falsepositives:
+  - "Overlays, recorders and input tools that patch graphics or input functions"
+  - "Antivirus and anti-cheat software that hooks system DLLs in every process"
+  - "A module updated on disk while the old copy is still loaded"
+references:
+  - https://learn.microsoft.com/en-us/windows/win32/debug/pe-format
+author: B.O.P.E Scanner contributors
+date: 2026-10-16
+tags: [roblox, memory, integrity]
+level: warn
+category: roblox

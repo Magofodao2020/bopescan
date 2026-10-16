@@ -196,12 +196,15 @@ pub fn default_category(collector: &str) -> &'static str {
     match collector {
         "roblox_trace" => "roblox_tools",
         "fastflags" => "fastflags",
-        "roblox" | "roblox_process" | "executor_footprint" => "roblox",
-        "process" => "processes_memory",
+        "roblox" | "roblox_process" | "executor_footprint" | "roblox_memory" | "roblox_monitor" => {
+            "roblox"
+        }
+        "roblox_flags" => "fastflags",
+        "process" | "process_modules" => "processes_memory",
         "prefetch" | "bam" | "pca" | "userassist" | "shimcache" | "feature_usage" | "muicache"
         | "shell_mru" | "amcache" | "shortcuts" | "srum" | "shellbags" => "execution",
         "user_files" | "usn" | "fivem_dir" | "fivem_servers" | "roblox_files" | "mft"
-        | "recycle_bin" => "files",
+        | "recycle_bin" | "file_inventory" => "files",
         "autostart" | "hijack" | "defender_exclusion" | "wmi_subscription" => "persistence",
         "driver_service" => "drivers",
         "usb_device" | "pci_device" => "usb_devices",
@@ -216,10 +219,15 @@ pub fn default_category(collector: &str) -> &'static str {
 /// The source family of a collector: collectors that read the same underlying record are one source.
 pub fn source_family(collector: &str) -> &'static str {
     match collector {
-        "process" | "roblox_process" => "process_snapshot",
-        "user_files" | "executor_footprint" | "roblox" | "fivem_dir" | "roblox_files" => {
-            "file_listing"
-        }
+        // The live process state: the process list, the loader's module lists and the memory read
+        // through them are one source however many collectors read them (B.O.P.E, ADR 0134).
+        "process" | "roblox_process" | "process_modules" | "roblox_memory" => "process_snapshot",
+        "user_files" | "executor_footprint" | "roblox" | "fivem_dir" | "roblox_files"
+        | "file_inventory" => "file_listing",
+        // Settings files and the crash dumps beside them are the client's own configuration record.
+        "fastflags" | "roblox_flags" => "client_config",
+        // Samples over time, a source of its own (B.O.P.E, ADR 0137).
+        "roblox_monitor" => "monitoring",
         "evtx" | "windows_start" => "event_logs",
         // The Recycle Bin's `$I` files are their own record, not a folder listing (ADR 0131).
         "recycle_bin" => "recycle_bin",
@@ -252,7 +260,6 @@ pub fn source_family(collector: &str) -> &'static str {
             "shellbags" => "shellbags",
             "wmi_subscription" => "wmi",
             "shortcuts" => "shortcuts",
-            "fastflags" => "client_config",
             "roblox_trace" => "roblox_trace",
             _ => "other",
         },

@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: ea2b718b-d6f9-4251-866e-6df8d2e896e7
+title: "The Roblox player's memory holds names of script-executor functions"
+description: >-
+  Readable memory of the running Roblox player holds text such as getgenv, hookfunction or
+  loadstring helpers that script executors add to Roblox's Lua environment. A string is not proof
+  that anything ran: chat, a web page or a script someone pasted can put the same words in memory.
+  Only these categories of text are kept, with their address and encoding.
+status: test
+collector: roblox_memory
+strength: context
+match:
+  scope: "string"
+  category: "executor_function"
+retention: >-
+  The memory at the moment of the scan.
+unmeasured_when: [not_windows, access_denied, source_absent]
+falsepositives:
+  - "Chat messages, a developer console or an in-game script viewer showing these words"
+  - "A Roblox Studio plugin or game that defines functions with the same names"
+references:
+  - https://create.roblox.com/docs/reference/engine/globals/LuaGlobals
+author: B.O.P.E Scanner contributors
+date: 2026-10-16
+tags: [roblox, memory, strings]
+level: warn
+category: roblox

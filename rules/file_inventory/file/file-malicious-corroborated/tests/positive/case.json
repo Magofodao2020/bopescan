@@ -1,0 +1,16 @@
+{
+  "description": "Synthetic positive case for file_inventory/file/file-malicious-corroborated.",
+  "observations": [
+    {
+      "collector": "file_inventory",
+      "fields": {
+        "scope": "file",
+        "path": "C:\\Users\\a\\Downloads\\exec\\injector.exe",
+        "integrity_class": "malicious_corroborated",
+        "integrity_reasons": "known_tool,injection_imports",
+        "size": 40960
+      }
+    }
+  ],
+  "expect_matches": 1
+}

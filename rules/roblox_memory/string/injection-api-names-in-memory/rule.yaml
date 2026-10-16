@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: 17477da4-decd-4b47-9444-b5ece71e203c
+title: "The Roblox player's memory holds names of process-injection functions"
+description: >-
+  Readable non-image memory of the running Roblox player holds the names of Windows functions used
+  to inject code, such as WriteProcessMemory or CreateRemoteThread. Inside a game client these names
+  have little reason to appear outside system DLLs, which are not scanned. A string is still not
+  proof anything used them.
+status: test
+collector: roblox_memory
+strength: context
+match:
+  scope: "string"
+  category: "injection_api"
+retention: >-
+  The memory at the moment of the scan.
+unmeasured_when: [not_windows, access_denied, source_absent]
+falsepositives:
+  - "An overlay or anti-cheat component that resolves these functions by name at run time"
+  - "Crash-reporting or diagnostics code that lists API names"
+references:
+  - https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-writeprocessmemory
+author: B.O.P.E Scanner contributors
+date: 2026-10-16
+tags: [roblox, memory, strings]
+level: info
+category: roblox

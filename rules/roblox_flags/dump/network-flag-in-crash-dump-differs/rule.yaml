@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: 714ce486-7753-4ed6-87e1-e4295d029911
+title: "A Roblox crash dump holds a network or physics FastFlag value other than the reference"
+description: >-
+  A crash dump the Roblox player left holds a FastFlag assignment written as JSON text that sets a
+  network or physics flag to a value different from the reference. A dump is the player's memory
+  when it was written, so the value was in that process at that time; it may still be a copy the
+  client read and did not apply. The dump's time is on the row.
+status: test
+collector: roblox_flags
+strength: context
+match:
+  scope: "dump_value"
+  flag_kind: "network"
+  comparison: "differs"
+retention: >-
+  Crash dumps stay until Windows Error Reporting or the person removes them.
+unmeasured_when: [not_windows]
+falsepositives:
+  - "A reference copy from another client version than the one that crashed"
+references:
+  - https://learn.microsoft.com/en-us/windows/win32/wer/collecting-user-mode-dumps
+author: B.O.P.E Scanner contributors
+date: 2026-10-16
+tags: [roblox, fastflags, history]
+level: info
+category: fastflags

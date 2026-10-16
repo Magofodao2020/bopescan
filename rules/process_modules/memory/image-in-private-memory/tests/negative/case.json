@@ -1,0 +1,17 @@
+{
+  "description": "Synthetic negative case for process_modules/memory/image-in-private-memory.",
+  "observations": [
+    {
+      "collector": "process_modules",
+      "fields": {
+        "scope": "allocation",
+        "pid": 900,
+        "process_name": "game.exe",
+        "address": "0x7ff600000000",
+        "size": 8192,
+        "permissions": "rx",
+        "holds_image": false
+      }
+    }
+  ]
+}

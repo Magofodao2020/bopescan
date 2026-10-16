@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: e3f4cb04-3fce-4104-b0ab-8a4bdf6797a1
+title: "A module loaded in a running process is suspicious or its integrity is compromised"
+description: >-
+  A DLL loaded in a running process was classified suspicious, integrity compromised or malicious
+  with corroborated evidence. The reasons and the processes that loaded it are on the row. Most
+  loaded modules are signed system or vendor files and are not listed.
+status: test
+collector: process_modules
+strength: presence
+match:
+  scope: "module"
+  integrity_class: ["suspicious", "integrity_compromised", "malicious_corroborated"]
+retention: >-
+  The modules loaded at the moment of the scan.
+unmeasured_when: [not_windows, access_denied]
+falsepositives:
+  - "A debugger, profiler, macro tool or modding tool that imports process-writing functions"
+  - "A legitimate file whose signature became invalid after an interrupted update"
+references:
+  - https://learn.microsoft.com/en-us/windows/win32/api/psapi/nf-psapi-enumprocessmodulesex
+author: B.O.P.E Scanner contributors
+date: 2026-10-16
+tags: [process, module, integrity]
+level: warn
+category: processes_memory

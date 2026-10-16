@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: f781498a-f336-47ab-9ab9-320aa30fb581
+title: "The Roblox player has an image mapping its module list does not show"
+description: >-
+  An image section is mapped in the running Roblox player but the loader's module list does not
+  include it: a DLL mapped without the loader, or one removed from the list after loading. Some
+  legitimate components map images for reading resources, which this check cannot tell apart; the
+  mapped file, when Windows names one, is on the row.
+status: test
+collector: roblox_memory
+strength: context
+match:
+  scope: "region"
+  finding: "unlisted_image"
+retention: >-
+  The address space at the moment of the scan.
+unmeasured_when: [not_windows, access_denied, source_absent]
+falsepositives:
+  - "A DLL mapped as an image only to read its resources or version"
+  - "A module the loader is still loading or has just unloaded while the scan walked the memory"
+references:
+  - https://learn.microsoft.com/en-us/windows/win32/api/psapi/nf-psapi-getmappedfilenamew
+author: B.O.P.E Scanner contributors
+date: 2026-10-16
+tags: [roblox, memory, module]
+level: warn
+category: roblox

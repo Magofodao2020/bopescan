@@ -1,0 +1,16 @@
+{
+  "description": "Synthetic negative case for process_modules/module/loaded-module-integrity-not-trusted.",
+  "observations": [
+    {
+      "collector": "process_modules",
+      "fields": {
+        "scope": "module",
+        "path": "D:\\Tools\\fps.dll",
+        "integrity_class": "unknown",
+        "integrity_reasons": "unsigned",
+        "processes": 1,
+        "loaded_by": "game.exe"
+      }
+    }
+  ]
+}

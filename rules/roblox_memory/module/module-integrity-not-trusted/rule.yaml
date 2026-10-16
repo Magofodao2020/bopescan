@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: 299b8a02-1b4a-4e1d-b284-d8d40144203e
+title: "A module loaded in the Roblox player is suspicious or its integrity is compromised"
+description: >-
+  A module loaded in the running Roblox player was classified suspicious or integrity compromised:
+  for example a signature that does not verify, a system DLL name outside Windows, an extension that
+  hides an executable, or imports of the functions used to write into other processes. The reasons
+  are on the row. It does not say the module was used to cheat.
+status: test
+collector: roblox_memory
+strength: presence
+match:
+  scope: "module"
+  integrity_class: ["suspicious", "integrity_compromised"]
+retention: >-
+  The modules loaded at the moment of the scan.
+unmeasured_when: [not_windows, access_denied, source_absent]
+falsepositives:
+  - "A debugger, profiler or modding tool that imports process-writing functions for a legitimate reason"
+  - "A legitimate file whose signature became invalid after an interrupted update"
+references:
+  - https://learn.microsoft.com/en-us/windows/win32/seccrypto/authenticode
+author: B.O.P.E Scanner contributors
+date: 2026-10-16
+tags: [roblox, module, integrity]
+level: warn
+category: roblox

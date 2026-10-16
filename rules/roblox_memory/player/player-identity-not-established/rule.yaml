@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: 3f2e4519-7570-456c-b8c3-e8f2c1f950c6
+title: "A process named like the Roblox player is neither signed by Roblox nor in a Roblox version folder"
+description: >-
+  A running process carries the Roblox player's name, but its file is not under a Roblox Versions
+  folder and does not carry a verifying signature from Roblox Corporation. The name alone is not
+  trusted; a renamed program could take it. The identity checks that held are on the row.
+status: test
+collector: roblox_memory
+strength: presence
+match:
+  scope: "player"
+  identity_confidence: "low"
+retention: >-
+  Processes running at the moment of the scan.
+unmeasured_when: [not_windows]
+falsepositives:
+  - "A PC whose certificate store lacks the root certificate, so the Roblox signature cannot be verified offline, with the player installed outside the usual folder"
+references:
+  - https://learn.microsoft.com/en-us/windows/win32/seccrypto/authenticode
+author: B.O.P.E Scanner contributors
+date: 2026-10-16
+tags: [roblox, process, signature]
+level: warn
+category: roblox

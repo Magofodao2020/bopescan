@@ -1,0 +1,21 @@
+{
+  "description": "Synthetic positive case for roblox_memory/code/module-code-differs-from-file.",
+  "observations": [
+    {
+      "collector": "roblox_memory",
+      "fields": {
+        "scope": "code_change",
+        "pid": 1200,
+        "module": "C:\\Windows\\System32\\user32.dll",
+        "base": "0x7ffb10000000",
+        "sections": 1,
+        "bytes_compared": 65536,
+        "bytes_differing": 5,
+        "bytes_unreadable": 0,
+        "expected_runtime_change": false,
+        "ranges": "0x7ffb10001000+5"
+      }
+    }
+  ],
+  "expect_matches": 1
+}

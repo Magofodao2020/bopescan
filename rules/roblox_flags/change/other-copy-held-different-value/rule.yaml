@@ -1,0 +1,30 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: be178c93-0089-47af-8571-a384b17ee4bc
+title: "Another copy of the Roblox settings held a non-reference value the active file no longer has"
+description: >-
+  A backup, an older version folder or a bootstrapper's copy sets a flag to a value that differs
+  from the reference, while the active version's file now holds the reference value or does not set
+  the flag. That is what setting a flag and putting it back leaves on disk. Both files and both
+  modification times are on the row; no other time is inferred, and it does not say when the value
+  was in effect.
+status: test
+collector: roblox_flags
+strength: context
+match:
+  scope: "change"
+  finding: ["other_copy_differs_active_matches_reference", "other_copy_differs_active_unset"]
+retention: >-
+  The files as they are at the moment of the scan; Roblox removes old version folders after updates.
+unmeasured_when: [not_windows]
+falsepositives:
+  - "An old version folder Roblox has not removed yet, from before the player reset their settings"
+  - "A bootstrapper profile the player no longer uses"
+references:
+  - https://github.com/MaximumADHD/Roblox-FFlag-Tracker
+author: B.O.P.E Scanner contributors
+date: 2026-10-16
+tags: [roblox, fastflags, history]
+level: warn
+category: fastflags

@@ -1,0 +1,20 @@
+{
+  "description": "Synthetic negative case for roblox_memory/code/module-code-differs-from-file.",
+  "observations": [
+    {
+      "collector": "roblox_memory",
+      "fields": {
+        "scope": "code_change",
+        "pid": 1200,
+        "module": "C:\\R\\RobloxPlayerBeta.exe",
+        "base": "0x7ff700000000",
+        "sections": 3,
+        "bytes_compared": 65536,
+        "bytes_differing": 4096,
+        "bytes_unreadable": 0,
+        "expected_runtime_change": true,
+        "ranges": "0x7ff700001000+4096"
+      }
+    }
+  ]
+}

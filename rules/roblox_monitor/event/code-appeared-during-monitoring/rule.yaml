@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: ad2ce9ff-df8f-4ce5-b1b0-71ca8a86502c
+title: "During monitoring the Roblox player gained a module, executable memory or an unlisted image"
+description: >-
+  The monitoring session saw a module load, a block of private executable memory appear, or an image
+  mapping the loader does not list appear in the Roblox player between two samples. Overlays and the
+  anti-cheat also load code during play, so each event is a time to compare with other sources, not
+  a finding on its own.
+status: test
+collector: roblox_monitor
+strength: context
+match:
+  scope: "event"
+  event: ["module_loaded", "executable_region_appeared", "unlisted_image_appeared"]
+retention: >-
+  Only the monitoring session included in this report.
+unmeasured_when: [not_windows, source_absent]
+falsepositives:
+  - "Roblox loading its own components, or its anti-cheat allocating code, during play"
+  - "An overlay or recorder attaching after the game started"
+references:
+  - https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-virtualqueryex
+author: B.O.P.E Scanner contributors
+date: 2026-10-16
+tags: [roblox, memory, monitoring]
+level: info
+category: roblox

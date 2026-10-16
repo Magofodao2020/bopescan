@@ -2202,3 +2202,275 @@ d615135a-756a-4da8-ae18-ef2737a3e921:
     O arquivo compactado como está no momento da verificação.
   falsepositives:
     - "Qualquer arquivo compactado com senha: backups, documentos enviados pelo trabalho ou pela escola, mods de jogos"
+
+cd24dd82-84f7-4793-87ad-3b34234387ba:
+  title: "Uma função de um módulo do player do Roblox salta para memória sem arquivo"
+  description: >-
+    Os primeiros bytes de uma função exportada por um módulo carregado no player do Roblox diferem
+    do arquivo do módulo e agora saltam para memória privada ou mapeada que nenhum módulo carregado
+    explica. Hooks colocados por código injetado têm essa forma. Overlays, gravadores e softwares de
+    segurança também fazem hooks, mas normalmente saltam para o próprio módulo assinado. A imagem do
+    próprio Roblox fica de fora porque o anticheat a altera durante a execução. Mostra o salto e o
+    destino; não diz o que o código de lá faz.
+  retention: >-
+    O código em memória no momento da verificação.
+  falsepositives:
+    - "Overlay ou capturador que coloca seus trampolins em memória privada em vez de dentro do próprio módulo"
+    - "Software de segurança ou anticheat que faz hook em DLLs do sistema a partir de memória que ele mesmo alocou"
+
+b056ea61-e39f-4a49-9ee1-85d0aa26ffd9:
+  title: "Uma função de um módulo do player do Roblox salta para um módulo não reconhecido"
+  description: >-
+    Os primeiros bytes de uma função exportada por um módulo carregado no player do Roblox diferem
+    do arquivo e saltam para outro módulo carregado cuja classe de integridade é desconhecida,
+    suspeita, integridade comprometida ou maliciosa com evidência corroborada. Overlays e
+    ferramentas de segurança assinadas não entram aqui. Mostra o salto e a classe do módulo de
+    destino; a classe tem seus motivos na linha do módulo.
+  retention: >-
+    O código em memória no momento da verificação.
+  falsepositives:
+    - "Overlay pequeno sem assinatura, contador de FPS ou remapeador de entrada que faz hook em funções gráficas ou de entrada"
+    - "Ferramenta assinada cuja assinatura este PC não conseguiu verificar sem internet, que então não conta como assinada"
+
+62f97fca-6c7f-4827-8c18-bf6145e33f44:
+  title: "O player do Roblox contém uma imagem executável que o carregador do Windows não carregou"
+  description: >-
+    Memória privada executável no player do Roblox começa com um cabeçalho de imagem PE: uma DLL ou
+    programa copiado à mão para a memória em vez de carregado pelo Windows, que é como injetores de
+    "manual map" colocam código. O anticheat do Roblox descriptografa código durante a execução, mas
+    normalmente não deixa cabeçalho PE em memória privada. Mostra o endereço e a proteção; nada além
+    do cabeçalho é lido.
+  retention: >-
+    O espaço de endereçamento no momento da verificação.
+  falsepositives:
+    - "Empacotador, runtime .NET ou de script dentro de um overlay legítimo que mapeia uma imagem por conta própria"
+    - "Produto de segurança que copia um módulo para dentro do processo para inspecioná-lo"
+
+f781498a-f336-47ab-9ab9-320aa30fb581:
+  title: "O player do Roblox tem um mapeamento de imagem que sua lista de módulos não mostra"
+  description: >-
+    Uma seção de imagem está mapeada no player do Roblox, mas a lista de módulos do carregador não a
+    inclui: uma DLL mapeada sem o carregador ou removida da lista depois de carregada. Alguns
+    componentes legítimos mapeiam imagens só para ler recursos, o que esta verificação não
+    distingue; o arquivo mapeado, quando o Windows informa, está na linha.
+  retention: >-
+    O espaço de endereçamento no momento da verificação.
+  falsepositives:
+    - "DLL mapeada como imagem só para ler seus recursos ou versão"
+    - "Módulo que o carregador ainda está carregando ou acabou de descarregar enquanto a memória era percorrida"
+
+917fecbb-4032-4fae-9091-4ccd4417b0bd:
+  title: "O código de um módulo no player do Roblox difere do arquivo"
+  description: >-
+    As seções executáveis de um módulo carregado no player do Roblox foram comparadas com o arquivo,
+    montado e realocado como o Windows carrega, ignorando as tabelas que o carregador preenche, e
+    alguns bytes diferem. Código alterado tem essa forma; hooks de overlays, gravadores e softwares
+    de segurança também. A imagem do próprio Roblox fica de fora porque o anticheat a altera durante
+    a execução. A linha informa quantos bytes diferem e onde.
+  retention: >-
+    O código em memória no momento da verificação.
+  falsepositives:
+    - "Overlays, gravadores e ferramentas de entrada que alteram funções gráficas ou de entrada"
+    - "Antivírus e anticheats que fazem hook em DLLs do sistema em todos os processos"
+    - "Módulo atualizado no disco enquanto a cópia antiga continua carregada"
+
+299b8a02-1b4a-4e1d-b284-d8d40144203e:
+  title: "Um módulo carregado no player do Roblox é suspeito ou tem a integridade comprometida"
+  description: >-
+    Um módulo carregado no player do Roblox foi classificado como suspeito ou com integridade
+    comprometida: por exemplo, assinatura que não confere, nome de DLL do sistema fora do Windows,
+    extensão que esconde um executável ou importação das funções usadas para escrever em outros
+    processos. Os motivos estão na linha. Não diz que o módulo foi usado para trapacear.
+  retention: >-
+    Os módulos carregados no momento da verificação.
+  falsepositives:
+    - "Depurador, profiler ou ferramenta de mod que importa funções de escrita em processos por motivo legítimo"
+    - "Arquivo legítimo cuja assinatura ficou inválida após uma atualização interrompida"
+
+605f730e-2931-4b08-9b1a-18462982fb00:
+  title: "Um módulo no player do Roblox corresponde a uma ferramenta de trapaça conhecida e importa funções de injeção"
+  description: >-
+    Um módulo carregado no player do Roblox tem o nome de uma ferramenta que o catálogo deste
+    programa lista como capaz de trapacear e também importa as funções usadas para abrir e escrever
+    em outros processos; a assinatura não muda isso. São dois fatos independentes apontando para o
+    mesmo lado, por isso é mais forte que cada um. A entrada do catálogo e os motivos estão na
+    linha.
+  retention: >-
+    Os módulos carregados no momento da verificação.
+  falsepositives:
+    - "Programa legítimo que por acaso tem um nome do catálogo e é ele mesmo um depurador ou editor de memória"
+
+ea2b718b-d6f9-4251-866e-6df8d2e896e7:
+  title: "A memória do player do Roblox contém nomes de funções de executores de script"
+  description: >-
+    Memória legível do player do Roblox contém textos como getgenv, hookfunction ou funções
+    auxiliares de loadstring que executores de script adicionam ao ambiente Lua do Roblox. Uma
+    string não prova que algo foi executado: chat, uma página web ou um script colado podem pôr as
+    mesmas palavras na memória. Só essas categorias de texto são guardadas, com endereço e
+    codificação.
+  retention: >-
+    A memória no momento da verificação.
+  falsepositives:
+    - "Mensagens de chat, console de desenvolvedor ou visualizador de scripts no jogo mostrando essas palavras"
+    - "Plugin do Roblox Studio ou jogo que define funções com os mesmos nomes"
+
+17477da4-decd-4b47-9444-b5ece71e203c:
+  title: "A memória do player do Roblox contém nomes de funções de injeção em processos"
+  description: >-
+    Memória legível fora das imagens do player do Roblox contém nomes de funções do Windows usadas
+    para injetar código, como WriteProcessMemory ou CreateRemoteThread. Dentro de um cliente de jogo
+    esses nomes têm pouco motivo para aparecer fora das DLLs do sistema, que não são varridas. Ainda
+    assim, uma string não prova que algo as usou.
+  retention: >-
+    A memória no momento da verificação.
+  falsepositives:
+    - "Componente de overlay ou anticheat que resolve essas funções pelo nome durante a execução"
+    - "Código de relatório de falhas ou diagnóstico que lista nomes de API"
+
+5e3c39ce-bb82-4237-9a0f-460f1b3b6f96:
+  title: "Um valor de FastFlag de rede ou física na memória do player do Roblox difere da referência"
+  description: >-
+    Uma atribuição de FastFlag escrita como texto JSON na memória do player do Roblox define uma
+    flag de rede ou física (por exemplo PhysicsSenderRate) com um valor diferente do que a
+    referência do FFlag tracker registra para o canal ao vivo. Esse texto pode ser um arquivo de
+    configuração que o cliente leu, uma cópia que ele não aplicou ou o que o servidor entregou; a
+    referência muda com o tempo e pode não corresponder a esta versão do cliente. Leia junto com a
+    linha de referência de roblox_flags.
+  retention: >-
+    A memória no momento da verificação.
+  falsepositives:
+    - "Cópia da referência de outra versão ou canal do cliente"
+    - "Flag que o servidor define por lugar ou por usuário, que a referência do canal ao vivo não mostra"
+
+3f2e4519-7570-456c-b8c3-e8f2c1f950c6:
+  title: "Um processo com o nome do player do Roblox não é assinado pela Roblox nem está numa pasta de versão"
+  description: >-
+    Um processo em execução tem o nome do player do Roblox, mas seu arquivo não está numa pasta
+    Versions do Roblox e não tem assinatura válida da Roblox Corporation. O nome sozinho não é
+    confiável; um programa renomeado poderia usá-lo. As verificações de identidade que passaram
+    estão na linha.
+  retention: >-
+    Processos em execução no momento da verificação.
+  falsepositives:
+    - "PC cujo repositório de certificados não tem o certificado raiz, de modo que a assinatura do Roblox não pode ser verificada sem internet, com o player instalado fora da pasta habitual"
+
+e3f4cb04-3fce-4104-b0ab-8a4bdf6797a1:
+  title: "Um módulo carregado em um processo é suspeito ou tem a integridade comprometida"
+  description: >-
+    Uma DLL carregada em um processo em execução foi classificada como suspeita, com integridade
+    comprometida ou maliciosa com evidência corroborada. Os motivos e os processos que a carregaram
+    estão na linha. A maioria dos módulos carregados são arquivos assinados do sistema ou de
+    fabricantes e não é listada.
+  retention: >-
+    Os módulos carregados no momento da verificação.
+  falsepositives:
+    - "Depurador, profiler, ferramenta de macro ou de mod que importa funções de escrita em processos"
+    - "Arquivo legítimo cuja assinatura ficou inválida após uma atualização interrompida"
+
+d125476c-6df4-4a34-a61a-2b9741cf1cc1:
+  title: "Um processo em execução contém uma imagem executável que o carregador do Windows não carregou"
+  description: >-
+    Memória privada executável em um processo começa com um cabeçalho de imagem PE: código copiado à
+    mão para a memória em vez de carregado pelo Windows. Injetores de "manual map" fazem isso;
+    alguns empacotadores, runtimes e produtos de segurança também. O processo e o endereço estão na
+    linha.
+  retention: >-
+    O espaço de endereçamento no momento da verificação.
+  falsepositives:
+    - "Programas legítimos empacotados ou protegidos que se descompactam em memória privada"
+    - "Produtos de segurança e anticheats que copiam módulos para inspeção"
+
+d55afe49-df1d-4c4b-9c0e-9c3ea54d30b0:
+  title: "Uma DLL ou executável numa unidade é suspeito ou tem a integridade comprometida"
+  description: >-
+    A verificação completa percorreu as unidades acessíveis e classificou uma DLL, executável ou
+    driver como suspeito ou com integridade comprometida: por exemplo um executável disfarçado com
+    outra extensão, nome de DLL do sistema fora do Windows, assinatura ou entrada de catálogo que
+    não confere, ou importação das funções usadas para escrever em outros processos. Os motivos e
+    limitações estão na linha. Nenhum arquivo é executado.
+  retention: >-
+    Arquivos presentes no momento da verificação.
+  falsepositives:
+    - "Depuradores, editores de memória e ferramentas de mod, que importam as mesmas funções"
+    - "Instaladores antigos ou reempacotados cuja assinatura não confere mais"
+    - "Saídas de compilação numa pasta de projetos"
+
+33bea129-93b3-4c72-98db-2c51803a8c95:
+  title: "Um arquivo numa unidade corresponde a uma ferramenta de trapaça conhecida e importa funções de injeção"
+  description: >-
+    Uma DLL ou executável encontrado numa unidade tem o nome de uma ferramenta que o catálogo deste
+    programa lista como capaz de trapacear e também importa as funções usadas para abrir e escrever
+    em outros processos. São dois fatos independentes apontando para o mesmo lado. A entrada do
+    catálogo, o hash e os motivos estão na linha. Nenhum arquivo é executado.
+  retention: >-
+    Arquivos presentes no momento da verificação.
+  falsepositives:
+    - "Depurador ou editor de memória legítimo que tem um nome do catálogo"
+
+684df0e4-28ef-4e00-ae34-f7667369dce8:
+  title: "Um arquivo de configuração lido pelo player do Roblox define uma FastFlag de rede ou física com valor diferente da referência"
+  description: >-
+    Um ClientAppSettings.json numa pasta de versão do Roblox, ou a cópia de um bootstrapper, define
+    uma flag de rede ou física (PhysicsSenderRate, flags de replicação ou de humanoid) com valor
+    diferente da referência do FFlag tracker. São as flags usadas para dessincronizar o personagem
+    do servidor. Clientes recentes ignoram flags fora de uma lista permitida, então um valor no
+    arquivo não prova que teve efeito; a linha de referência diz quanto a referência corresponde a
+    esta versão do cliente.
+  retention: >-
+    Os arquivos como estão no momento da verificação.
+  falsepositives:
+    - "Cópia da referência de outra versão do cliente que não a instalada"
+    - "Flag que o jogador copiou de um guia de desempenho sem saber o efeito"
+
+be178c93-0089-47af-8571-a384b17ee4bc:
+  title: "Outra cópia das configurações do Roblox tinha um valor fora da referência que o arquivo ativo não tem mais"
+  description: >-
+    Um backup, uma pasta de versão antiga ou a cópia de um bootstrapper define uma flag com valor
+    diferente da referência, enquanto o arquivo da versão ativa agora tem o valor da referência ou
+    não define a flag. É o que definir uma flag e depois voltar atrás deixa no disco. Os dois
+    arquivos e as duas datas de modificação estão na linha; nenhum outro horário é deduzido, e não
+    diz quando o valor esteve em vigor.
+  retention: >-
+    Os arquivos como estão no momento da verificação; o Roblox apaga pastas de versão antigas após
+    atualizações.
+  falsepositives:
+    - "Pasta de versão antiga que o Roblox ainda não removeu, de antes de o jogador redefinir as configurações"
+    - "Perfil de bootstrapper que o jogador não usa mais"
+
+714ce486-7753-4ed6-87e1-e4295d029911:
+  title: "Um dump de falha do Roblox contém valor de FastFlag de rede ou física diferente da referência"
+  description: >-
+    Um dump de falha deixado pelo player do Roblox contém uma atribuição de FastFlag escrita como
+    texto JSON que define uma flag de rede ou física com valor diferente da referência. Um dump é a
+    memória do player no momento em que foi gravado, então o valor estava naquele processo naquela
+    hora; ainda pode ser uma cópia que o cliente leu e não aplicou. A hora do dump está na linha.
+  retention: >-
+    Dumps de falha ficam até o Relatório de Erros do Windows ou a pessoa os apagar.
+  falsepositives:
+    - "Cópia da referência de outra versão do cliente que não a que falhou"
+
+f77a8580-bed0-44a7-bfdf-be13e2a1116a:
+  title: "Durante o monitoramento uma FastFlag mudou e depois voltou ao valor anterior"
+  description: >-
+    A sessão de monitoramento que a pessoa executou viu um valor de FastFlag na memória ou no
+    arquivo de configuração do player do Roblox mudar e depois voltar a um valor que tinha antes na
+    sessão. Os horários das amostras de cada lado de cada mudança estão na linha. Só o que as
+    amostras viram é informado; uma mudança desfeita entre duas amostras não é vista.
+  retention: >-
+    Somente a sessão de monitoramento incluída neste relatório.
+  falsepositives:
+    - "O servidor entregando um valor novo e depois o antigo de novo"
+    - "Um bootstrapper reescrevendo o arquivo de configuração a cada vez que abre o player"
+
+ad2ce9ff-df8f-4ce5-b1b0-71ca8a86502c:
+  title: "Durante o monitoramento o player do Roblox ganhou um módulo, memória executável ou imagem não listada"
+  description: >-
+    A sessão de monitoramento viu um módulo ser carregado, um bloco de memória privada executável
+    aparecer ou um mapeamento de imagem que o carregador não lista aparecer no player do Roblox
+    entre duas amostras. Overlays e o anticheat também carregam código durante o jogo, então cada
+    evento é um horário para comparar com outras fontes, não uma conclusão por si só.
+  retention: >-
+    Somente a sessão de monitoramento incluída neste relatório.
+  falsepositives:
+    - "O Roblox carregando seus próprios componentes, ou o anticheat alocando código, durante o jogo"
+    - "Overlay ou gravador se conectando depois que o jogo começou"

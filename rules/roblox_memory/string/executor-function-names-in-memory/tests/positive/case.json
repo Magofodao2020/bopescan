@@ -1,0 +1,21 @@
+{
+  "description": "Synthetic positive case for roblox_memory/string/executor-function-names-in-memory.",
+  "observations": [
+    {
+      "collector": "roblox_memory",
+      "fields": {
+        "scope": "string",
+        "pid": 1200,
+        "address": "0x20001000",
+        "region_kind": "private",
+        "permissions": "rw",
+        "encoding": "ascii",
+        "length": 7,
+        "text": "getgenv",
+        "category": "executor_function",
+        "method": "categorised_string_scan"
+      }
+    }
+  ],
+  "expect_matches": 1
+}

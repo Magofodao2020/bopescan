@@ -1,0 +1,31 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: 684df0e4-28ef-4e00-ae34-f7667369dce8
+title: "A settings file the Roblox player reads sets a network or physics FastFlag to a value other than the reference"
+description: >-
+  A ClientAppSettings.json in a Roblox version folder, or a bootstrapper's copy of it, sets a
+  network or physics flag (PhysicsSenderRate, replication or humanoid flags) to a value that differs
+  from the FFlag tracker reference. These are the flags used to desynchronise a character from the
+  server. Recent clients ignore flags outside an allow-list, so a value in a file is not proof it
+  took effect; the reference row says how far the reference matches this client version.
+status: test
+collector: roblox_flags
+strength: context
+match:
+  scope: "value"
+  flag_kind: "network"
+  comparison: "differs"
+retention: >-
+  The files as they are at the moment of the scan.
+unmeasured_when: [not_windows]
+falsepositives:
+  - "A reference copy from another client version than the one installed"
+  - "A flag the player copied from a performance guide without knowing its effect"
+references:
+  - https://github.com/MaximumADHD/Roblox-FFlag-Tracker
+author: B.O.P.E Scanner contributors
+date: 2026-10-16
+tags: [roblox, fastflags]
+level: warn
+category: fastflags

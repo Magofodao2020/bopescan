@@ -1,0 +1,18 @@
+{
+  "description": "Synthetic positive case for roblox_memory/player/player-identity-not-established.",
+  "observations": [
+    {
+      "collector": "roblox_memory",
+      "fields": {
+        "scope": "player",
+        "pid": 1200,
+        "name": "RobloxPlayerBeta.exe",
+        "path": "C:\\Users\\a\\Downloads\\RobloxPlayerBeta.exe",
+        "identity_checks": "name",
+        "identity_confidence": "low",
+        "access": "opened"
+      }
+    }
+  ],
+  "expect_matches": 1
+}

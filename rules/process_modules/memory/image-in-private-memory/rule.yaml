@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: d125476c-6df4-4a34-a61a-2b9741cf1cc1
+title: "A running process holds an executable image the Windows loader did not load"
+description: >-
+  Private executable memory in a running process begins with a PE image header: code copied into
+  memory by hand rather than loaded by Windows. Manual-mapping injectors do this; so do some
+  packers, runtimes and security products. The process and the address are on the row.
+status: test
+collector: process_modules
+strength: context
+match:
+  scope: "allocation"
+  holds_image: true
+retention: >-
+  The address space at the moment of the scan.
+unmeasured_when: [not_windows, access_denied]
+falsepositives:
+  - "Packed or protected legitimate programs that unpack themselves into private memory"
+  - "Security products and anti-cheats that copy modules for inspection"
+references:
+  - https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-virtualqueryex
+author: B.O.P.E Scanner contributors
+date: 2026-10-16
+tags: [process, memory, injection]
+level: warn
+category: processes_memory

@@ -1,0 +1,16 @@
+{
+  "description": "Synthetic positive case for roblox_memory/module/module-malicious-corroborated.",
+  "observations": [
+    {
+      "collector": "roblox_memory",
+      "fields": {
+        "scope": "module",
+        "pid": 1200,
+        "path": "C:\\Users\\a\\Downloads\\exec\\module.dll",
+        "integrity_class": "malicious_corroborated",
+        "integrity_reasons": "known_tool,injection_imports"
+      }
+    }
+  ],
+  "expect_matches": 1
+}

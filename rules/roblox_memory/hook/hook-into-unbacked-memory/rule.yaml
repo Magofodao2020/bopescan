@@ -1,0 +1,32 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: cd24dd82-84f7-4793-87ad-3b34234387ba
+title: "A function in a module of the Roblox player jumps into memory no file backs"
+description: >-
+  The first bytes of a function exported by a module loaded in the running Roblox player differ from
+  the module's file and now jump to private or mapped memory that no loaded module accounts for.
+  Inline hooks placed by injected code look like this. Overlays, recorders and security software
+  also hook functions, but they usually jump into their own signed module. Roblox's own image is
+  excluded here because its anti-cheat changes it at run time. It shows the jump and where it goes;
+  it does not say what the code there does.
+status: test
+collector: roblox_memory
+strength: presence
+match:
+  scope: "hook"
+  expected_runtime_change: false
+  "target_module|startswith": "unbacked_"
+retention: >-
+  The code in memory at the moment of the scan.
+unmeasured_when: [not_windows, access_denied, source_absent]
+falsepositives:
+  - "An overlay or capture tool that allocates its trampolines in private memory instead of inside its own module"
+  - "Security software or an anti-cheat that hooks system DLLs from memory it allocated"
+references:
+  - https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-readprocessmemory
+author: B.O.P.E Scanner contributors
+date: 2026-10-16
+tags: [roblox, memory, hook]
+level: flag
+category: roblox

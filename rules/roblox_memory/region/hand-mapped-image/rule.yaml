@@ -1,0 +1,30 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: 62f97fca-6c7f-4827-8c18-bf6145e33f44
+title: "The Roblox player holds an executable image the Windows loader did not load"
+description: >-
+  Private executable memory in the running Roblox player begins with a PE image header: a DLL or
+  program copied into memory by hand rather than loaded by Windows, which is how manual-mapping
+  injectors place code. Roblox's anti-cheat decrypts code at run time but does not normally leave a
+  PE header in private memory. It shows the address and protection; no content beyond the header is
+  read.
+status: test
+collector: roblox_memory
+strength: presence
+match:
+  scope: "region"
+  finding: "hand_mapped_image"
+retention: >-
+  The address space at the moment of the scan.
+unmeasured_when: [not_windows, access_denied, source_absent]
+falsepositives:
+  - "A packer, .NET or script runtime inside a legitimate overlay that maps an image itself"
+  - "A security product that copies a module into the process for its own inspection"
+references:
+  - https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-virtualqueryex
+author: B.O.P.E Scanner contributors
+date: 2026-10-16
+tags: [roblox, memory, injection]
+level: flag
+category: roblox

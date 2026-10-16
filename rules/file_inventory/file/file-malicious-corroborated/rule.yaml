@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: 33bea129-93b3-4c72-98db-2c51803a8c95
+title: "A file on a drive matches a known cheat tool and imports injection functions"
+description: >-
+  A DLL or executable found on a drive carries the name of a tool this program's catalog lists as
+  able to cheat and also imports the functions used to open and write into other processes. Two
+  independent facts point the same way. The catalog entry, the hash and the reasons are on the row.
+  No file is executed.
+status: test
+collector: file_inventory
+strength: presence
+match:
+  scope: "file"
+  integrity_class: "malicious_corroborated"
+retention: >-
+  Files present at the moment of the scan.
+unmeasured_when: [not_windows]
+falsepositives:
+  - "A legitimate debugger or memory editor that shares a catalogued name"
+references:
+  - https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-writeprocessmemory
+author: B.O.P.E Scanner contributors
+date: 2026-10-16
+tags: [files, integrity, injection]
+level: flag
+category: files

@@ -1,0 +1,20 @@
+{
+  "description": "Synthetic positive case for roblox_memory/hook/hook-into-unrecognised-module.",
+  "observations": [
+    {
+      "collector": "roblox_memory",
+      "fields": {
+        "scope": "hook",
+        "pid": 1200,
+        "module": "C:\\Windows\\System32\\user32.dll",
+        "function": "GetAsyncKeyState",
+        "hook_kind": "jmp_rel32",
+        "target": "0x7ff610001000",
+        "target_module": "helper.dll",
+        "target_class": "unknown",
+        "expected_runtime_change": false
+      }
+    }
+  ],
+  "expect_matches": 1
+}

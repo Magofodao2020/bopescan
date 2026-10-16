@@ -16,8 +16,8 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
 | rules bundle | |
 |---|---|
 | รูปแบบ rule | 4 |
-| จำนวน rule | 152 |
-| SHA-256 | `51a6d97b7eb0f0f66f2492585e7e37ad4b06f913a817b2e1011a8f3a012280e3` |
+| จำนวน rule | 172 |
+| SHA-256 | `fe96f24a56eaa9a4c2102539e834bf8c91ee407f12864155aa6685e2e89af14a` |
 
 ส่วนหัวของรายงานแสดงจำนวน rule และ SHA-256 ของ bundle ถ้า SHA-256 ในรายงานไม่ตรงกับค่านี้ แปลว่าโปรแกรมนั้นมี
 ชุด rule ต่างจากที่หน้านี้อธิบาย ให้อ่านหน้านี้ที่ commit ที่โปรแกรมนั้น build มา
@@ -66,6 +66,9 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
   - [The Roblox player reads a FastFlag file with custom flags](#rule-884dbc2d-24c2-4564-8bcc-3130ecd302d8) — `context` · `experimental`
   - [The ClientAppSettings.json the Roblox player reads sets network or physics FastFlags](#rule-ef38eab7-9baf-4ce0-9882-1614a4aed672) — `presence` · `experimental`
   - [A launcher or FastFlag tool keeps network or physics FastFlags](#rule-b456ead3-43f6-498d-9471-77aa9b576501) — `context` · `experimental`
+- `file_inventory`
+  - [A DLL or executable on a drive is suspicious or its integrity is compromised](#rule-d55afe49-df1d-4c4b-9c0e-9c3ea54d30b0) — `presence` · `test`
+  - [A file on a drive matches a known cheat tool and imports injection functions](#rule-33bea129-93b3-4c72-98db-2c51803a8c95) — `presence` · `test`
 - `fivem_dir`
   - [FiveM.exe มีลายเซ็นที่ถูกต้อง แต่ไม่ได้เซ็นด้วยใบรับรองที่ rule นี้รู้จัก](#rule-2dc11b64-72a2-48f5-a273-985e906d5a9e) — `presence` · `experimental`
   - [FiveM.exe ไม่มีลายเซ็นฝังในไฟล์ซึ่งตรวจผ่านบนเครื่องนี้](#rule-148cbcdd-8d18-4af6-a541-71cc7f21b2eb) — `presence` · `experimental`
@@ -145,6 +148,9 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
   - [A macro interpreter is running during the check](#rule-d2436b4d-95ef-4cd7-b71b-18613bdd4a76) — `context` · `experimental`
   - [A memory editor, debugger or process inspector is running during the check](#rule-003a01bc-baff-4536-bee2-034a19a3eee4) — `presence` · `experimental`
   - [A script runtime is running during the check](#rule-6c338af4-c3b9-4cc9-aa2c-b0204af85495) — `context` · `experimental`
+- `process_modules`
+  - [A running process holds an executable image the Windows loader did not load](#rule-d125476c-6df4-4a34-a61a-2b9741cf1cc1) — `context` · `test`
+  - [A module loaded in a running process is suspicious or its integrity is compromised](#rule-e3f4cb04-3fce-4104-b0ab-8a4bdf6797a1) — `presence` · `test`
 - `roblox`
   - [A third-party Roblox bootstrapper is installed](#rule-e315d48a-2cf4-4e84-8a0b-4fd9ccfac04e) — `context` · `experimental`
   - [Roblox client settings (FastFlags) are overridden](#rule-50882b33-a1aa-4e8c-bf59-7f4175c9b00f) — `context` · `experimental`
@@ -156,6 +162,25 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
   - [A .zip archive holds a Roblox executor's folder layout](#rule-b77bd209-8711-4277-82a9-ae7c6b349a62) — `presence` · `experimental`
   - [An unsigned program named like a Roblox executor or injector, in a Roblox context](#rule-40a072f5-89ee-408d-be3c-41d631978b1e) — `presence` · `experimental`
   - [An item named like a Roblox executor or injector is in the Recycle Bin](#rule-51cd80d4-0a55-4900-9eee-6ad30958c99e) — `presence` · `experimental`
+- `roblox_flags`
+  - [Another copy of the Roblox settings held a non-reference value the active file no longer has](#rule-be178c93-0089-47af-8571-a384b17ee4bc) — `context` · `test`
+  - [A Roblox crash dump holds a network or physics FastFlag value other than the reference](#rule-714ce486-7753-4ed6-87e1-e4295d029911) — `context` · `test`
+  - [A settings file the Roblox player reads sets a network or physics FastFlag to a value other than the reference](#rule-684df0e4-28ef-4e00-ae34-f7667369dce8) — `context` · `test`
+- `roblox_memory`
+  - [Code of a module in the Roblox player differs from its file](#rule-917fecbb-4032-4fae-9091-4ccd4417b0bd) — `context` · `test`
+  - [A network or physics FastFlag value in the Roblox player's memory differs from the reference](#rule-5e3c39ce-bb82-4237-9a0f-460f1b3b6f96) — `context` · `test`
+  - [A function in a module of the Roblox player jumps into memory no file backs](#rule-cd24dd82-84f7-4793-87ad-3b34234387ba) — `presence` · `test`
+  - [A function in a module of the Roblox player jumps into a module that is not recognised](#rule-b056ea61-e39f-4a49-9ee1-85d0aa26ffd9) — `presence` · `test`
+  - [A module loaded in the Roblox player is suspicious or its integrity is compromised](#rule-299b8a02-1b4a-4e1d-b284-d8d40144203e) — `presence` · `test`
+  - [A module loaded in the Roblox player matches a known cheat tool and imports injection functions](#rule-605f730e-2931-4b08-9b1a-18462982fb00) — `presence` · `test`
+  - [A process named like the Roblox player is neither signed by Roblox nor in a Roblox version folder](#rule-3f2e4519-7570-456c-b8c3-e8f2c1f950c6) — `presence` · `test`
+  - [The Roblox player holds an executable image the Windows loader did not load](#rule-62f97fca-6c7f-4827-8c18-bf6145e33f44) — `presence` · `test`
+  - [The Roblox player has an image mapping its module list does not show](#rule-f781498a-f336-47ab-9ab9-320aa30fb581) — `context` · `test`
+  - [The Roblox player's memory holds names of script-executor functions](#rule-ea2b718b-d6f9-4251-866e-6df8d2e896e7) — `context` · `test`
+  - [The Roblox player's memory holds names of process-injection functions](#rule-17477da4-decd-4b47-9444-b5ece71e203c) — `context` · `test`
+- `roblox_monitor`
+  - [During monitoring the Roblox player gained a module, executable memory or an unlisted image](#rule-ad2ce9ff-df8f-4ce5-b1b0-71ca8a86502c) — `context` · `test`
+  - [During monitoring a FastFlag changed and later returned to its earlier value](#rule-f77a8580-bed0-44a7-bfdf-be13e2a1116a) — `context` · `test`
 - `roblox_process`
   - [The Roblox player holds private executable memory](#rule-da5a1b8d-6278-432a-9172-81b365f22e1b) — `context` · `experimental`
   - [The running Roblox player has a module loaded from a user folder](#rule-d01b990f-c1bd-45db-810a-41a2e057aab8) — `presence` · `experimental`
@@ -1142,6 +1167,86 @@ rule นี้ไม่ได้ระบุไว้
 **เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน** *(แสดงข้อความภาษาอังกฤษ)*
 
 - Settings kept but never used to start Roblox
+
+## collector `file_inventory`
+
+### `file_inventory` / `file`
+
+<a id="rule-d55afe49-df1d-4c4b-9c0e-9c3ea54d30b0"></a>
+
+#### A DLL or executable on a drive is suspicious or its integrity is compromised *(แสดงข้อความภาษาอังกฤษ)*
+
+- id: `d55afe49-df1d-4c4b-9c0e-9c3ea54d30b0`
+- ไฟล์: [`rules/file_inventory/file/file-integrity-not-trusted/rule.yaml`](../rules/file_inventory/file/file-integrity-not-trusted/rule.yaml)
+- collector: `file_inventory`
+- strength: `presence` — มีไฟล์อยู่
+- status: `test` — เชื่อว่าถูกต้อง มี fixture ทั้งแบบเจอและแบบไม่เจอ
+- tag: `files`, `integrity`
+- เขียนเมื่อ: 2026-10-16
+
+**เกี่ยวกับการตรวจนี้** *(แสดงข้อความภาษาอังกฤษ)*
+
+The full scan walked the accessible drives and classified a DLL, executable or driver as suspicious or integrity compromised: for example an executable disguised with another extension, a system DLL name outside Windows, a signature or catalog entry that does not verify, or imports of the functions used to write into other processes. The reasons and limitations are on the row. No file is executed.
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `integrity_class`: เป็นค่าใดค่าหนึ่งใน `suspicious`, `integrity_compromised` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+- `scope`: เป็น `file` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้** *(แสดงข้อความภาษาอังกฤษ)*
+
+Files present at the moment of the scan.
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน** *(แสดงข้อความภาษาอังกฤษ)*
+
+- Debuggers, memory editors and modding tools, which import the same functions
+- Old or repacked installers whose signatures no longer verify
+- Developer build outputs in a projects folder
+
+**แหล่งอ้างอิง**
+
+- <https://learn.microsoft.com/en-us/windows/win32/seccrypto/authenticode>
+
+<a id="rule-33bea129-93b3-4c72-98db-2c51803a8c95"></a>
+
+#### A file on a drive matches a known cheat tool and imports injection functions *(แสดงข้อความภาษาอังกฤษ)*
+
+- id: `33bea129-93b3-4c72-98db-2c51803a8c95`
+- ไฟล์: [`rules/file_inventory/file/file-malicious-corroborated/rule.yaml`](../rules/file_inventory/file/file-malicious-corroborated/rule.yaml)
+- collector: `file_inventory`
+- strength: `presence` — มีไฟล์อยู่
+- status: `test` — เชื่อว่าถูกต้อง มี fixture ทั้งแบบเจอและแบบไม่เจอ
+- tag: `files`, `integrity`, `injection`
+- เขียนเมื่อ: 2026-10-16
+
+**เกี่ยวกับการตรวจนี้** *(แสดงข้อความภาษาอังกฤษ)*
+
+A DLL or executable found on a drive carries the name of a tool this program's catalog lists as able to cheat and also imports the functions used to open and write into other processes. Two independent facts point the same way. The catalog entry, the hash and the reasons are on the row. No file is executed.
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `integrity_class`: เป็น `malicious_corroborated` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+- `scope`: เป็น `file` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้** *(แสดงข้อความภาษาอังกฤษ)*
+
+Files present at the moment of the scan.
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน** *(แสดงข้อความภาษาอังกฤษ)*
+
+- A legitimate debugger or memory editor that shares a catalogued name
+
+**แหล่งอ้างอิง**
+
+- <https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-writeprocessmemory>
 
 ## collector `fivem_dir`
 
@@ -3690,6 +3795,90 @@ Processes running at the moment of the scan.
 
 - Development work, bots, local servers and tools built on these runtimes
 
+## collector `process_modules`
+
+### `process_modules` / `memory`
+
+<a id="rule-d125476c-6df4-4a34-a61a-2b9741cf1cc1"></a>
+
+#### A running process holds an executable image the Windows loader did not load *(แสดงข้อความภาษาอังกฤษ)*
+
+- id: `d125476c-6df4-4a34-a61a-2b9741cf1cc1`
+- ไฟล์: [`rules/process_modules/memory/image-in-private-memory/rule.yaml`](../rules/process_modules/memory/image-in-private-memory/rule.yaml)
+- collector: `process_modules`
+- strength: `context` — ข้อมูลประกอบ
+- status: `test` — เชื่อว่าถูกต้อง มี fixture ทั้งแบบเจอและแบบไม่เจอ
+- tag: `process`, `memory`, `injection`
+- เขียนเมื่อ: 2026-10-16
+
+**เกี่ยวกับการตรวจนี้** *(แสดงข้อความภาษาอังกฤษ)*
+
+Private executable memory in a running process begins with a PE image header: code copied into memory by hand rather than loaded by Windows. Manual-mapping injectors do this; so do some packers, runtimes and security products. The process and the address are on the row.
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `holds_image`: เป็น `true`
+- `scope`: เป็น `allocation` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้** *(แสดงข้อความภาษาอังกฤษ)*
+
+The address space at the moment of the scan.
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+- `access_denied` — Windows ไม่อนุญาตให้เปิดอ่าน
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน** *(แสดงข้อความภาษาอังกฤษ)*
+
+- Packed or protected legitimate programs that unpack themselves into private memory
+- Security products and anti-cheats that copy modules for inspection
+
+**แหล่งอ้างอิง**
+
+- <https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-virtualqueryex>
+
+### `process_modules` / `module`
+
+<a id="rule-e3f4cb04-3fce-4104-b0ab-8a4bdf6797a1"></a>
+
+#### A module loaded in a running process is suspicious or its integrity is compromised *(แสดงข้อความภาษาอังกฤษ)*
+
+- id: `e3f4cb04-3fce-4104-b0ab-8a4bdf6797a1`
+- ไฟล์: [`rules/process_modules/module/loaded-module-integrity-not-trusted/rule.yaml`](../rules/process_modules/module/loaded-module-integrity-not-trusted/rule.yaml)
+- collector: `process_modules`
+- strength: `presence` — มีไฟล์อยู่
+- status: `test` — เชื่อว่าถูกต้อง มี fixture ทั้งแบบเจอและแบบไม่เจอ
+- tag: `process`, `module`, `integrity`
+- เขียนเมื่อ: 2026-10-16
+
+**เกี่ยวกับการตรวจนี้** *(แสดงข้อความภาษาอังกฤษ)*
+
+A DLL loaded in a running process was classified suspicious, integrity compromised or malicious with corroborated evidence. The reasons and the processes that loaded it are on the row. Most loaded modules are signed system or vendor files and are not listed.
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `integrity_class`: เป็นค่าใดค่าหนึ่งใน `suspicious`, `integrity_compromised`, `malicious_corroborated` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+- `scope`: เป็น `module` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้** *(แสดงข้อความภาษาอังกฤษ)*
+
+The modules loaded at the moment of the scan.
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+- `access_denied` — Windows ไม่อนุญาตให้เปิดอ่าน
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน** *(แสดงข้อความภาษาอังกฤษ)*
+
+- A debugger, profiler, macro tool or modding tool that imports process-writing functions
+- A legitimate file whose signature became invalid after an interrupted update
+
+**แหล่งอ้างอิง**
+
+- <https://learn.microsoft.com/en-us/windows/win32/api/psapi/nf-psapi-enumprocessmodulesex>
+
 ## collector `roblox`
 
 ### `roblox` / `bootstrapper`
@@ -4019,6 +4208,668 @@ rule นี้ไม่ได้ระบุไว้
 **เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน** *(แสดงข้อความภาษาอังกฤษ)*
 
 - A download deleted without being used; an unrelated file with the same name
+
+## collector `roblox_flags`
+
+### `roblox_flags` / `change`
+
+<a id="rule-be178c93-0089-47af-8571-a384b17ee4bc"></a>
+
+#### Another copy of the Roblox settings held a non-reference value the active file no longer has *(แสดงข้อความภาษาอังกฤษ)*
+
+- id: `be178c93-0089-47af-8571-a384b17ee4bc`
+- ไฟล์: [`rules/roblox_flags/change/other-copy-held-different-value/rule.yaml`](../rules/roblox_flags/change/other-copy-held-different-value/rule.yaml)
+- collector: `roblox_flags`
+- strength: `context` — ข้อมูลประกอบ
+- status: `test` — เชื่อว่าถูกต้อง มี fixture ทั้งแบบเจอและแบบไม่เจอ
+- tag: `roblox`, `fastflags`, `history`
+- เขียนเมื่อ: 2026-10-16
+
+**เกี่ยวกับการตรวจนี้** *(แสดงข้อความภาษาอังกฤษ)*
+
+A backup, an older version folder or a bootstrapper's copy sets a flag to a value that differs from the reference, while the active version's file now holds the reference value or does not set the flag. That is what setting a flag and putting it back leaves on disk. Both files and both modification times are on the row; no other time is inferred, and it does not say when the value was in effect.
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `finding`: เป็นค่าใดค่าหนึ่งใน `other_copy_differs_active_matches_reference`, `other_copy_differs_active_unset` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+- `scope`: เป็น `change` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้** *(แสดงข้อความภาษาอังกฤษ)*
+
+The files as they are at the moment of the scan; Roblox removes old version folders after updates.
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน** *(แสดงข้อความภาษาอังกฤษ)*
+
+- An old version folder Roblox has not removed yet, from before the player reset their settings
+- A bootstrapper profile the player no longer uses
+
+**แหล่งอ้างอิง**
+
+- <https://github.com/MaximumADHD/Roblox-FFlag-Tracker>
+
+### `roblox_flags` / `dump`
+
+<a id="rule-714ce486-7753-4ed6-87e1-e4295d029911"></a>
+
+#### A Roblox crash dump holds a network or physics FastFlag value other than the reference *(แสดงข้อความภาษาอังกฤษ)*
+
+- id: `714ce486-7753-4ed6-87e1-e4295d029911`
+- ไฟล์: [`rules/roblox_flags/dump/network-flag-in-crash-dump-differs/rule.yaml`](../rules/roblox_flags/dump/network-flag-in-crash-dump-differs/rule.yaml)
+- collector: `roblox_flags`
+- strength: `context` — ข้อมูลประกอบ
+- status: `test` — เชื่อว่าถูกต้อง มี fixture ทั้งแบบเจอและแบบไม่เจอ
+- tag: `roblox`, `fastflags`, `history`
+- เขียนเมื่อ: 2026-10-16
+
+**เกี่ยวกับการตรวจนี้** *(แสดงข้อความภาษาอังกฤษ)*
+
+A crash dump the Roblox player left holds a FastFlag assignment written as JSON text that sets a network or physics flag to a value different from the reference. A dump is the player's memory when it was written, so the value was in that process at that time; it may still be a copy the client read and did not apply. The dump's time is on the row.
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `comparison`: เป็น `differs` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+- `flag_kind`: เป็น `network` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+- `scope`: เป็น `dump_value` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้** *(แสดงข้อความภาษาอังกฤษ)*
+
+Crash dumps stay until Windows Error Reporting or the person removes them.
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน** *(แสดงข้อความภาษาอังกฤษ)*
+
+- A reference copy from another client version than the one that crashed
+
+**แหล่งอ้างอิง**
+
+- <https://learn.microsoft.com/en-us/windows/win32/wer/collecting-user-mode-dumps>
+
+### `roblox_flags` / `value`
+
+<a id="rule-684df0e4-28ef-4e00-ae34-f7667369dce8"></a>
+
+#### A settings file the Roblox player reads sets a network or physics FastFlag to a value other than the reference *(แสดงข้อความภาษาอังกฤษ)*
+
+- id: `684df0e4-28ef-4e00-ae34-f7667369dce8`
+- ไฟล์: [`rules/roblox_flags/value/network-flag-set-differs-from-reference/rule.yaml`](../rules/roblox_flags/value/network-flag-set-differs-from-reference/rule.yaml)
+- collector: `roblox_flags`
+- strength: `context` — ข้อมูลประกอบ
+- status: `test` — เชื่อว่าถูกต้อง มี fixture ทั้งแบบเจอและแบบไม่เจอ
+- tag: `roblox`, `fastflags`
+- เขียนเมื่อ: 2026-10-16
+
+**เกี่ยวกับการตรวจนี้** *(แสดงข้อความภาษาอังกฤษ)*
+
+A ClientAppSettings.json in a Roblox version folder, or a bootstrapper's copy of it, sets a network or physics flag (PhysicsSenderRate, replication or humanoid flags) to a value that differs from the FFlag tracker reference. These are the flags used to desynchronise a character from the server. Recent clients ignore flags outside an allow-list, so a value in a file is not proof it took effect; the reference row says how far the reference matches this client version.
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `comparison`: เป็น `differs` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+- `flag_kind`: เป็น `network` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+- `scope`: เป็น `value` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้** *(แสดงข้อความภาษาอังกฤษ)*
+
+The files as they are at the moment of the scan.
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน** *(แสดงข้อความภาษาอังกฤษ)*
+
+- A reference copy from another client version than the one installed
+- A flag the player copied from a performance guide without knowing its effect
+
+**แหล่งอ้างอิง**
+
+- <https://github.com/MaximumADHD/Roblox-FFlag-Tracker>
+
+## collector `roblox_memory`
+
+### `roblox_memory` / `code`
+
+<a id="rule-917fecbb-4032-4fae-9091-4ccd4417b0bd"></a>
+
+#### Code of a module in the Roblox player differs from its file *(แสดงข้อความภาษาอังกฤษ)*
+
+- id: `917fecbb-4032-4fae-9091-4ccd4417b0bd`
+- ไฟล์: [`rules/roblox_memory/code/module-code-differs-from-file/rule.yaml`](../rules/roblox_memory/code/module-code-differs-from-file/rule.yaml)
+- collector: `roblox_memory`
+- strength: `context` — ข้อมูลประกอบ
+- status: `test` — เชื่อว่าถูกต้อง มี fixture ทั้งแบบเจอและแบบไม่เจอ
+- tag: `roblox`, `memory`, `integrity`
+- เขียนเมื่อ: 2026-10-16
+
+**เกี่ยวกับการตรวจนี้** *(แสดงข้อความภาษาอังกฤษ)*
+
+The executable sections of a module loaded in the running Roblox player were compared with its file, laid out and relocated as Windows loads it, with the tables the loader fills skipped, and some bytes differ. Patched code looks like this; so do hooks placed by overlays, capture tools and security software. Roblox's own image is excluded because its anti-cheat changes it at run time. The row gives how many bytes differ and where.
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `bytes_differing|gte`: ตั้งแต่ `1` ขึ้นไป
+- `expected_runtime_change`: เป็น `false`
+- `scope`: เป็น `code_change` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้** *(แสดงข้อความภาษาอังกฤษ)*
+
+The code in memory at the moment of the scan.
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+- `access_denied` — Windows ไม่อนุญาตให้เปิดอ่าน
+- `source_absent` — เครื่องนี้ไม่มีข้อมูลส่วนนี้ให้อ่าน
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน** *(แสดงข้อความภาษาอังกฤษ)*
+
+- Overlays, recorders and input tools that patch graphics or input functions
+- Antivirus and anti-cheat software that hooks system DLLs in every process
+- A module updated on disk while the old copy is still loaded
+
+**แหล่งอ้างอิง**
+
+- <https://learn.microsoft.com/en-us/windows/win32/debug/pe-format>
+
+### `roblox_memory` / `flag`
+
+<a id="rule-5e3c39ce-bb82-4237-9a0f-460f1b3b6f96"></a>
+
+#### A network or physics FastFlag value in the Roblox player's memory differs from the reference *(แสดงข้อความภาษาอังกฤษ)*
+
+- id: `5e3c39ce-bb82-4237-9a0f-460f1b3b6f96`
+- ไฟล์: [`rules/roblox_memory/flag/network-flag-value-in-memory-differs/rule.yaml`](../rules/roblox_memory/flag/network-flag-value-in-memory-differs/rule.yaml)
+- collector: `roblox_memory`
+- strength: `context` — ข้อมูลประกอบ
+- status: `test` — เชื่อว่าถูกต้อง มี fixture ทั้งแบบเจอและแบบไม่เจอ
+- tag: `roblox`, `fastflags`, `memory`
+- เขียนเมื่อ: 2026-10-16
+
+**เกี่ยวกับการตรวจนี้** *(แสดงข้อความภาษาอังกฤษ)*
+
+A FastFlag assignment written as JSON text in the running Roblox player's memory sets a network or physics flag (for example PhysicsSenderRate) to a value different from the one the FFlag tracker reference records for the live channel. That text may be a settings file the client read, a copy it did not apply, or the server's own delivery; the reference changes over time and may not match this client version. Read it with the reference row of roblox\_flags.
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `comparison`: เป็น `differs` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+- `flag_kind`: เป็น `network` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+- `scope`: เป็น `flag_value` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้** *(แสดงข้อความภาษาอังกฤษ)*
+
+The memory at the moment of the scan.
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+- `access_denied` — Windows ไม่อนุญาตให้เปิดอ่าน
+- `source_absent` — เครื่องนี้ไม่มีข้อมูลส่วนนี้ให้อ่าน
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน** *(แสดงข้อความภาษาอังกฤษ)*
+
+- A reference copy from a different client version or channel than this client
+- A flag the server sets per place or per user, which the live-channel reference does not show
+
+**แหล่งอ้างอิง**
+
+- <https://github.com/MaximumADHD/Roblox-FFlag-Tracker>
+
+### `roblox_memory` / `hook`
+
+<a id="rule-cd24dd82-84f7-4793-87ad-3b34234387ba"></a>
+
+#### A function in a module of the Roblox player jumps into memory no file backs *(แสดงข้อความภาษาอังกฤษ)*
+
+- id: `cd24dd82-84f7-4793-87ad-3b34234387ba`
+- ไฟล์: [`rules/roblox_memory/hook/hook-into-unbacked-memory/rule.yaml`](../rules/roblox_memory/hook/hook-into-unbacked-memory/rule.yaml)
+- collector: `roblox_memory`
+- strength: `presence` — มีไฟล์อยู่
+- status: `test` — เชื่อว่าถูกต้อง มี fixture ทั้งแบบเจอและแบบไม่เจอ
+- tag: `roblox`, `memory`, `hook`
+- เขียนเมื่อ: 2026-10-16
+
+**เกี่ยวกับการตรวจนี้** *(แสดงข้อความภาษาอังกฤษ)*
+
+The first bytes of a function exported by a module loaded in the running Roblox player differ from the module's file and now jump to private or mapped memory that no loaded module accounts for. Inline hooks placed by injected code look like this. Overlays, recorders and security software also hook functions, but they usually jump into their own signed module. Roblox's own image is excluded here because its anti-cheat changes it at run time. It shows the jump and where it goes; it does not say what the code there does.
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `expected_runtime_change`: เป็น `false`
+- `scope`: เป็น `hook` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+- `target_module|startswith`: ขึ้นต้นด้วย `unbacked_` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้** *(แสดงข้อความภาษาอังกฤษ)*
+
+The code in memory at the moment of the scan.
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+- `access_denied` — Windows ไม่อนุญาตให้เปิดอ่าน
+- `source_absent` — เครื่องนี้ไม่มีข้อมูลส่วนนี้ให้อ่าน
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน** *(แสดงข้อความภาษาอังกฤษ)*
+
+- An overlay or capture tool that allocates its trampolines in private memory instead of inside its own module
+- Security software or an anti-cheat that hooks system DLLs from memory it allocated
+
+**แหล่งอ้างอิง**
+
+- <https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-readprocessmemory>
+
+<a id="rule-b056ea61-e39f-4a49-9ee1-85d0aa26ffd9"></a>
+
+#### A function in a module of the Roblox player jumps into a module that is not recognised *(แสดงข้อความภาษาอังกฤษ)*
+
+- id: `b056ea61-e39f-4a49-9ee1-85d0aa26ffd9`
+- ไฟล์: [`rules/roblox_memory/hook/hook-into-unrecognised-module/rule.yaml`](../rules/roblox_memory/hook/hook-into-unrecognised-module/rule.yaml)
+- collector: `roblox_memory`
+- strength: `presence` — มีไฟล์อยู่
+- status: `test` — เชื่อว่าถูกต้อง มี fixture ทั้งแบบเจอและแบบไม่เจอ
+- tag: `roblox`, `memory`, `hook`
+- เขียนเมื่อ: 2026-10-16
+
+**เกี่ยวกับการตรวจนี้** *(แสดงข้อความภาษาอังกฤษ)*
+
+The first bytes of a function exported by a module loaded in the running Roblox player differ from its file and jump into another loaded module whose integrity class is unknown, suspicious, integrity compromised or malicious with corroborated evidence. Signed overlays and security tools are not counted here. It shows the jump and the class of the module it reaches; the class has its own reasons on the module row.
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `expected_runtime_change`: เป็น `false`
+- `scope`: เป็น `hook` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+- `target_class`: เป็นค่าใดค่าหนึ่งใน `unknown`, `suspicious`, `integrity_compromised`, `malicious_corroborated` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้** *(แสดงข้อความภาษาอังกฤษ)*
+
+The code in memory at the moment of the scan.
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+- `access_denied` — Windows ไม่อนุญาตให้เปิดอ่าน
+- `source_absent` — เครื่องนี้ไม่มีข้อมูลส่วนนี้ให้อ่าน
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน** *(แสดงข้อความภาษาอังกฤษ)*
+
+- A small unsigned overlay, FPS counter or input remapper that hooks graphics or input functions
+- A signed tool whose signature this PC could not verify offline, which is then not counted as signed
+
+**แหล่งอ้างอิง**
+
+- <https://learn.microsoft.com/en-us/windows/win32/seccrypto/authenticode>
+
+### `roblox_memory` / `module`
+
+<a id="rule-299b8a02-1b4a-4e1d-b284-d8d40144203e"></a>
+
+#### A module loaded in the Roblox player is suspicious or its integrity is compromised *(แสดงข้อความภาษาอังกฤษ)*
+
+- id: `299b8a02-1b4a-4e1d-b284-d8d40144203e`
+- ไฟล์: [`rules/roblox_memory/module/module-integrity-not-trusted/rule.yaml`](../rules/roblox_memory/module/module-integrity-not-trusted/rule.yaml)
+- collector: `roblox_memory`
+- strength: `presence` — มีไฟล์อยู่
+- status: `test` — เชื่อว่าถูกต้อง มี fixture ทั้งแบบเจอและแบบไม่เจอ
+- tag: `roblox`, `module`, `integrity`
+- เขียนเมื่อ: 2026-10-16
+
+**เกี่ยวกับการตรวจนี้** *(แสดงข้อความภาษาอังกฤษ)*
+
+A module loaded in the running Roblox player was classified suspicious or integrity compromised: for example a signature that does not verify, a system DLL name outside Windows, an extension that hides an executable, or imports of the functions used to write into other processes. The reasons are on the row. It does not say the module was used to cheat.
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `integrity_class`: เป็นค่าใดค่าหนึ่งใน `suspicious`, `integrity_compromised` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+- `scope`: เป็น `module` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้** *(แสดงข้อความภาษาอังกฤษ)*
+
+The modules loaded at the moment of the scan.
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+- `access_denied` — Windows ไม่อนุญาตให้เปิดอ่าน
+- `source_absent` — เครื่องนี้ไม่มีข้อมูลส่วนนี้ให้อ่าน
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน** *(แสดงข้อความภาษาอังกฤษ)*
+
+- A debugger, profiler or modding tool that imports process-writing functions for a legitimate reason
+- A legitimate file whose signature became invalid after an interrupted update
+
+**แหล่งอ้างอิง**
+
+- <https://learn.microsoft.com/en-us/windows/win32/seccrypto/authenticode>
+
+<a id="rule-605f730e-2931-4b08-9b1a-18462982fb00"></a>
+
+#### A module loaded in the Roblox player matches a known cheat tool and imports injection functions *(แสดงข้อความภาษาอังกฤษ)*
+
+- id: `605f730e-2931-4b08-9b1a-18462982fb00`
+- ไฟล์: [`rules/roblox_memory/module/module-malicious-corroborated/rule.yaml`](../rules/roblox_memory/module/module-malicious-corroborated/rule.yaml)
+- collector: `roblox_memory`
+- strength: `presence` — มีไฟล์อยู่
+- status: `test` — เชื่อว่าถูกต้อง มี fixture ทั้งแบบเจอและแบบไม่เจอ
+- tag: `roblox`, `module`, `injection`
+- เขียนเมื่อ: 2026-10-16
+
+**เกี่ยวกับการตรวจนี้** *(แสดงข้อความภาษาอังกฤษ)*
+
+A module loaded in the running Roblox player carries the name of a tool this program's catalog lists as able to cheat, and also imports the functions used to open and write into other processes; its signature does not change that. Two independent facts point the same way, which is why it is stronger than either. The catalog entry and the reasons are on the row.
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `integrity_class`: เป็น `malicious_corroborated` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+- `scope`: เป็น `module` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้** *(แสดงข้อความภาษาอังกฤษ)*
+
+The modules loaded at the moment of the scan.
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+- `access_denied` — Windows ไม่อนุญาตให้เปิดอ่าน
+- `source_absent` — เครื่องนี้ไม่มีข้อมูลส่วนนี้ให้อ่าน
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน** *(แสดงข้อความภาษาอังกฤษ)*
+
+- A legitimate program that happens to share a catalogued name and is a debugger or memory editor itself
+
+**แหล่งอ้างอิง**
+
+- <https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-writeprocessmemory>
+
+### `roblox_memory` / `player`
+
+<a id="rule-3f2e4519-7570-456c-b8c3-e8f2c1f950c6"></a>
+
+#### A process named like the Roblox player is neither signed by Roblox nor in a Roblox version folder *(แสดงข้อความภาษาอังกฤษ)*
+
+- id: `3f2e4519-7570-456c-b8c3-e8f2c1f950c6`
+- ไฟล์: [`rules/roblox_memory/player/player-identity-not-established/rule.yaml`](../rules/roblox_memory/player/player-identity-not-established/rule.yaml)
+- collector: `roblox_memory`
+- strength: `presence` — มีไฟล์อยู่
+- status: `test` — เชื่อว่าถูกต้อง มี fixture ทั้งแบบเจอและแบบไม่เจอ
+- tag: `roblox`, `process`, `signature`
+- เขียนเมื่อ: 2026-10-16
+
+**เกี่ยวกับการตรวจนี้** *(แสดงข้อความภาษาอังกฤษ)*
+
+A running process carries the Roblox player's name, but its file is not under a Roblox Versions folder and does not carry a verifying signature from Roblox Corporation. The name alone is not trusted; a renamed program could take it. The identity checks that held are on the row.
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `identity_confidence`: เป็น `low` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+- `scope`: เป็น `player` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้** *(แสดงข้อความภาษาอังกฤษ)*
+
+Processes running at the moment of the scan.
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน** *(แสดงข้อความภาษาอังกฤษ)*
+
+- A PC whose certificate store lacks the root certificate, so the Roblox signature cannot be verified offline, with the player installed outside the usual folder
+
+**แหล่งอ้างอิง**
+
+- <https://learn.microsoft.com/en-us/windows/win32/seccrypto/authenticode>
+
+### `roblox_memory` / `region`
+
+<a id="rule-62f97fca-6c7f-4827-8c18-bf6145e33f44"></a>
+
+#### The Roblox player holds an executable image the Windows loader did not load *(แสดงข้อความภาษาอังกฤษ)*
+
+- id: `62f97fca-6c7f-4827-8c18-bf6145e33f44`
+- ไฟล์: [`rules/roblox_memory/region/hand-mapped-image/rule.yaml`](../rules/roblox_memory/region/hand-mapped-image/rule.yaml)
+- collector: `roblox_memory`
+- strength: `presence` — มีไฟล์อยู่
+- status: `test` — เชื่อว่าถูกต้อง มี fixture ทั้งแบบเจอและแบบไม่เจอ
+- tag: `roblox`, `memory`, `injection`
+- เขียนเมื่อ: 2026-10-16
+
+**เกี่ยวกับการตรวจนี้** *(แสดงข้อความภาษาอังกฤษ)*
+
+Private executable memory in the running Roblox player begins with a PE image header: a DLL or program copied into memory by hand rather than loaded by Windows, which is how manual-mapping injectors place code. Roblox's anti-cheat decrypts code at run time but does not normally leave a PE header in private memory. It shows the address and protection; no content beyond the header is read.
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `finding`: เป็น `hand_mapped_image` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+- `scope`: เป็น `region` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้** *(แสดงข้อความภาษาอังกฤษ)*
+
+The address space at the moment of the scan.
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+- `access_denied` — Windows ไม่อนุญาตให้เปิดอ่าน
+- `source_absent` — เครื่องนี้ไม่มีข้อมูลส่วนนี้ให้อ่าน
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน** *(แสดงข้อความภาษาอังกฤษ)*
+
+- A packer, .NET or script runtime inside a legitimate overlay that maps an image itself
+- A security product that copies a module into the process for its own inspection
+
+**แหล่งอ้างอิง**
+
+- <https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-virtualqueryex>
+
+<a id="rule-f781498a-f336-47ab-9ab9-320aa30fb581"></a>
+
+#### The Roblox player has an image mapping its module list does not show *(แสดงข้อความภาษาอังกฤษ)*
+
+- id: `f781498a-f336-47ab-9ab9-320aa30fb581`
+- ไฟล์: [`rules/roblox_memory/region/unlisted-image-mapping/rule.yaml`](../rules/roblox_memory/region/unlisted-image-mapping/rule.yaml)
+- collector: `roblox_memory`
+- strength: `context` — ข้อมูลประกอบ
+- status: `test` — เชื่อว่าถูกต้อง มี fixture ทั้งแบบเจอและแบบไม่เจอ
+- tag: `roblox`, `memory`, `module`
+- เขียนเมื่อ: 2026-10-16
+
+**เกี่ยวกับการตรวจนี้** *(แสดงข้อความภาษาอังกฤษ)*
+
+An image section is mapped in the running Roblox player but the loader's module list does not include it: a DLL mapped without the loader, or one removed from the list after loading. Some legitimate components map images for reading resources, which this check cannot tell apart; the mapped file, when Windows names one, is on the row.
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `finding`: เป็น `unlisted_image` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+- `scope`: เป็น `region` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้** *(แสดงข้อความภาษาอังกฤษ)*
+
+The address space at the moment of the scan.
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+- `access_denied` — Windows ไม่อนุญาตให้เปิดอ่าน
+- `source_absent` — เครื่องนี้ไม่มีข้อมูลส่วนนี้ให้อ่าน
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน** *(แสดงข้อความภาษาอังกฤษ)*
+
+- A DLL mapped as an image only to read its resources or version
+- A module the loader is still loading or has just unloaded while the scan walked the memory
+
+**แหล่งอ้างอิง**
+
+- <https://learn.microsoft.com/en-us/windows/win32/api/psapi/nf-psapi-getmappedfilenamew>
+
+### `roblox_memory` / `string`
+
+<a id="rule-ea2b718b-d6f9-4251-866e-6df8d2e896e7"></a>
+
+#### The Roblox player's memory holds names of script-executor functions *(แสดงข้อความภาษาอังกฤษ)*
+
+- id: `ea2b718b-d6f9-4251-866e-6df8d2e896e7`
+- ไฟล์: [`rules/roblox_memory/string/executor-function-names-in-memory/rule.yaml`](../rules/roblox_memory/string/executor-function-names-in-memory/rule.yaml)
+- collector: `roblox_memory`
+- strength: `context` — ข้อมูลประกอบ
+- status: `test` — เชื่อว่าถูกต้อง มี fixture ทั้งแบบเจอและแบบไม่เจอ
+- tag: `roblox`, `memory`, `strings`
+- เขียนเมื่อ: 2026-10-16
+
+**เกี่ยวกับการตรวจนี้** *(แสดงข้อความภาษาอังกฤษ)*
+
+Readable memory of the running Roblox player holds text such as getgenv, hookfunction or loadstring helpers that script executors add to Roblox's Lua environment. A string is not proof that anything ran: chat, a web page or a script someone pasted can put the same words in memory. Only these categories of text are kept, with their address and encoding.
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `category`: เป็น `executor_function` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+- `scope`: เป็น `string` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้** *(แสดงข้อความภาษาอังกฤษ)*
+
+The memory at the moment of the scan.
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+- `access_denied` — Windows ไม่อนุญาตให้เปิดอ่าน
+- `source_absent` — เครื่องนี้ไม่มีข้อมูลส่วนนี้ให้อ่าน
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน** *(แสดงข้อความภาษาอังกฤษ)*
+
+- Chat messages, a developer console or an in-game script viewer showing these words
+- A Roblox Studio plugin or game that defines functions with the same names
+
+**แหล่งอ้างอิง**
+
+- <https://create.roblox.com/docs/reference/engine/globals/LuaGlobals>
+
+<a id="rule-17477da4-decd-4b47-9444-b5ece71e203c"></a>
+
+#### The Roblox player's memory holds names of process-injection functions *(แสดงข้อความภาษาอังกฤษ)*
+
+- id: `17477da4-decd-4b47-9444-b5ece71e203c`
+- ไฟล์: [`rules/roblox_memory/string/injection-api-names-in-memory/rule.yaml`](../rules/roblox_memory/string/injection-api-names-in-memory/rule.yaml)
+- collector: `roblox_memory`
+- strength: `context` — ข้อมูลประกอบ
+- status: `test` — เชื่อว่าถูกต้อง มี fixture ทั้งแบบเจอและแบบไม่เจอ
+- tag: `roblox`, `memory`, `strings`
+- เขียนเมื่อ: 2026-10-16
+
+**เกี่ยวกับการตรวจนี้** *(แสดงข้อความภาษาอังกฤษ)*
+
+Readable non-image memory of the running Roblox player holds the names of Windows functions used to inject code, such as WriteProcessMemory or CreateRemoteThread. Inside a game client these names have little reason to appear outside system DLLs, which are not scanned. A string is still not proof anything used them.
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `category`: เป็น `injection_api` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+- `scope`: เป็น `string` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้** *(แสดงข้อความภาษาอังกฤษ)*
+
+The memory at the moment of the scan.
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+- `access_denied` — Windows ไม่อนุญาตให้เปิดอ่าน
+- `source_absent` — เครื่องนี้ไม่มีข้อมูลส่วนนี้ให้อ่าน
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน** *(แสดงข้อความภาษาอังกฤษ)*
+
+- An overlay or anti-cheat component that resolves these functions by name at run time
+- Crash-reporting or diagnostics code that lists API names
+
+**แหล่งอ้างอิง**
+
+- <https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-writeprocessmemory>
+
+## collector `roblox_monitor`
+
+### `roblox_monitor` / `event`
+
+<a id="rule-ad2ce9ff-df8f-4ce5-b1b0-71ca8a86502c"></a>
+
+#### During monitoring the Roblox player gained a module, executable memory or an unlisted image *(แสดงข้อความภาษาอังกฤษ)*
+
+- id: `ad2ce9ff-df8f-4ce5-b1b0-71ca8a86502c`
+- ไฟล์: [`rules/roblox_monitor/event/code-appeared-during-monitoring/rule.yaml`](../rules/roblox_monitor/event/code-appeared-during-monitoring/rule.yaml)
+- collector: `roblox_monitor`
+- strength: `context` — ข้อมูลประกอบ
+- status: `test` — เชื่อว่าถูกต้อง มี fixture ทั้งแบบเจอและแบบไม่เจอ
+- tag: `roblox`, `memory`, `monitoring`
+- เขียนเมื่อ: 2026-10-16
+
+**เกี่ยวกับการตรวจนี้** *(แสดงข้อความภาษาอังกฤษ)*
+
+The monitoring session saw a module load, a block of private executable memory appear, or an image mapping the loader does not list appear in the Roblox player between two samples. Overlays and the anti-cheat also load code during play, so each event is a time to compare with other sources, not a finding on its own.
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `event`: เป็นค่าใดค่าหนึ่งใน `module_loaded`, `executable_region_appeared`, `unlisted_image_appeared` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+- `scope`: เป็น `event` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้** *(แสดงข้อความภาษาอังกฤษ)*
+
+Only the monitoring session included in this report.
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+- `source_absent` — เครื่องนี้ไม่มีข้อมูลส่วนนี้ให้อ่าน
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน** *(แสดงข้อความภาษาอังกฤษ)*
+
+- Roblox loading its own components, or its anti-cheat allocating code, during play
+- An overlay or recorder attaching after the game started
+
+**แหล่งอ้างอิง**
+
+- <https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-virtualqueryex>
+
+<a id="rule-f77a8580-bed0-44a7-bfdf-be13e2a1116a"></a>
+
+#### During monitoring a FastFlag changed and later returned to its earlier value *(แสดงข้อความภาษาอังกฤษ)*
+
+- id: `f77a8580-bed0-44a7-bfdf-be13e2a1116a`
+- ไฟล์: [`rules/roblox_monitor/event/flag-value-restored-during-monitoring/rule.yaml`](../rules/roblox_monitor/event/flag-value-restored-during-monitoring/rule.yaml)
+- collector: `roblox_monitor`
+- strength: `context` — ข้อมูลประกอบ
+- status: `test` — เชื่อว่าถูกต้อง มี fixture ทั้งแบบเจอและแบบไม่เจอ
+- tag: `roblox`, `fastflags`, `monitoring`
+- เขียนเมื่อ: 2026-10-16
+
+**เกี่ยวกับการตรวจนี้** *(แสดงข้อความภาษาอังกฤษ)*
+
+The monitoring session the person ran saw a FastFlag value in the Roblox player's memory or settings file change and later come back to a value it had held earlier in the session. The times of the samples on either side of each change are on the row. Only what the samples saw is reported; a change undone between two samples is not seen.
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `event`: เป็น `flag_value_restored` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+- `scope`: เป็น `event` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้** *(แสดงข้อความภาษาอังกฤษ)*
+
+Only the monitoring session included in this report.
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+- `source_absent` — เครื่องนี้ไม่มีข้อมูลส่วนนี้ให้อ่าน
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน** *(แสดงข้อความภาษาอังกฤษ)*
+
+- The server delivering a new value and then the old one again
+- A bootstrapper rewriting the settings file each time it launches the player
+
+**แหล่งอ้างอิง**
+
+- <https://github.com/MaximumADHD/Roblox-FFlag-Tracker>
 
 ## collector `roblox_process`
 

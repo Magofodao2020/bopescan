@@ -1,0 +1,24 @@
+{
+  "description": "Synthetic negative case for roblox_flags/change/other-copy-held-different-value.",
+  "observations": [
+    {
+      "collector": "roblox_flags",
+      "fields": {
+        "scope": "change",
+        "flag": "DFIntTaskSchedulerTargetFps",
+        "flag_kind": "fps",
+        "finding": "differs_between_copies",
+        "earlier_value": "144",
+        "earlier_path": "C:\\x\\old\\ClientAppSettings.json",
+        "earlier_modified": "2026-10-01T12:00:00Z",
+        "location": "version_folder",
+        "backup": false,
+        "current_path": "C:\\x\\new\\ClientAppSettings.json",
+        "current_value": "240",
+        "modified": "2026-10-14T19:00:00Z",
+        "earlier_comparison": "differs",
+        "comparison": "differs"
+      }
+    }
+  ]
+}

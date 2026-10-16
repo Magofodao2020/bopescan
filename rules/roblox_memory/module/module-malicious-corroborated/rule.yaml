@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: 605f730e-2931-4b08-9b1a-18462982fb00
+title: "A module loaded in the Roblox player matches a known cheat tool and imports injection functions"
+description: >-
+  A module loaded in the running Roblox player carries the name of a tool this program's catalog
+  lists as able to cheat, and also imports the functions used to open and write into other
+  processes; its signature does not change that. Two independent facts point the same way, which is
+  why it is stronger than either. The catalog entry and the reasons are on the row.
+status: test
+collector: roblox_memory
+strength: presence
+match:
+  scope: "module"
+  integrity_class: "malicious_corroborated"
+retention: >-
+  The modules loaded at the moment of the scan.
+unmeasured_when: [not_windows, access_denied, source_absent]
+falsepositives:
+  - "A legitimate program that happens to share a catalogued name and is a debugger or memory editor itself"
+references:
+  - https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-writeprocessmemory
+author: B.O.P.E Scanner contributors
+date: 2026-10-16
+tags: [roblox, module, injection]
+level: flag
+category: roblox

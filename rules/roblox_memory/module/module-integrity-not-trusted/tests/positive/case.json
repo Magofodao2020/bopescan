@@ -1,0 +1,16 @@
+{
+  "description": "Synthetic positive case for roblox_memory/module/module-integrity-not-trusted.",
+  "observations": [
+    {
+      "collector": "roblox_memory",
+      "fields": {
+        "scope": "module",
+        "pid": 1200,
+        "path": "C:\\Users\\a\\AppData\\Local\\Temp\\x.dll",
+        "integrity_class": "suspicious",
+        "integrity_reasons": "unsigned,injection_imports"
+      }
+    }
+  ],
+  "expect_matches": 1
+}

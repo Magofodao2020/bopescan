@@ -1,0 +1,22 @@
+{
+  "description": "Synthetic positive case for roblox_flags/dump/network-flag-in-crash-dump-differs.",
+  "observations": [
+    {
+      "collector": "roblox_flags",
+      "fields": {
+        "scope": "dump_value",
+        "path": "C:\\Users\\a\\AppData\\Local\\CrashDumps\\RobloxPlayerBeta.exe.1200.dmp",
+        "written_at": "2026-10-14T20:00:00Z",
+        "flag": "DFIntS2PhysicsSenderRate",
+        "flag_kind": "network",
+        "value": "1",
+        "encoding": "ascii",
+        "comparison": "differs",
+        "reference_value": "15",
+        "reference_key": "DFIntS2PhysicsSenderRate",
+        "reference_revision": "abc"
+      }
+    }
+  ],
+  "expect_matches": 1
+}

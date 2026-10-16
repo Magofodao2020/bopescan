@@ -1,0 +1,16 @@
+{
+  "description": "Synthetic positive case for file_inventory/file/file-integrity-not-trusted.",
+  "observations": [
+    {
+      "collector": "file_inventory",
+      "fields": {
+        "scope": "file",
+        "path": "C:\\Users\\a\\Downloads\\photo.jpg",
+        "integrity_class": "suspicious",
+        "integrity_reasons": "disguised_extension",
+        "size": 40960
+      }
+    }
+  ],
+  "expect_matches": 1
+}

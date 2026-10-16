@@ -1,0 +1,16 @@
+{
+  "description": "Synthetic negative case for roblox_monitor/event/code-appeared-during-monitoring.",
+  "observations": [
+    {
+      "collector": "roblox_monitor",
+      "fields": {
+        "scope": "event",
+        "at": "2026-10-16T10:00:30Z",
+        "since": "2026-10-16T10:00:00Z",
+        "event": "module_unloaded",
+        "pid": 1200,
+        "subject": "c:\\users\\a\\appdata\\local\\temp\\x.dll"
+      }
+    }
+  ]
+}

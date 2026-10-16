@@ -1,0 +1,31 @@
+# SPDX-FileCopyrightText: 2026 B.O.P.E Scanner contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of B.O.P.E Scanner, a modified version of aeterna-rongroi. Using it to evade detection is out of scope — see AGENTS.md.
+id: b056ea61-e39f-4a49-9ee1-85d0aa26ffd9
+title: "A function in a module of the Roblox player jumps into a module that is not recognised"
+description: >-
+  The first bytes of a function exported by a module loaded in the running Roblox player differ from
+  its file and jump into another loaded module whose integrity class is unknown, suspicious,
+  integrity compromised or malicious with corroborated evidence. Signed overlays and security tools
+  are not counted here. It shows the jump and the class of the module it reaches; the class has its
+  own reasons on the module row.
+status: test
+collector: roblox_memory
+strength: presence
+match:
+  scope: "hook"
+  expected_runtime_change: false
+  target_class: ["unknown", "suspicious", "integrity_compromised", "malicious_corroborated"]
+retention: >-
+  The code in memory at the moment of the scan.
+unmeasured_when: [not_windows, access_denied, source_absent]
+falsepositives:
+  - "A small unsigned overlay, FPS counter or input remapper that hooks graphics or input functions"
+  - "A signed tool whose signature this PC could not verify offline, which is then not counted as signed"
+references:
+  - https://learn.microsoft.com/en-us/windows/win32/seccrypto/authenticode
+author: B.O.P.E Scanner contributors
+date: 2026-10-16
+tags: [roblox, memory, hook]
+level: warn
+category: roblox

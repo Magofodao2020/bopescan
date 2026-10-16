@@ -96,7 +96,7 @@ const INTERNAL_PLACES: [&str; 7] = [
     "identifier",
 ];
 
-static FIELDS: [Field; 91] = [
+static FIELDS: [Field; 92] = [
     Field::text("access"),
     Field::text("address"),
     Field::text("base"),
@@ -123,6 +123,7 @@ static FIELDS: [Field; 91] = [
     Field::text("file_version"),
     Field::text("finding"),
     Field::text("flag"),
+    Field::text("flag_kind"),
     Field::number("flag_values"),
     Field::text("function"),
     Field::text("hook_kind"),
@@ -562,6 +563,7 @@ impl Player<'_> {
                             .with("address", hex_address(assignment.address))
                             .with("region_kind", region_kind)
                             .with("encoding", assignment.encoding.as_str())
+                            .with("flag_kind", crate::fastflags::flag_kind(&assignment.name))
                             .with("flag", assignment.name)
                             .with("value", assignment.value)
                             .with("value_source", "json_text_in_memory")

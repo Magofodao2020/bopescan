@@ -1,0 +1,20 @@
+{
+  "description": "Synthetic negative case for roblox_memory/string/injection-api-names-in-memory.",
+  "observations": [
+    {
+      "collector": "roblox_memory",
+      "fields": {
+        "scope": "string",
+        "pid": 1200,
+        "address": "0x20002000",
+        "region_kind": "private",
+        "permissions": "rw",
+        "encoding": "ascii",
+        "length": 12,
+        "text": "https://x.io",
+        "category": "url",
+        "method": "categorised_string_scan"
+      }
+    }
+  ]
+}

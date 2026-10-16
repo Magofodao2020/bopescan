@@ -1,0 +1,15 @@
+{
+  "description": "Synthetic negative case for file_inventory/file/file-integrity-not-trusted.",
+  "observations": [
+    {
+      "collector": "file_inventory",
+      "fields": {
+        "scope": "file",
+        "path": "D:\\Games\\mod.dll",
+        "integrity_class": "unknown",
+        "integrity_reasons": "unsigned",
+        "size": 40960
+      }
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "description": "Synthetic negative case for roblox_flags/value/network-flag-set-differs-from-reference.",
+  "observations": [
+    {
+      "collector": "roblox_flags",
+      "fields": {
+        "scope": "value",
+        "flag": "DFIntTaskSchedulerTargetFps",
+        "flag_kind": "fps",
+        "value": "240",
+        "path": "C:\\Users\\a\\AppData\\Local\\Roblox\\Versions\\version-1\\ClientSettings\\ClientAppSettings.json",
+        "location": "version_folder",
+        "owner": "roblox",
+        "applies_to_player": true,
+        "active_version": true,
+        "backup": false,
+        "comparison": "differs",
+        "reference_value": "60",
+        "reference_key": "DFIntTaskSchedulerTargetFps",
+        "reference_revision": "abc"
+      }
+    }
+  ]
+}

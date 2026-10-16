@@ -1,0 +1,19 @@
+{
+  "description": "Synthetic positive case for roblox_memory/region/unlisted-image-mapping.",
+  "observations": [
+    {
+      "collector": "roblox_memory",
+      "fields": {
+        "scope": "region",
+        "pid": 1200,
+        "finding": "unlisted_image",
+        "address": "0x7ff620000000",
+        "size": 4096,
+        "permissions": "rx",
+        "region_kind": "image",
+        "mapped_file": "\\Device\\HarddiskVolume3\\Users\\a\\AppData\\Local\\Temp\\x.dll"
+      }
+    }
+  ],
+  "expect_matches": 1
+}

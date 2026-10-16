@@ -1,0 +1,17 @@
+{
+  "description": "Synthetic positive case for process_modules/module/loaded-module-integrity-not-trusted.",
+  "observations": [
+    {
+      "collector": "process_modules",
+      "fields": {
+        "scope": "module",
+        "path": "C:\\Users\\a\\AppData\\Local\\Temp\\x.dll",
+        "integrity_class": "suspicious",
+        "integrity_reasons": "system_name_outside_windows",
+        "processes": 1,
+        "loaded_by": "game.exe"
+      }
+    }
+  ],
+  "expect_matches": 1
+}

@@ -1,0 +1,25 @@
+{
+  "description": "Synthetic positive case for roblox_flags/value/network-flag-set-differs-from-reference.",
+  "observations": [
+    {
+      "collector": "roblox_flags",
+      "fields": {
+        "scope": "value",
+        "flag": "DFIntS2PhysicsSenderRate",
+        "flag_kind": "network",
+        "value": "1",
+        "path": "C:\\Users\\a\\AppData\\Local\\Roblox\\Versions\\version-1\\ClientSettings\\ClientAppSettings.json",
+        "location": "version_folder",
+        "owner": "roblox",
+        "applies_to_player": true,
+        "active_version": true,
+        "backup": false,
+        "comparison": "differs",
+        "reference_value": "15",
+        "reference_key": "DFIntS2PhysicsSenderRate",
+        "reference_revision": "abc"
+      }
+    }
+  ],
+  "expect_matches": 1
+}
